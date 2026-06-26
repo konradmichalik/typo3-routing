@@ -32,6 +32,7 @@ return [
         'CODEOWNERS',
         'composer.lock',
         'composer-require-checker.json',
+        'composer-unused.php',
         'CONTRIBUTING.md',
         'editorconfig',
         'gitattributes',

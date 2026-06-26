@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures;
 
-use KonradMichalik\Typo3Routing\Attribute\{Cache, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Cache, RateLimit, Route};
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
@@ -30,6 +30,13 @@ final class FixtureController implements RouteControllerInterface
     public function count(ServerRequestInterface $request): JsonResponse
     {
         return new JsonResponse(['count' => 42]);
+    }
+
+    #[Route(path: '/api/limited', name: 'fixture_limited')]
+    #[RateLimit(limit: 5, interval: '10 seconds', policy: 'fixed_window')]
+    public function limited(ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse(['limited' => true]);
     }
 
     #[Route(path: '/api/results', methods: ['GET', 'POST'])]

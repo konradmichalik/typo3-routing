@@ -117,6 +117,25 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesRateLimitPerRouteName(): void
+    {
+        $registry = new RouteRegistry(
+            [],
+            new ServiceLocator([]),
+            [],
+            ['limited' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window']],
+        );
+
+        $rateLimit = $registry->getRateLimit('limited');
+
+        self::assertNotNull($rateLimit);
+        self::assertSame(60, $rateLimit['limit']);
+        self::assertSame('1 minute', $rateLimit['interval']);
+        self::assertSame('sliding_window', $rateLimit['policy']);
+        self::assertNull($registry->getRateLimit('unlimited'));
+    }
+
+    #[Test]
     public function exposesRawRoutesAndControllerLocator(): void
     {
         $locator = new ServiceLocator([]);

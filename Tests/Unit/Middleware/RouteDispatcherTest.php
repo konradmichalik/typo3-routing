@@ -17,6 +17,7 @@ use KonradMichalik\RoutingTest\Controller\ExampleController;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
+use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -25,6 +26,7 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\{ApplicationContext, Environment};
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
@@ -44,9 +46,12 @@ final class RouteDispatcherTest extends TestCase
 
     private ResponseCacheManager $responseCache;
 
+    private RateLimitEnforcer $rateLimiter;
+
     protected function setUp(): void
     {
         $this->responseCache = $this->createResponseCacheManager();
+        $this->rateLimiter = new RateLimitEnforcer(new InMemoryStorage());
     }
 
     #[Test]
@@ -177,7 +182,7 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
 
-        $dispatcher = new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -207,6 +212,28 @@ final class RouteDispatcherTest extends TestCase
         self::assertNotSame((string) $first->getBody(), (string) $second->getBody());
     }
 
+    #[Test]
+    public function blocksRequestsExceedingTheRateLimitWith429AndRetryAfter(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/limited'));
+        $second = $this->dispatch($this->request('GET', 'https://example.com/api/limited'));
+
+        self::assertSame(200, $first->getStatusCode());
+        self::assertSame(429, $second->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"Too Many Requests","status":429}', (string) $second->getBody());
+        self::assertNotSame('', $second->getHeaderLine('Retry-After'));
+    }
+
+    #[Test]
+    public function doesNotRateLimitRoutesWithoutAnAttribute(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
+        $second = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
+
+        self::assertSame(200, $first->getStatusCode());
+        self::assertSame(200, $second->getStatusCode());
+    }
+
     private function dispatch(ServerRequestInterface $request, ?ResponseInterface $fallThrough = null): ResponseInterface
     {
         return $this->dispatcher()->process($request, $this->handler($fallThrough ?? new Response('php://temp', 200)));
@@ -217,7 +244,7 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn('/api/');
 
-        return new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $extensionConfiguration);
+        return new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -231,6 +258,7 @@ final class RouteDispatcherTest extends TestCase
             'cached' => ['path' => '/api/cached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
             'guarded' => ['path' => '/api/guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'posted' => ['path' => '/api/posted', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => ['n' => '\d+']],
+            'limited' => ['path' => '/api/limited', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -238,9 +266,14 @@ final class RouteDispatcherTest extends TestCase
             'cached' => ['lifetime' => 3600, 'tags' => ['pages'], 'ignoreParams' => []],
         ];
 
+        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
+        $rateLimits = [
+            'limited' => ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window'],
+        ];
+
         $locator = new ServiceLocator(['ctrl' => static fn (): ExampleController => new ExampleController()]);
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs);
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits);
     }
 
     private function request(string $method, string $url, string $base = 'https://example.com/'): ServerRequest

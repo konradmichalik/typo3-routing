@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\RoutingTest\Controller;
 
-use KonradMichalik\Typo3Routing\Attribute\{Cache, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Cache, RateLimit, Route};
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
@@ -29,6 +29,13 @@ final class ExampleController implements RouteControllerInterface
     public function count(ServerRequestInterface $request): JsonResponse
     {
         return new JsonResponse(['count' => 3]);
+    }
+
+    #[Route(path: '/api/example/limited', name: 'example_limited')]
+    #[RateLimit(limit: 1, interval: '1 minute', policy: 'sliding_window')]
+    public function limited(ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse(['limited' => true]);
     }
 
     #[Route(path: '/api/example/submit', methods: ['POST'], name: 'example_submit')]

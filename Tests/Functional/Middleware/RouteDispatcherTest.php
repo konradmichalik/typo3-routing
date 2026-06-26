@@ -18,6 +18,8 @@ use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Cache\Backend\TransientMemoryBackend;
+use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -34,6 +36,22 @@ final class RouteDispatcherTest extends FunctionalTestCase
     protected array $testExtensionsToLoad = [
         'typo3_routing',
         __DIR__.'/../Fixtures/Extensions/routing_test',
+    ];
+
+    /**
+     * A transient backend keeps the rate-limit buckets in-process and free of a DB cache table.
+     */
+    protected array $configurationToUseInTestInstance = [
+        'SYS' => [
+            'caching' => [
+                'cacheConfigurations' => [
+                    'typo3_routing_ratelimit' => [
+                        'frontend' => VariableFrontend::class,
+                        'backend' => TransientMemoryBackend::class,
+                    ],
+                ],
+            ],
+        ],
     ];
 
     #[Test]
@@ -133,6 +151,18 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function blocksRequestsExceedingTheRateLimitWith429(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/limited'));
+        $second = $this->process($this->request('GET', 'https://example.com/api/example/limited'));
+
+        self::assertSame(200, $first->getStatusCode());
+        self::assertSame(429, $second->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"Too Many Requests","status":429}', (string) $second->getBody());
+        self::assertNotSame('', $second->getHeaderLine('Retry-After'));
     }
 
     #[Test]

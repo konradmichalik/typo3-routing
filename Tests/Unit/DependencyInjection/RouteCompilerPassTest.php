@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, DuplicateNameController, FixtureController, PlainService};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, DuplicateNameController, FixtureController, InvalidRateLimitPolicyController, PlainService};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -148,6 +148,32 @@ final class RouteCompilerPassTest extends TestCase
         self::assertSame(['tx_fixture'], $cacheConfigs['fixture_count']['tags']);
         // Methods without #[Cache] get no entry.
         self::assertArrayNotHasKey('fixture_controller_results', $cacheConfigs);
+    }
+
+    #[Test]
+    public function capturesRateLimitForAnnotatedMethods(): void
+    {
+        $container = $this->buildContainer(['fixture_controller' => FixtureController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
+        $rateLimits = $container->getDefinition(RouteRegistry::class)->getArgument('$rateLimits');
+
+        self::assertArrayHasKey('fixture_limited', $rateLimits);
+        self::assertSame(5, $rateLimits['fixture_limited']['limit']);
+        self::assertSame('10 seconds', $rateLimits['fixture_limited']['interval']);
+        self::assertSame('fixed_window', $rateLimits['fixture_limited']['policy']);
+        // Methods without #[RateLimit] get no entry.
+        self::assertArrayNotHasKey('fixture_count', $rateLimits);
+    }
+
+    #[Test]
+    public function throwsOnUnsupportedRateLimitPolicy(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000001);
+
+        $this->discover($this->buildContainer(['bogus' => InvalidRateLimitPolicyController::class]));
     }
 
     /**

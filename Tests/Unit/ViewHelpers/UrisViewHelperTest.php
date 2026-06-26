@@ -25,13 +25,11 @@ use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
-
 /**
  * UrisViewHelperTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-
 #[CoversClass(UrisViewHelper::class)]
 final class UrisViewHelperTest extends TestCase
 {

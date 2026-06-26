@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
+use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -24,14 +25,16 @@ use Symfony\Component\Routing\RequestContext;
 use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
-use TYPO3\CMS\Core\Http\Response;
+use TYPO3\CMS\Core\Http\{NormalizedParams, Response};
 
 use function array_key_exists;
 use function assert;
 use function is_array;
 use function is_object;
 use function is_string;
+use function max;
 use function sprintf;
+use function time;
 
 /**
  * RouteDispatcher.
@@ -46,6 +49,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private RouteRegistry $registry,
         private SiteBasePathResolver $basePathResolver,
         private ResponseCacheManager $cache,
+        private RateLimitEnforcer $rateLimiter,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $prefix = '/api/';
@@ -98,8 +102,48 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $this->errorResponse(400, $error);
         }
 
-        // 5. Dispatch (with optional opt-in response cache).
+        // 5. Rate limiting (opt-in). Enforced before the cache so a cacheable response cannot bypass the limit.
+        $rateLimited = $this->enforceRateLimit($match, $request);
+        if (null !== $rateLimited) {
+            return $rateLimited;
+        }
+
+        // 6. Dispatch (with optional opt-in response cache).
         return $this->dispatch($match, $request);
+    }
+
+    /**
+     * @param array<string, mixed> $match
+     */
+    private function enforceRateLimit(array $match, ServerRequestInterface $request): ?ResponseInterface
+    {
+        $routeName = (string) ($match['_route'] ?? '');
+        $config = $this->registry->getRateLimit($routeName);
+        if (null === $config) {
+            return null;
+        }
+
+        $result = $this->rateLimiter->consume($routeName, $config, $this->clientId($request));
+        if ($result->isAccepted()) {
+            return null;
+        }
+
+        return $this->errorResponse(429, 'Too Many Requests', [
+            'Retry-After' => (string) max(0, $result->getRetryAfter()->getTimestamp() - time()),
+        ]);
+    }
+
+    private function clientId(ServerRequestInterface $request): string
+    {
+        // normalizedParams is set early in the frontend stack and resolves reverse-proxy headers.
+        $normalizedParams = $request->getAttribute('normalizedParams');
+        if ($normalizedParams instanceof NormalizedParams) {
+            return $normalizedParams->getRemoteAddress();
+        }
+
+        $remoteAddress = $request->getServerParams()['REMOTE_ADDR'] ?? '';
+
+        return is_string($remoteAddress) ? $remoteAddress : '';
     }
 
     /**

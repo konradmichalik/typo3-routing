@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\Attribute\{Cache, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Cache, RateLimit, Route};
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
 use Override;
@@ -22,6 +22,7 @@ use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 
+use function in_array;
 use function is_string;
 use function sprintf;
 
@@ -32,6 +33,11 @@ use function sprintf;
  */
 final class RouteCompilerPass implements CompilerPassInterface
 {
+    /**
+     * @var list<string>
+     */
+    private const SUPPORTED_RATE_LIMIT_POLICIES = ['sliding_window', 'fixed_window'];
+
     #[Override]
     public function process(ContainerBuilder $container): void
     {
@@ -43,6 +49,8 @@ final class RouteCompilerPass implements CompilerPassInterface
         $routes = [];
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
         $cacheConfigs = [];
+        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
+        $rateLimits = [];
         /** @var array<string, Reference> $controllerReferences */
         $controllerReferences = [];
 
@@ -52,7 +60,7 @@ final class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            if ($this->collectRoutes(new ReflectionClass($class), $serviceId, $routes, $cacheConfigs)) {
+            if ($this->collectRoutes(new ReflectionClass($class), $serviceId, $routes, $cacheConfigs, $rateLimits)) {
                 // Keep the controller fetchable from the locator even though it stays a private service.
                 $controllerReferences[$serviceId] = new Reference($serviceId);
             }
@@ -64,6 +72,7 @@ final class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$routes', $routes);
         $registry->setArgument('$controllerLocator', $locator);
         $registry->setArgument('$cacheConfigs', $cacheConfigs);
+        $registry->setArgument('$rateLimits', $rateLimits);
     }
 
     /**
@@ -100,8 +109,9 @@ final class RouteCompilerPass implements CompilerPassInterface
      * @param ReflectionClass<object>                                                                                                              $reflection
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes
      * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                  $cacheConfigs
+     * @param array<string, array{limit: int, interval: string, policy: string}>                                                                   $rateLimits
      */
-    private function collectRoutes(ReflectionClass $reflection, string $serviceId, array &$routes, array &$cacheConfigs): bool
+    private function collectRoutes(ReflectionClass $reflection, string $serviceId, array &$routes, array &$cacheConfigs, array &$rateLimits): bool
     {
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -110,6 +120,7 @@ final class RouteCompilerPass implements CompilerPassInterface
             }
 
             $cache = $this->resolveCache($method);
+            $rateLimit = $this->resolveRateLimit($method, $serviceId);
 
             foreach ($method->getAttributes(Route::class) as $attribute) {
                 $route = $attribute->newInstance();
@@ -128,6 +139,9 @@ final class RouteCompilerPass implements CompilerPassInterface
                 ];
                 if (null !== $cache) {
                     $cacheConfigs[$name] = $cache;
+                }
+                if (null !== $rateLimit) {
+                    $rateLimits[$name] = $rateLimit;
                 }
                 $found = true;
             }
@@ -149,6 +163,25 @@ final class RouteCompilerPass implements CompilerPassInterface
         $cache = $attributes[0]->newInstance();
 
         return ['lifetime' => $cache->lifetime, 'tags' => $cache->tags, 'ignoreParams' => $cache->ignoreParams];
+    }
+
+    /**
+     * @return array{limit: int, interval: string, policy: string}|null
+     */
+    private function resolveRateLimit(ReflectionMethod $method, string $serviceId): ?array
+    {
+        $attributes = $method->getAttributes(RateLimit::class);
+        if ([] === $attributes) {
+            return null;
+        }
+
+        $rateLimit = $attributes[0]->newInstance();
+
+        if (!in_array($rateLimit->policy, self::SUPPORTED_RATE_LIMIT_POLICIES, true)) {
+            throw new LogicException(sprintf('Unsupported #[RateLimit] policy "%s" on "%s::%s()". Supported policies are "%s".', $rateLimit->policy, $serviceId, $method->getName(), implode('", "', self::SUPPORTED_RATE_LIMIT_POLICIES)), 1750000001);
+        }
+
+        return ['limit' => $rateLimit->limit, 'interval' => $rateLimit->interval, 'policy' => $rateLimit->policy];
     }
 
     private function deriveRouteName(string $serviceId, string $method): string

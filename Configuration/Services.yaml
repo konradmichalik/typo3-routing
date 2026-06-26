@@ -29,6 +29,19 @@ services:
     KonradMichalik\Typo3Routing\Http\RouteUrlGenerator:
         public: true
 
+    # Dedicated TYPO3 cache backing the rate-limiter bucket store.
+    cache.typo3_routing_ratelimit:
+        class: TYPO3\CMS\Core\Cache\Frontend\FrontendInterface
+        factory: ['@TYPO3\CMS\Core\Cache\CacheManager', 'getCache']
+        arguments: ['typo3_routing_ratelimit']
+
+    KonradMichalik\Typo3Routing\RateLimit\CacheStorage:
+        arguments:
+            $cache: '@cache.typo3_routing_ratelimit'
+
+    Symfony\Component\RateLimiter\Storage\StorageInterface:
+        alias: KonradMichalik\Typo3Routing\RateLimit\CacheStorage
+
     KonradMichalik\Typo3Routing\Command\RouteDebugCommand:
         tags:
             - name: console.command

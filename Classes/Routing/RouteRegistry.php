@@ -29,11 +29,13 @@ final class RouteRegistry
     /**
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes
      * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                  $cacheConfigs
+     * @param array<string, array{limit: int, interval: string, policy: string}>                                                                   $rateLimits
      */
     public function __construct(
         private readonly array $routes,
         private readonly ContainerInterface $controllerLocator,
         private readonly array $cacheConfigs = [],
+        private readonly array $rateLimits = [],
     ) {}
 
     public function getRouteCollection(): RouteCollection
@@ -77,6 +79,14 @@ final class RouteRegistry
     public function getCacheConfig(string $routeName): ?array
     {
         return $this->cacheConfigs[$routeName] ?? null;
+    }
+
+    /**
+     * @return array{limit: int, interval: string, policy: string}|null
+     */
+    public function getRateLimit(string $routeName): ?array
+    {
+        return $this->rateLimits[$routeName] ?? null;
     }
 
     /**

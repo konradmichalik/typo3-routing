@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing;
 
 use KonradMichalik\Typo3Routing\Cache\{CacheTagFlusher, ResponseCacheManager};
+use KonradMichalik\Typo3Routing\RateLimit\CacheStorage;
 use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
 
 /**
@@ -40,6 +41,17 @@ final class Configuration
         $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER] ??= [
             'frontend' => VariableFrontend::class,
             'groups' => ['all'],
+        ];
+    }
+
+    /**
+     * Register the rate-limit bucket store. Deliberately kept out of every cache group so a
+     * "Flush all caches" cannot reset live rate-limit counters; buckets expire on their own TTL.
+     */
+    public static function registerRateLimitCache(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][CacheStorage::CACHE_IDENTIFIER] ??= [
+            'frontend' => VariableFrontend::class,
         ];
     }
 

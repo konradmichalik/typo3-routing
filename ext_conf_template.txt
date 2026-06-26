@@ -1,0 +1,2 @@
+# cat=basic/enable/010; type=string; label=Path prefix gate:Only request paths starting with this prefix (after stripping the site/language base) are matched against attribute routes. This is a pure performance gate; route paths in the #[Route] attribute are still written in full (including the prefix). Leave empty to match every path (with a performance penalty for every page request).
+prefix = /api/

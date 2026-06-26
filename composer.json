@@ -1,0 +1,78 @@
+{
+	"name": "konradmichalik/typo3-routing",
+	"description": "Attribute Routing - Register frontend endpoints via PHP attributes on controller methods, as an attribute-based alternative to the missing frontend counterpart of AjaxRoutes.php.",
+	"license": [
+		"GPL-2.0-or-later"
+	],
+	"type": "typo3-cms-extension",
+	"authors": [
+		{
+			"name": "Konrad Michalik",
+			"email": "hej@konradmichalik.dev",
+			"role": "Maintainer"
+		}
+	],
+	"require": {
+		"php": "~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
+		"psr/container": "^1.1 || ^2.0",
+		"psr/http-message": "^1.0 || ^2.0",
+		"psr/http-server-handler": "^1.0.2",
+		"psr/http-server-middleware": "^1.0.2",
+		"symfony/dependency-injection": "^7.0 || ^8.0",
+		"symfony/routing": "^7.0 || ^8.0",
+		"typo3/cms-core": "^13.4 || ^14.0",
+		"typo3/cms-frontend": "^13.4 || ^14.0",
+		"typo3fluid/fluid": "^4.2 || ^5.0"
+	},
+	"require-dev": {
+		"eliashaeussler/version-bumper": "^4.0.3",
+		"phpunit/phpunit": "^11.0 || ^12.0 || ^13.0",
+		"typo3/cms-base-distribution": "^13.4 || ^14.0",
+		"typo3/cms-lowlevel": "^13.4 || ^14.0",
+		"typo3/testing-framework": "^8.2 || ^9.0 || ^10.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"KonradMichalik\\Typo3Routing\\": "Classes/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"KonradMichalik\\RoutingTest\\": "Tests/Functional/Fixtures/Extensions/routing_test/Classes/",
+			"KonradMichalik\\Typo3Routing\\Tests\\": "Tests/"
+		}
+	},
+	"config": {
+		"allow-plugins": {
+			"eliashaeussler/version-bumper": true,
+			"ergebnis/composer-normalize": true,
+			"php-http/discovery": true,
+			"typo3/class-alias-loader": true,
+			"typo3/cms-composer-installers": true
+		},
+		"platform": {
+			"php": "8.2"
+		},
+		"sort-packages": true
+	},
+	"extra": {
+		"konradmichalik/php-cs-fixer-preset": {
+			"copyright": 2026
+		},
+		"typo3/cms": {
+			"cms-package-dir": "{$vendor-dir}/typo3/cms",
+			"extension-key": "typo3_routing",
+			"web-dir": "public"
+		}
+	},
+	"scripts": {
+		"post-install-cmd": [
+			"@cgl install"
+		],
+		"cgl": "@composer -d Tests/CGL --",
+		"test": "@test:unit",
+		"test:coverage": "phpunit -c phpunit.xml",
+		"test:functional": "phpunit -c phpunit.functional.xml",
+		"test:unit": "phpunit -c phpunit.xml --no-coverage"
+	}
+}

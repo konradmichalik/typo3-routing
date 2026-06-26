@@ -1,0 +1,36 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    KonradMichalik\Typo3Routing\:
+        resource: '../Classes/*'
+        exclude:
+            - '../Classes/Attribute/*'
+            - '../Classes/Routing/RouteControllerInterface.php'
+
+    # Arguments are injected at container compile time by RouteCompilerPass.
+    KonradMichalik\Typo3Routing\Routing\RouteRegistry:
+        autowire: false
+        arguments:
+            $routes: []
+            $cacheConfigs: []
+
+    # Public so the DataHandler cache-tag flusher (resolved via GeneralUtility::makeInstance) is DI-wired.
+    KonradMichalik\Typo3Routing\Cache\CacheTagFlusher:
+        public: true
+
+    # Middleware services must be public so the TYPO3 middleware dispatcher can fetch them.
+    KonradMichalik\Typo3Routing\Middleware\RouteDispatcher:
+        public: true
+
+    # Public so the routing:uri ViewHelper can fetch it from the container at render time.
+    KonradMichalik\Typo3Routing\Http\RouteUrlGenerator:
+        public: true
+
+    KonradMichalik\Typo3Routing\Command\RouteDebugCommand:
+        tags:
+            - name: console.command
+              command: 'routing:debug'
+              description: 'List all registered attribute routes'

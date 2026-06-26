@@ -1,0 +1,25 @@
+includes:
+	- %rootDir%/../../konradmichalik/phpstan-typo3-preset/phpstan.neon.dist
+	- phpstan-baseline.neon
+
+parameters:
+	level: 8
+
+	scanDirectories:
+		- ../../vendor
+	paths:
+		- ../../Classes
+		- ../../Configuration
+		- ../../Tests/Unit
+		- ../../Tests/Functional
+
+	excludePaths:
+		- ../../Tests/Functional/Fixtures/Extensions/*/vendor (?)
+		- ../../Tests/Functional/Fixtures/Extensions/*/ext_emconf.php
+
+	type_coverage:
+		constant: 0 # TODO: Set to 100, when PHP 8.3 is minimum requirement
+
+	typo3:
+		requestGetAttributeMapping:
+			id: 'string'

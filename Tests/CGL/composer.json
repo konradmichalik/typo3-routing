@@ -1,0 +1,72 @@
+{
+	"authors": [
+		{
+			"name": "Konrad Michalik",
+			"email": "hej@konradmichalik.dev",
+			"role": "Maintainer"
+		}
+	],
+	"require-dev": {
+		"armin/editorconfig-cli": "^2.2.1",
+		"ergebnis/composer-normalize": "^2.52.0",
+		"konradmichalik/php-cs-fixer-preset": "^0.2.1",
+		"konradmichalik/php-doc-block-header-fixer": "^0.3.3",
+		"konradmichalik/phpstan-typo3-preset": "^0.3",
+		"phpstan/phpstan-phpunit": "^1.0 || ^2.0",
+		"psr/http-message": "^1.0 || ^2.0",
+		"shipmonk/composer-dependency-analyser": "1.8.4",
+		"ssch/typo3-rector": "^2.10 || ^3.0",
+		"typo3/coding-standards": "^0.7 || ^0.8"
+	},
+	"replace": {
+		"typo3/cms-core": "*"
+	},
+	"config": {
+		"allow-plugins": {
+			"ergebnis/composer-normalize": true,
+			"php-http/discovery": true,
+			"typo3/class-alias-loader": false,
+			"typo3/cms-composer-installers": false
+		},
+		"lock": false,
+		"sort-packages": true
+	},
+	"extra": {
+		"konradmichalik/php-cs-fixer-preset": {
+			"copyright": 2026
+		}
+	},
+	"scripts": {
+		"analyze": [
+			"@analyze:dependencies"
+		],
+		"analyze:dependencies": "composer-dependency-analyser --composer-json ../../composer.json",
+		"fix": [
+			"@fix:composer",
+			"@fix:editorconfig",
+			"@fix:php"
+		],
+		"fix:composer": [
+			"@composer normalize",
+			"@composer normalize ../../composer.json"
+		],
+		"fix:editorconfig": "@lint:editorconfig --fix",
+		"fix:php": "@php vendor/bin/php-cs-fixer --config=.php-cs-fixer.php fix",
+		"lint": [
+			"@lint:composer",
+			"@lint:editorconfig",
+			"@lint:php"
+		],
+		"lint:composer": "@fix:composer --dry-run",
+		"lint:editorconfig": "ec --git-only",
+		"lint:php": "@fix:php --dry-run",
+		"migration": [
+			"@migration:rector"
+		],
+		"migration:rector": "rector process -c rector.php",
+		"sca": [
+			"@sca:php"
+		],
+		"sca:php": "phpstan analyse --memory-limit=2G"
+	}
+}

@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * This file is part of the "typo3_routing" TYPO3 CMS extension.
+ *
+ * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+use KonradMichalik\PhpCsFixerPreset\Config;
+use KonradMichalik\PhpCsFixerPreset\Package\{Author, CopyrightRange, Type};
+use KonradMichalik\PhpCsFixerPreset\Rules\Header;
+use KonradMichalik\PhpCsFixerPreset\Rules\Set\RuleSet;
+use KonradMichalik\PhpDocBlockHeaderFixer\Generators\DocBlockHeader;
+use KonradMichalik\PhpDocBlockHeaderFixer\Rules\DocBlockHeaderFixer;
+use Symfony\Component\Finder\Finder;
+
+$rootPath = dirname(__DIR__, 2);
+
+return Config::create()
+    ->registerCustomFixers([
+        new DocBlockHeaderFixer(),
+    ])
+    ->withRule(
+        Header::create(
+            'typo3_routing',
+            Type::TYPO3Extension,
+            Author::create('Konrad Michalik', 'hej@konradmichalik.dev'),
+            CopyrightRange::from(2026),
+        ),
+    )
+    ->withRule(
+        RuleSet::fromArray(
+            DocBlockHeader::fromComposer()->__toArray(),
+        ),
+    )
+    ->withFinder(
+        static fn (Finder $finder) => $finder
+            ->in($rootPath)
+            ->notPath(['ext_emconf.php']),
+    )
+;

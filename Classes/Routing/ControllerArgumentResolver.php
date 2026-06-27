@@ -146,7 +146,7 @@ final class ControllerArgumentResolver
             return null;
         }
 
-        throw new ArgumentResolutionException(sprintf('Missing required parameter: %s', $spec['name']));
+        throw new ArgumentResolutionException(sprintf('Missing required parameter: %s', $spec['name']), 9685154824);
     }
 
     /**

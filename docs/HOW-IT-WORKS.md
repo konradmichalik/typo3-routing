@@ -13,3 +13,33 @@
 vendor/bin/typo3 routing:debug          # human-readable table
 vendor/bin/typo3 routing:debug --json   # machine-readable (tooling / LLM)
 ```
+
+The table lists every route with its path, methods, controller, environment binding, and requirements:
+
+```
+ Attribute Routes
+ ================
+
+ ---------------------- -------------------- --------- ------------------------------------ ------------- --------------
+  Name                   Path                 Methods   Controller                           Env           Requirements
+ ---------------------- -------------------- --------- ------------------------------------ ------------- --------------
+  course_search_count    /api/course-search   GET       CourseSearchController::count        -             -
+  course_show            /api/courses/{id}    GET       CourseController::show               -             id: \d+
+  debug_dump             /api/debug/dump      GET       DebugController::dump                 Development   -
+ ---------------------- -------------------- --------- ------------------------------------ ------------- --------------
+```
+
+`--json` emits the same data as an array, ready for tooling or an LLM:
+
+```json
+[
+    {
+        "name": "course_show",
+        "path": "/api/courses/{id}",
+        "methods": ["GET"],
+        "controller": "CourseController::show",
+        "env": null,
+        "requirements": {"id": "\\d+"}
+    }
+]
+```

@@ -136,6 +136,17 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesArgumentSpecsPerRouteName(): void
+    {
+        $spec = ['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null];
+        $registry = new RouteRegistry([], new ServiceLocator([]), [], [], ['item' => [$spec]]);
+
+        self::assertSame([$spec], $registry->getArguments('item'));
+        // Routes without recorded specs report an empty argument list.
+        self::assertSame([], $registry->getArguments('unknown'));
+    }
+
+    #[Test]
     public function exposesRawRoutesAndControllerLocator(): void
     {
         $locator = new ServiceLocator([]);

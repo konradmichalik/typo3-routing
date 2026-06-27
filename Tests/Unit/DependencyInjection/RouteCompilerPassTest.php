@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, DuplicateNameController, FixtureController, InvalidRateLimitPolicyController, PlainService};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, DuplicateNameController, FixtureController, InvalidRateLimitPolicyController, PlainService, TypedArgumentController, UnsupportedArgumentController};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -174,6 +174,40 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000001);
 
         $this->discover($this->buildContainer(['bogus' => InvalidRateLimitPolicyController::class]));
+    }
+
+    #[Test]
+    public function bakesArgumentSpecsWithSourceAndType(): void
+    {
+        $container = $this->buildContainer(['typed' => TypedArgumentController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
+        $arguments = $container->getDefinition(RouteRegistry::class)->getArgument('$arguments');
+        $specs = $arguments['typed_mixed'];
+
+        // Path placeholder → 'path', typed int.
+        self::assertSame(['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null], $specs[0]);
+        // Not a placeholder → 'input'.
+        self::assertSame('q', $specs[1]['name']);
+        self::assertSame('string', $specs[1]['type']);
+        self::assertSame('input', $specs[1]['source']);
+        // Optional bool with default.
+        self::assertSame('bool', $specs[2]['type']);
+        self::assertTrue($specs[2]['hasDefault']);
+        self::assertFalse($specs[2]['default']);
+        // PSR-7 request interface → 'request'.
+        self::assertSame('request', $specs[3]['source']);
+        self::assertNull($specs[3]['type']);
+    }
+
+    #[Test]
+    public function throwsOnUnsupportedObjectParameterType(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000004);
+
+        $this->discover($this->buildContainer(['unsupported' => UnsupportedArgumentController::class]));
     }
 
     /**

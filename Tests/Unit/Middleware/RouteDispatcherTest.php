@@ -18,7 +18,7 @@ use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
-use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, RouteRegistry};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -29,7 +29,7 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\{ApplicationContext, Environment};
-use TYPO3\CMS\Core\Http\{Response, ServerRequest};
+use TYPO3\CMS\Core\Http\{NormalizedParams, Response, ServerRequest};
 use TYPO3\CMS\Core\Site\Entity\Site;
 
 use function dirname;
@@ -92,12 +92,34 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
-    public function passesRouteParametersAsRequestAttributes(): void
+    public function passesPathPlaceholderAsTypedControllerArgument(): void
     {
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/item/7'));
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"id":"7"}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"id":7}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsBadRequestWhenTypedArgumentCannotBeCoerced(): void
+    {
+        // No requirement on this route, so matching succeeds and the resolver's coercion rejects it.
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/typed/abc'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertStringContainsString('Invalid value for parameter: id', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function usesNormalizedParamsRemoteAddressForRateLimiting(): void
+    {
+        $normalizedParams = $this->createMock(NormalizedParams::class);
+        $normalizedParams->method('getRemoteAddress')->willReturn('203.0.113.5');
+        $request = $this->request('GET', 'https://example.com/api/limited')->withAttribute('normalizedParams', $normalizedParams);
+
+        $response = $this->dispatch($request);
+
+        self::assertSame(200, $response->getStatusCode());
     }
 
     #[Test]
@@ -182,7 +204,7 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
 
-        $dispatcher = new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -244,7 +266,7 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn('/api/');
 
-        return new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, $extensionConfiguration);
+        return new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -254,6 +276,7 @@ final class RouteDispatcherTest extends TestCase
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []],
             'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
+            'typed' => ['path' => '/api/typed/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => []],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
             'cached' => ['path' => '/api/cached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
             'guarded' => ['path' => '/api/guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
@@ -271,9 +294,25 @@ final class RouteDispatcherTest extends TestCase
             'limited' => ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window'],
         ];
 
+        $request = ['name' => 'request', 'type' => null, 'source' => 'request', 'nullable' => false, 'hasDefault' => false, 'default' => null];
+        $id = ['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null];
+
+        /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
+        $arguments = [
+            'count' => [],
+            'submit' => [$request],
+            'item' => [$id],
+            'typed' => [$id],
+            'dev' => [],
+            'cached' => [],
+            'guarded' => [],
+            'posted' => [$request],
+            'limited' => [],
+        ];
+
         $locator = new ServiceLocator(['ctrl' => static fn (): ExampleController => new ExampleController()]);
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits);
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments);
     }
 
     private function request(string $method, string $url, string $base = 'https://example.com/'): ServerRequest

@@ -101,12 +101,13 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function passesRouteParametersAsRequestAttributes(): void
+    public function passesPathPlaceholderAsTypedControllerArgument(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/item/42'));
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"id":"42"}', (string) $response->getBody());
+        // The controller declares `int $id`; the placeholder is cast and encoded as a JSON number.
+        self::assertJsonStringEqualsJsonString('{"id":42}', (string) $response->getBody());
     }
 
     #[Test]
@@ -139,7 +140,80 @@ final class RouteDispatcherTest extends FunctionalTestCase
         $response = $this->process($this->request('GET', 'https://example.com/api/example/search?q=42'));
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"q":"42"}', (string) $response->getBody());
+        // `int $q` arrives type-cast.
+        self::assertJsonStringEqualsJsonString('{"q":42}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function appliesDefaultsForOmittedOptionalArguments(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=3'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"from":3,"to":10,"label":null}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function resolvesAllTypedArgumentsWhenProvided(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=3&to=7&label=days'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"from":3,"to":7,"label":"days"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsBadRequestWhenRequiredTypedArgumentIsMissing(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/range'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"Missing required parameter: from","status":400}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsBadRequestWhenTypedArgumentCannotBeCoerced(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=abc'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"Invalid value for parameter: from","status":400}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function resolvesBackedEnumFromPathPlaceholder(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/status/active'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"status":"active"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsNotFoundForUnknownEnumPlaceholder(): void
+    {
+        // The matcher accepts any segment, but the enum cannot be resolved → 400.
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/status/bogus'));
+
+        self::assertSame(400, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function spreadsVariadicQueryArrayIntoArguments(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/tags?tags[]=php&tags[]=typo3'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"tags":["php","typo3"]}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function resolvesParamNameOverrideFromQuery(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/aliased?q=hello'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"term":"hello"}', (string) $response->getBody());
     }
 
     #[Test]

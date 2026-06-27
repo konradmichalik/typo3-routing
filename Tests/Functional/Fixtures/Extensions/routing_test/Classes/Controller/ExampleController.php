@@ -13,7 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\RoutingTest\Controller;
 
-use KonradMichalik\Typo3Routing\Attribute\{Cache, RateLimit, Route};
+use KonradMichalik\RoutingTest\Enum\Status;
+use KonradMichalik\Typo3Routing\Attribute\{Cache, Param, RateLimit, Route};
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
@@ -26,14 +27,14 @@ use TYPO3\CMS\Core\Http\JsonResponse;
 final class ExampleController implements RouteControllerInterface
 {
     #[Route(path: '/api/example/count', name: 'example_count')]
-    public function count(ServerRequestInterface $request): JsonResponse
+    public function count(): JsonResponse
     {
         return new JsonResponse(['count' => 3]);
     }
 
     #[Route(path: '/api/example/limited', name: 'example_limited')]
     #[RateLimit(limit: 1, interval: '1 minute', policy: 'sliding_window')]
-    public function limited(ServerRequestInterface $request): JsonResponse
+    public function limited(): JsonResponse
     {
         return new JsonResponse(['limited' => true]);
     }
@@ -41,30 +42,61 @@ final class ExampleController implements RouteControllerInterface
     #[Route(path: '/api/example/submit', methods: ['POST'], name: 'example_submit')]
     public function submit(ServerRequestInterface $request): JsonResponse
     {
-        return new JsonResponse(['submitted' => true]);
+        // The request itself stays injectable for handlers that need headers, body, attributes, …
+        return new JsonResponse(['submitted' => true, 'method' => $request->getMethod()]);
     }
 
     #[Route(path: '/api/example/dev', name: 'example_dev', env: 'Development')]
-    public function dev(ServerRequestInterface $request): JsonResponse
+    public function dev(): JsonResponse
     {
         return new JsonResponse(['dev' => true]);
     }
 
     #[Route(path: '/api/example/item/{id}', name: 'example_item', requirements: ['id' => '\d+'])]
-    public function item(ServerRequestInterface $request): JsonResponse
+    public function item(int $id): JsonResponse
     {
-        return new JsonResponse(['id' => $request->getAttribute('id')]);
+        // The path placeholder arrives type-cast to int (encoded as a JSON number).
+        return new JsonResponse(['id' => $id]);
     }
 
     #[Route(path: '/api/example/search', name: 'example_search', requirements: ['q' => '\d+'])]
-    public function search(ServerRequestInterface $request): JsonResponse
+    public function search(int $q): JsonResponse
     {
-        return new JsonResponse(['q' => $request->getQueryParams()['q'] ?? null]);
+        // A query parameter, type-cast to int.
+        return new JsonResponse(['q' => $q]);
+    }
+
+    #[Route(path: '/api/example/range', name: 'example_range')]
+    public function range(int $from, int $to = 10, ?string $label = null): JsonResponse
+    {
+        // Mixed sources with defaults: required + optional query parameters.
+        return new JsonResponse(['from' => $from, 'to' => $to, 'label' => $label]);
+    }
+
+    #[Route(path: '/api/example/status/{status}', name: 'example_status')]
+    public function status(Status $status): JsonResponse
+    {
+        // A backed enum resolved from a path placeholder.
+        return new JsonResponse(['status' => $status->value]);
+    }
+
+    #[Route(path: '/api/example/tags', name: 'example_tags')]
+    public function tags(string ...$tags): JsonResponse
+    {
+        // Variadic: ?tags[]=a&tags[]=b expands to ('a', 'b').
+        return new JsonResponse(['tags' => $tags]);
+    }
+
+    #[Route(path: '/api/example/aliased', name: 'example_aliased')]
+    public function aliased(#[Param(name: 'q')] string $term): JsonResponse
+    {
+        // #[Param] reads the query key "q" into a differently named parameter.
+        return new JsonResponse(['term' => $term]);
     }
 
     #[Route(path: '/api/example/cached', name: 'example_cached')]
     #[Cache(lifetime: 3600, tags: ['pages'])]
-    public function cached(ServerRequestInterface $request): JsonResponse
+    public function cached(): JsonResponse
     {
         // A fresh token each call — identical across requests proves a cache hit.
         return new JsonResponse(['token' => bin2hex(random_bytes(8))]);

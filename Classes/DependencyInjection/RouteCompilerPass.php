@@ -31,7 +31,7 @@ use function sprintf;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class RouteCompilerPass implements CompilerPassInterface
+final readonly class RouteCompilerPass implements CompilerPassInterface
 {
     /**
      * @var list<string>
@@ -39,7 +39,7 @@ final class RouteCompilerPass implements CompilerPassInterface
     private const SUPPORTED_RATE_LIMIT_POLICIES = ['sliding_window', 'fixed_window'];
 
     public function __construct(
-        private readonly ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
+        private ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
     ) {}
 
     #[Override]

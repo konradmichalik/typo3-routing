@@ -62,4 +62,7 @@ final class FixtureController implements RouteControllerInterface
     {
         return new JsonResponse([]);
     }
+
+    // A public static method is skipped by the route scanner (never a route target).
+    public static function helper(): void {}
 }

@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
-use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
@@ -50,6 +50,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private SiteBasePathResolver $basePathResolver,
         private ResponseCacheManager $cache,
         private RateLimitEnforcer $rateLimiter,
+        private ControllerArgumentResolver $argumentResolver,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $prefix = '/api/';
@@ -211,16 +212,24 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $controller = $this->registry->getControllerLocator()->get($serviceId);
         assert(is_object($controller));
 
+        // Path placeholders stay available as request attributes for controllers that take the request.
         foreach ($match as $key => $value) {
             if (!str_starts_with($key, '_')) {
                 $request = $request->withAttribute($key, $value);
             }
         }
 
-        /** @var callable(ServerRequestInterface): ResponseInterface $target */
+        $routeName = (string) ($match['_route'] ?? '');
+        try {
+            $arguments = $this->argumentResolver->resolve($this->registry->getArguments($routeName), $match, $request);
+        } catch (ArgumentResolutionException $exception) {
+            return $this->errorResponse(400, $exception->getMessage());
+        }
+
+        /** @var callable(mixed...): ResponseInterface $target */
         $target = [$controller, $method];
 
-        return $target($request);
+        return $target(...$arguments);
     }
 
     private function matchesCurrentContext(string $env): bool

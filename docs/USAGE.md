@@ -1,0 +1,133 @@
+# Usage
+
+Implement the marker interface [`RouteControllerInterface`](../Classes/Routing/RouteControllerInterface.php) and annotate public methods with [`#[Route]`](../Classes/Attribute/Route.php). No further configuration is needed beyond registering the controller as a service (autoconfiguration in your `Configuration/Services.yaml` is sufficient).
+
+```php
+use KonradMichalik\Typo3Routing\Attribute\Route;
+use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Core\Http\JsonResponse;
+
+final readonly class CourseSearchController implements RouteControllerInterface
+{
+    public function __construct(/* … injected services … */) {}
+
+    #[Route(path: '/api/course-search/count', name: 'course_search_count')]
+    public function count(): ResponseInterface
+    {
+        return new JsonResponse(['count' => 42]);
+    }
+}
+```
+
+A controller method declares **only the parameters it needs** — there is no fixed signature. Type-hint `ServerRequestInterface` to receive the request; everything else is resolved by name from the route (see [Typed arguments](#typed-controller-arguments)).
+
+## The `#[Route]` attribute
+
+The attribute is repeatable. Its parameters:
+
+| Parameter      | Type                    | Default   | Description                                                              |
+|----------------|-------------------------|-----------|--------------------------------------------------------------------------|
+| `path`         | `string`                | –         | Full request path, written including the prefix (e.g. `/api/...`).       |
+| `methods`      | `list<string>`          | `['GET']` | Allowed HTTP methods.                                                    |
+| `name`         | `?string`               | `null`    | Route name; auto-derived from service id + method when omitted.          |
+| `env`          | `?string`               | `null`    | Bind the route to a top-level application context (e.g. `Development`).  |
+| `requirements` | `array<string, string>` | `[]`      | Constraints by parameter name → regex (`''` = presence only). See below. |
+
+## Requirements
+
+`requirements` constrains parameters by name, with two enforcement layers depending on where the parameter lives:
+
+- **Path placeholders** (a name that appears as `{name}` in the path) are enforced by the **matcher**: a violating path is treated as no match → **404**.
+- **Any other name** is a required **query or POST-body** parameter, validated at **dispatch**: missing or format-violating → **400**, before your controller runs. (`''` means presence only.)
+
+```php
+#[Route(
+    path: '/api/item/{id}',
+    name: 'item_show',
+    // {id} → matcher (404 if not digits); q → required query/body param (400 if missing or not digits)
+    requirements: ['id' => '\d+', 'q' => '\d+'],
+)]
+public function show(int $id, int $q): ResponseInterface
+{
+    // $id and $q arrive type-cast and validated — no manual reading from the request.
+    // …
+}
+```
+
+## Typed controller arguments
+
+Instead of reading values off the request by hand, declare them as **typed method parameters**. The extension reflects each routed method's signature at container-compile time and resolves the arguments at dispatch:
+
+| Parameter shape                   | Resolved from                          |
+|-----------------------------------|----------------------------------------|
+| `ServerRequestInterface $request` | The PSR-7 request itself.              |
+| A name matching a `{placeholder}` | The matched path segment.              |
+| Any other scalar name             | Query string, then parsed POST body.   |
+
+Values are coerced to the declared type (`int`, `float`, `bool`, `string`, `array`, `mixed`; untyped = raw string) — including **backed enums**. A value that cannot be coerced, or a missing parameter without a default, yields a **400** before the controller runs. Optional parameters use their PHP default; nullable parameters become `null` when absent.
+
+```php
+#[Route(path: '/api/courses/{id}', name: 'course_show', requirements: ['id' => '\d+'])]
+public function show(int $id, int $page = 1, ?string $sort = null, ServerRequestInterface $request): ResponseInterface
+{
+    // $id   ← path placeholder, cast to int
+    // $page ← ?page=… query param, defaults to 1
+    // $sort ← ?sort=… query param, null when omitted
+    // $request ← the full request, still available when you need headers/body
+    // …
+}
+```
+
+> [!NOTE]
+> `requirements` validates the *format* (regex) of inputs and runs first; typed parameters handle the *type* mapping. Use them together: a placeholder constrained by `requirements: ['id' => '\d+']` plus an `int $id` parameter gives you a guaranteed, type-safe value.
+>
+> Unsupported parameter shapes (union/intersection types, non-request objects, pure non-backed enums) are rejected at compile time with a clear `LogicException`, so misuse surfaces during container build, not at runtime.
+
+### Backed enums
+
+A **backed enum** parameter is resolved from its backing value (string-compared, so `?priority=5` resolves an `int`-backed case). An unknown value yields a **400**.
+
+```php
+enum Status: string { case Active = 'active'; case Inactive = 'inactive'; }
+
+#[Route(path: '/api/users/{status}', name: 'users_by_status')]
+public function byStatus(Status $status): ResponseInterface
+{
+    // /api/users/active → Status::Active
+}
+```
+
+### Variadics
+
+A **variadic** parameter collects zero or more values from a single input array (`?ids[]=1&ids[]=2`), each coerced to the element type. An absent input yields no arguments.
+
+```php
+#[Route(path: '/api/courses', name: 'courses_filter')]
+public function filter(int ...$ids): ResponseInterface
+{
+    // /api/courses?ids[]=3&ids[]=7 → filter(3, 7)
+}
+```
+
+### Overriding the source with `#[Param]`
+
+By default the lookup key is the parameter name and the source is auto-derived. The [`#[Param]`](../Classes/Attribute/Param.php) attribute overrides either:
+
+| Argument | Description                                                            |
+|----------|------------------------------------------------------------------------|
+| `name`   | Read a different input/path key than the parameter name.               |
+| `source` | Pin the source: `path`, `query`, `body`, or `input` (query + body).    |
+
+```php
+use KonradMichalik\Typo3Routing\Attribute\Param;
+
+#[Route(path: '/api/search', name: 'search')]
+public function search(
+    #[Param(name: 'q')] string $term,        // reads ?q=… into $term
+    #[Param(source: 'body')] int $page = 1,  // only from the parsed POST body
+): ResponseInterface {
+    // …
+}
+```

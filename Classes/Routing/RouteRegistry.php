@@ -30,12 +30,14 @@ final class RouteRegistry
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes
      * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                  $cacheConfigs
      * @param array<string, array{limit: int, interval: string, policy: string}>                                                                   $rateLimits
+     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>        $arguments
      */
     public function __construct(
         private readonly array $routes,
         private readonly ContainerInterface $controllerLocator,
         private readonly array $cacheConfigs = [],
         private readonly array $rateLimits = [],
+        private readonly array $arguments = [],
     ) {}
 
     public function getRouteCollection(): RouteCollection
@@ -87,6 +89,17 @@ final class RouteRegistry
     public function getRateLimit(string $routeName): ?array
     {
         return $this->rateLimits[$routeName] ?? null;
+    }
+
+    /**
+     * The controller method's parameters in declaration order, as resolved at compile time.
+     * An empty list means the method takes no arguments (or has no recorded spec).
+     *
+     * @return list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>
+     */
+    public function getArguments(string $routeName): array
+    {
+        return $this->arguments[$routeName] ?? [];
     }
 
     /**

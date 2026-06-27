@@ -38,6 +38,10 @@ final class RouteCompilerPass implements CompilerPassInterface
      */
     private const SUPPORTED_RATE_LIMIT_POLICIES = ['sliding_window', 'fixed_window'];
 
+    public function __construct(
+        private readonly ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
+    ) {}
+
     #[Override]
     public function process(ContainerBuilder $container): void
     {
@@ -51,6 +55,8 @@ final class RouteCompilerPass implements CompilerPassInterface
         $cacheConfigs = [];
         /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
         $rateLimits = [];
+        /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
+        $arguments = [];
         /** @var array<string, Reference> $controllerReferences */
         $controllerReferences = [];
 
@@ -60,7 +66,7 @@ final class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            if ($this->collectRoutes(new ReflectionClass($class), $serviceId, $routes, $cacheConfigs, $rateLimits)) {
+            if ($this->collectRoutes(new ReflectionClass($class), $serviceId, $routes, $cacheConfigs, $rateLimits, $arguments)) {
                 // Keep the controller fetchable from the locator even though it stays a private service.
                 $controllerReferences[$serviceId] = new Reference($serviceId);
             }
@@ -73,6 +79,7 @@ final class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$controllerLocator', $locator);
         $registry->setArgument('$cacheConfigs', $cacheConfigs);
         $registry->setArgument('$rateLimits', $rateLimits);
+        $registry->setArgument('$arguments', $arguments);
     }
 
     /**
@@ -110,8 +117,9 @@ final class RouteCompilerPass implements CompilerPassInterface
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes
      * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                  $cacheConfigs
      * @param array<string, array{limit: int, interval: string, policy: string}>                                                                   $rateLimits
+     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>        $arguments
      */
-    private function collectRoutes(ReflectionClass $reflection, string $serviceId, array &$routes, array &$cacheConfigs, array &$rateLimits): bool
+    private function collectRoutes(ReflectionClass $reflection, string $serviceId, array &$routes, array &$cacheConfigs, array &$rateLimits, array &$arguments): bool
     {
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -143,6 +151,7 @@ final class RouteCompilerPass implements CompilerPassInterface
                 if (null !== $rateLimit) {
                     $rateLimits[$name] = $rateLimit;
                 }
+                $arguments[$name] = $this->argumentSpecs->build($method, $route->path, $serviceId);
                 $found = true;
             }
         }

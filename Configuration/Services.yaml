@@ -9,6 +9,7 @@ services:
         exclude:
             - '../Classes/Attribute/*'
             - '../Classes/Routing/RouteControllerInterface.php'
+            - '../Classes/Authentication/RouteAuthenticatorInterface.php'
 
     # Arguments are injected at container compile time by RouteCompilerPass.
     KonradMichalik\Typo3Routing\Routing\RouteRegistry:

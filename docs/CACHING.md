@@ -26,5 +26,7 @@ public function list(ServerRequestInterface $request): ResponseInterface
 - Only **successful (`200`) GET responses** are cached. The cache key is built from route name, path, query string (minus `ignoreParams`) and language, so query/language variants are cached separately.
 - Invalidation rides on the TYPO3 caching framework: changing a record of a tagged table flushes the matching entries immediately; `lifetime` is the fallback. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).
 
+- Routes carrying an [`#[Authenticate]`](AUTHENTICATION.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.
+
 > [!CAUTION]
-> Only cache responses that are the **same for everyone**. With the default middleware placement the dispatcher runs before authentication, so responses are not user-specific — but if you move it after `typo3/cms-frontend/authentication` (see [Configuration](CONFIGURATION.md#middleware-placement)) and cache a personalized response, you risk serving one user's data to another. `Set-Cookie` headers are never cached.
+> Only cache responses that are the **same for everyone**. `#[Cache]` is intended for public routes; `Set-Cookie` headers are never cached.

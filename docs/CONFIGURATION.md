@@ -24,7 +24,9 @@ public function dump(ServerRequestInterface $request): ResponseInterface { /* �
 
 ## Middleware placement
 
-The dispatcher middleware runs in the **frontend** stack, **after** `typo3/cms-frontend/site` (it needs the resolved site/language context) and **before** `typo3/cms-frontend/page-resolver`.
+The dispatcher middleware runs in the **frontend** stack, **after** `typo3/cms-frontend/site` (it needs the resolved site/language context) and after both auth middlewares — `typo3/cms-frontend/backend-user-authentication` and `typo3/cms-frontend/authentication` — and **before** `typo3/cms-frontend/page-resolver`.
 
-> [!IMPORTANT]
-> If an endpoint needs an authenticated `fe_user`, move the dispatcher **after** `typo3/cms-frontend/authentication` by overriding the middleware ordering in your own `Configuration/RequestMiddlewares.php`. The default placement responds before authentication runs, which is correct for public APIs but wrong for protected endpoints.
+This default covers every built-in [authenticator](AUTHENTICATION.md): the `frontend.user` / `backend.user` context aspects and the request token in the `SecurityAspect` (provided by the core request-token middleware, which runs even earlier) are all populated before the dispatcher's access checks.
+
+> [!NOTE]
+> A purely public or Bearer-only setup needs neither auth middleware. You may pull the dispatcher in front of them — by overriding the ordering in your own `Configuration/RequestMiddlewares.php` — for a marginally earlier short-circuit, as long as no route uses the FE/BE-user authenticators.

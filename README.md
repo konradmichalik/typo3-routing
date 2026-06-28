@@ -26,7 +26,8 @@ This extension lets you register **frontend endpoints via PHP attributes** on co
 - [**URL generation**](docs/URL-GENERATION.md) — a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
 - [**Opt-in caching**](docs/CACHING.md) — cache responses with `#[Cache]`, with tag-based invalidation
 - [**Opt-in rate limiting**](docs/RATE-LIMITING.md) — throttle requests per client IP with `#[RateLimit]`
-- [**Debug command**](docs/HOW-IT-WORKS.md#debug-command) — list every registered route as a table or JSON
+- [**Opt-in authentication & CSRF**](docs/AUTHENTICATION.md) — protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
+- [**Debug command**](docs/HOW-IT-WORKS.md#debug-command) — list every registered route as a table or JSON, including an `--unprotected` audit
 
 ## 🔥 Installation
 
@@ -98,6 +99,7 @@ See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments
 | [Configuration](docs/CONFIGURATION.md) | Path prefix gate, environment-bound routes, middleware placement |
 | [Caching](docs/CACHING.md) | Opt-in response caching with `#[Cache]` and tag-based invalidation |
 | [Rate Limiting](docs/RATE-LIMITING.md) | Opt-in per-IP throttling with `#[RateLimit]` |
+| [Authentication & CSRF](docs/AUTHENTICATION.md) | Protecting routes with `#[Authenticate]`, request tokens, and deployment notes |
 | [How It Works](docs/HOW-IT-WORKS.md) | Compile-time discovery, runtime dispatch, and the `routing:debug` command |
 | [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
 

@@ -17,9 +17,16 @@ return [
     'frontend' => [
         'konradmichalik/typo3-routing/dispatcher' => [
             'target' => RouteDispatcher::class,
-            // Needs the resolved site/language context, hence after the site middleware.
+            // Runs after the site middleware (resolved site/language context) and after both auth
+            // middlewares, so the frontend.user / backend.user context aspects and the SecurityAspect's
+            // received request token are populated before the #[Authenticate] / #[RequireRequestToken]
+            // checks. The core request-token middleware runs before backend-user-authentication, so it is
+            // covered too. For a Bearer-only / purely public setup neither auth middleware is needed; the
+            // dispatcher may then be pulled in front of them for a marginally earlier short-circuit.
             'after' => [
                 'typo3/cms-frontend/site',
+                'typo3/cms-frontend/backend-user-authentication',
+                'typo3/cms-frontend/authentication',
             ],
             // Runs before page resolving so attribute endpoints never hit the page router.
             'before' => [

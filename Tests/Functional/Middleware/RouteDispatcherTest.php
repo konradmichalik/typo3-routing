@@ -20,7 +20,9 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Cache\Backend\TransientMemoryBackend;
 use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
+use TYPO3\CMS\Core\Context\{Context, SecurityAspect};
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
+use TYPO3\CMS\Core\Security\RequestToken;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -237,6 +239,74 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertSame(429, $second->getStatusCode());
         self::assertJsonStringEqualsJsonString('{"error":"Too Many Requests","status":429}', (string) $second->getBody());
         self::assertNotSame('', $second->getHeaderLine('Retry-After'));
+    }
+
+    #[Test]
+    public function dispatchesBearerProtectedRouteWithAMatchingToken(): void
+    {
+        $_ENV['ROUTING_TEST_TOKEN'] = 'super-secret';
+
+        try {
+            $request = $this->request('GET', 'https://example.com/api/example/secure')
+                ->withHeader('Authorization', 'Bearer super-secret');
+
+            $response = $this->process($request);
+
+            self::assertSame(200, $response->getStatusCode());
+            self::assertJsonStringEqualsJsonString('{"secure":true}', (string) $response->getBody());
+        } finally {
+            unset($_ENV['ROUTING_TEST_TOKEN']);
+        }
+    }
+
+    #[Test]
+    public function rejectsBearerProtectedRouteWithAWrongToken(): void
+    {
+        $_ENV['ROUTING_TEST_TOKEN'] = 'super-secret';
+
+        try {
+            $request = $this->request('GET', 'https://example.com/api/example/secure')
+                ->withHeader('Authorization', 'Bearer nope');
+
+            $response = $this->process($request);
+
+            self::assertSame(401, $response->getStatusCode());
+            self::assertJsonStringEqualsJsonString('{"error":"Unauthorized","status":401}', (string) $response->getBody());
+        } finally {
+            unset($_ENV['ROUTING_TEST_TOKEN']);
+        }
+    }
+
+    #[Test]
+    public function failsClosedWhenTheBearerTokenEnvVariableIsNotSet(): void
+    {
+        // No ROUTING_TEST_TOKEN in the environment — the route must be unreachable, not open.
+        $request = $this->request('GET', 'https://example.com/api/example/secure')
+            ->withHeader('Authorization', 'Bearer anything');
+
+        self::assertSame(401, $this->process($request)->getStatusCode());
+    }
+
+    #[Test]
+    public function rejectsAStateChangingRequestWithoutARequestToken(): void
+    {
+        $response = $this->process($this->request('POST', 'https://example.com/api/example/token'));
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"Forbidden","status":403}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function dispatchesAStateChangingRequestWithAMatchingRequestToken(): void
+    {
+        // Simulate what the core RequestTokenMiddleware does: provide the decoded token in the SecurityAspect.
+        SecurityAspect::provideIn($this->get(Context::class))
+            ->setReceivedRequestToken(RequestToken::create('routing/example-token'));
+
+        $response = $this->process($this->request('POST', 'https://example.com/api/example/token'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"ok":true}', (string) $response->getBody());
     }
 
     #[Test]

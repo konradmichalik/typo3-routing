@@ -14,11 +14,13 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Middleware;
 
 use KonradMichalik\RoutingTest\Controller\ExampleController;
+use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, RouteRegistry};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -28,6 +30,7 @@ use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Core\{ApplicationContext, Environment};
 use TYPO3\CMS\Core\Http\{NormalizedParams, Response, ServerRequest};
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -204,7 +207,8 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
 
-        $dispatcher = new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), $extensionConfiguration);
+        $registry = $this->registry();
+        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), new AccessGuard($registry, new Context()), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -256,17 +260,50 @@ final class RouteDispatcherTest extends TestCase
         self::assertSame(200, $second->getStatusCode());
     }
 
-    private function dispatch(ServerRequestInterface $request, ?ResponseInterface $fallThrough = null): ResponseInterface
+    #[Test]
+    public function dispatchesPublicRouteWithoutAuthenticator(): void
     {
-        return $this->dispatcher()->process($request, $this->handler($fallThrough ?? new Response('php://temp', 200)));
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
+
+        self::assertSame(200, $response->getStatusCode());
     }
 
-    private function dispatcher(): RouteDispatcher
+    #[Test]
+    public function surfacesTheAccessGuardDenial(): void
+    {
+        // The guard's full auth/CSRF matrix lives in AccessGuardTest; here we only prove the dispatcher
+        // returns the guard's response instead of dispatching the controller.
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/denied'));
+
+        self::assertSame(401, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"Unauthorized","status":401}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function neverCachesAuthenticatedRoutesDespiteCacheAttribute(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/securecached'));
+        $second = $this->dispatch($this->request('GET', 'https://example.com/api/securecached'));
+
+        self::assertSame(200, $first->getStatusCode());
+        // The controller returns a fresh random token each call; differing bodies prove the response was not cached.
+        self::assertNotSame((string) $first->getBody(), (string) $second->getBody());
+    }
+
+    private function dispatch(ServerRequestInterface $request, ?ResponseInterface $fallThrough = null, ?Context $context = null): ResponseInterface
+    {
+        return $this->dispatcher($context)->process($request, $this->handler($fallThrough ?? new Response('php://temp', 200)));
+    }
+
+    private function dispatcher(?Context $context = null): RouteDispatcher
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn('/api/');
 
-        return new RouteDispatcher($this->registry(), new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), $extensionConfiguration);
+        $registry = $this->registry();
+        $accessGuard = new AccessGuard($registry, $context ?? new Context());
+
+        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), $accessGuard, $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -282,11 +319,15 @@ final class RouteDispatcherTest extends TestCase
             'guarded' => ['path' => '/api/guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'posted' => ['path' => '/api/posted', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => ['n' => '\d+']],
             'limited' => ['path' => '/api/limited', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'denied' => ['path' => '/api/denied', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'securecached' => ['path' => '/api/securecached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
         $cacheConfigs = [
             'cached' => ['lifetime' => 3600, 'tags' => ['pages'], 'ignoreParams' => []],
+            // Combined with an authenticator below — the dispatcher must force no-store regardless.
+            'securecached' => ['lifetime' => 3600, 'tags' => ['pages'], 'ignoreParams' => []],
         ];
 
         /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
@@ -308,11 +349,26 @@ final class RouteDispatcherTest extends TestCase
             'guarded' => [],
             'posted' => [$request],
             'limited' => [],
+            'denied' => [],
+            'securecached' => [],
         ];
 
-        $locator = new ServiceLocator(['ctrl' => static fn (): ExampleController => new ExampleController()]);
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = [
+            'denied' => [['service' => DenyAuthenticator::class, 'options' => []]],
+            'securecached' => [['service' => PassAuthenticator::class, 'options' => []]],
+        ];
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments);
+        /** @var array<string, string> $requestTokenScopes */
+        $requestTokenScopes = [];
+
+        $locator = new ServiceLocator(['ctrl' => static fn (): ExampleController => new ExampleController()]);
+        $authenticatorLocator = new ServiceLocator([
+            PassAuthenticator::class => static fn (): PassAuthenticator => new PassAuthenticator(),
+            DenyAuthenticator::class => static fn (): DenyAuthenticator => new DenyAuthenticator(),
+        ]);
+
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator);
     }
 
     private function request(string $method, string $url, string $base = 'https://example.com/'): ServerRequest

@@ -13,8 +13,9 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Middleware;
 
+use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
-use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
+use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, RouteRegistry};
 use Override;
@@ -25,7 +26,7 @@ use Symfony\Component\Routing\RequestContext;
 use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
-use TYPO3\CMS\Core\Http\{NormalizedParams, Response};
+use TYPO3\CMS\Core\Http\NormalizedParams;
 
 use function array_key_exists;
 use function assert;
@@ -51,6 +52,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private ResponseCacheManager $cache,
         private RateLimitEnforcer $rateLimiter,
         private ControllerArgumentResolver $argumentResolver,
+        private AccessGuard $accessGuard,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $prefix = '/api/';
@@ -75,42 +77,60 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $handler->handle($request);
         }
 
-        $context = new RequestContext();
-        $context->setMethod($request->getMethod());
-        $context->setHost($request->getUri()->getHost());
-        $context->setScheme($request->getUri()->getScheme());
-
-        // 2. Matching.
-        try {
-            $match = $this->registry->getMatcher($context)->match($path);
-        } catch (ResourceNotFoundException) {
-            return $this->errorResponse(404, 'Not Found');
-        } catch (MethodNotAllowedException $exception) {
-            return $this->errorResponse(405, 'Method Not Allowed', [
-                'Allow' => implode(', ', $exception->getAllowedMethods()),
-            ]);
+        // 2. Matching → 404 / 405.
+        $match = $this->matchRoute($request, $path);
+        if ($match instanceof ResponseInterface) {
+            return $match;
         }
 
         // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
         $env = $match['_env'] ?? null;
         if (is_string($env) && '' !== $env && !$this->matchesCurrentContext($env)) {
-            return $this->errorResponse(404, 'Not Found');
+            return JsonErrorResponse::create(404, 'Not Found');
         }
 
         // 4. Input requirements (query/body) → 400. Path requirements are matcher-enforced (404).
         $error = $this->firstInputRequirementError($match, $request);
         if (null !== $error) {
-            return $this->errorResponse(400, $error);
+            return JsonErrorResponse::create(400, $error);
         }
 
-        // 5. Rate limiting (opt-in). Enforced before the cache so a cacheable response cannot bypass the limit.
+        // 5. Rate limiting (opt-in). Enforced before auth so a coarse per-IP limit absorbs token
+        //    brute-force attempts before any authentication logic runs.
         $rateLimited = $this->enforceRateLimit($match, $request);
         if (null !== $rateLimited) {
             return $rateLimited;
         }
 
-        // 6. Dispatch (with optional opt-in response cache).
+        // 6. Access control (opt-in): authentication (401) then CSRF/request token (403).
+        $denied = $this->accessGuard->enforce($match, $request);
+        if (null !== $denied) {
+            return $denied;
+        }
+
+        // 7. Dispatch (with optional opt-in response cache; disabled for authenticated routes).
         return $this->dispatch($match, $request);
+    }
+
+    /**
+     * @return array<string, mixed>|ResponseInterface the matched route attributes, or a 404/405 error response
+     */
+    private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface
+    {
+        $context = new RequestContext();
+        $context->setMethod($request->getMethod());
+        $context->setHost($request->getUri()->getHost());
+        $context->setScheme($request->getUri()->getScheme());
+
+        try {
+            return $this->registry->getMatcher($context)->match($path);
+        } catch (ResourceNotFoundException) {
+            return JsonErrorResponse::create(404, 'Not Found');
+        } catch (MethodNotAllowedException $exception) {
+            return JsonErrorResponse::create(405, 'Method Not Allowed', [
+                'Allow' => implode(', ', $exception->getAllowedMethods()),
+            ]);
+        }
     }
 
     /**
@@ -129,7 +149,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return null;
         }
 
-        return $this->errorResponse(429, 'Too Many Requests', [
+        return JsonErrorResponse::create(429, 'Too Many Requests', [
             'Retry-After' => (string) max(0, $result->getRetryAfter()->getTimestamp() - time()),
         ]);
     }
@@ -185,6 +205,12 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $cacheConfig = $this->registry->getCacheConfig($routeName);
         $cacheKey = null;
 
+        // Authenticated routes are never cached: the cache key does not vary by identity, so a shared
+        // entry would leak one client's response to another. Force no-store regardless of #[Cache].
+        if ([] !== $this->registry->getAuthenticators($routeName)) {
+            $cacheConfig = null;
+        }
+
         // Only safe GET requests are cached; the success response format stays the controller's choice.
         if (null !== $cacheConfig && 'GET' === $request->getMethod()) {
             $cacheKey = $this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']);
@@ -223,7 +249,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         try {
             $arguments = $this->argumentResolver->resolve($this->registry->getArguments($routeName), $match, $request);
         } catch (ArgumentResolutionException $exception) {
-            return $this->errorResponse(400, $exception->getMessage());
+            return JsonErrorResponse::create(400, $exception->getMessage());
         }
 
         /** @var callable(mixed...): ResponseInterface $target */
@@ -237,17 +263,5 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $current = explode('/', (string) Environment::getContext())[0];
 
         return strtolower($current) === strtolower($env);
-    }
-
-    /**
-     * @param array<string, string> $headers
-     */
-    private function errorResponse(int $status, string $message, array $headers = []): Response
-    {
-        // JSON is intentional on the dispatch level; the success response format is the controller's call.
-        $response = new Response('php://temp', $status, array_merge(['Content-Type' => 'application/json'], $headers));
-        $response->getBody()->write(json_encode(['error' => $message, 'status' => $status], \JSON_THROW_ON_ERROR));
-
-        return $response;
     }
 }

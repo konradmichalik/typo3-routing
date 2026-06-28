@@ -85,6 +85,29 @@ ddev 13 composer install
 ddev all typo3 database:updateschema
 ```
 
+## Performance benchmark
+
+To check whether attribute routing is meaningfully slower than a conventional middleware, the
+`routing_benchmark` fixture extension exposes matched endpoint pairs — one served by
+`typo3-routing` (`/api/bench/routing/*`), one by a hand-rolled PSR-15 middleware
+(`/api/bench/plain/*`) that returns byte-for-byte identical responses. Server-side timings are
+recorded by [`konradmichalik/typo3-request-profiler`][2] (pinned to `dev-main` until the
+`TYPO3_REQUEST_PROFILER_FORCE` opt-in is released) and aggregated into a comparison table.
+
+```bash
+# Install an instance (profiler + benchmark fixture are pulled in automatically)
+ddev install 13
+
+# Run the benchmark (default 50 requests per endpoint)
+ddev benchmark            # lowest supported version
+ddev benchmark 13 100     # version 13, 100 requests per endpoint
+```
+
+Each scenario (no arguments, path parameter, query parameter) is run interleaved after a warmup,
+then `timing.total_ms` is reported per variant with the routing-vs-plain delta. The dispatch
+overhead is in the order of ~0.1 ms per request — negligible against a full frontend request, so
+the large percentage delta is an artifact of the near-zero plain-middleware baseline.
+
 ## Submit a pull request
 
 After completing your work, **open a pull request** and provide a description of your changes. Ideally, your PR should reference an issue that explains the problem you are addressing.
@@ -92,3 +115,4 @@ After completing your work, **open a pull request** and provide a description of
 All mentioned code quality tools will run automatically on every pull request. For more details, see the relevant [workflows][1].
 
 [1]: .github/workflows
+[2]: https://github.com/konradmichalik/typo3-request-profiler

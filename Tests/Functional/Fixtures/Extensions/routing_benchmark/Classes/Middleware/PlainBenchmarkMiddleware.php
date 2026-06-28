@@ -41,13 +41,13 @@ final class PlainBenchmarkMiddleware implements MiddlewareInterface
             return new JsonResponse(['ok' => true]);
         }
 
-        if (preg_match('#^/api/bench/plain/item/(\d+)$#', $path, $matches)) {
+        if (1 === preg_match('#^/api/bench/plain/item/(\d+)$#', $path, $matches)) {
             return new JsonResponse(['id' => (int) $matches[1]]);
         }
 
         if ('/api/bench/plain/search' === $path) {
             $q = $request->getQueryParams()['q'] ?? null;
-            if (null !== $q && preg_match('/^\d+$/', (string) $q)) {
+            if (null !== $q && 1 === preg_match('/^\d+$/', (string) $q)) {
                 return new JsonResponse(['q' => (int) $q]);
             }
         }

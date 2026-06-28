@@ -24,9 +24,9 @@ if ($argc < 4) {
     exit(1);
 }
 
-$baseUrl = rtrim((string) $argv[1], '/');
+$baseUrl = rtrim($argv[1], '/');
 $count = max(1, (int) $argv[2]);
-$profilesDir = (string) $argv[3];
+$profilesDir = $argv[3];
 $warmup = 5;
 
 /*
@@ -54,7 +54,7 @@ function request(string $url): void
     curl_setopt_array($ch, [
         \CURLOPT_RETURNTRANSFER => true,
         \CURLOPT_SSL_VERIFYPEER => false,
-        \CURLOPT_SSL_VERIFYHOST => false,
+        \CURLOPT_SSL_VERIFYHOST => 0,
         \CURLOPT_TIMEOUT => 30,
         \CURLOPT_HTTPHEADER => ['Accept: application/json'],
     ]);
@@ -62,6 +62,9 @@ function request(string $url): void
     curl_close($ch);
 }
 
+/**
+ * @param list<float> $values
+ */
 function percentile(array $values, float $p): float
 {
     if ([] === $values) {
@@ -91,11 +94,11 @@ foreach ($scenarios as $label => $pair) {
         curl_setopt_array($ch, [
             \CURLOPT_RETURNTRANSFER => true,
             \CURLOPT_SSL_VERIFYPEER => false,
-            \CURLOPT_SSL_VERIFYHOST => false,
+            \CURLOPT_SSL_VERIFYHOST => 0,
             \CURLOPT_TIMEOUT => 30,
         ]);
         $body = curl_exec($ch);
-        $status = (int) curl_getinfo($ch, \CURLINFO_HTTP_CODE);
+        $status = curl_getinfo($ch, \CURLINFO_HTTP_CODE);
         curl_close($ch);
         if (200 !== $status) {
             fwrite(\STDERR, "ERROR: {$variant} endpoint {$path} returned HTTP {$status}, not 200.\n");
@@ -154,10 +157,15 @@ foreach (glob($profilesDir.'/*.json') ?: [] as $file) {
     $timingsByPath[$path][] = (float) $data['timing']['total_ms'];
 }
 
+/**
+ * @param array<string, list<float>> $timingsByPath
+ *
+ * @return array{n: int, min: float, avg: float, median: float, p95: float, max: float}|null
+ */
 function statsFor(array $timingsByPath, string $url): ?array
 {
     $path = parse_url($url, \PHP_URL_PATH) ?: '';
-    if (empty($timingsByPath[$path])) {
+    if (!isset($timingsByPath[$path]) || [] === $timingsByPath[$path]) {
         return null;
     }
     $values = $timingsByPath[$path];

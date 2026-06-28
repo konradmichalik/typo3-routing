@@ -1,0 +1,21 @@
+{
+    "name": "konradmichalik/routing-benchmark",
+    "type": "typo3-cms-extension",
+    "description": "Fixture extension benchmarking typo3-routing attribute routes against an equivalent plain PSR-15 middleware.",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "konradmichalik/typo3-routing": "*",
+        "typo3/cms-core": "^13.4 || ^14.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "KonradMichalik\\RoutingBenchmark\\": "Classes/"
+        }
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "routing_benchmark",
+            "version": "1.0.0"
+        }
+    }
+}

@@ -13,7 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\Attribute\{Cache, RateLimit, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Authentication\RouteAuthenticatorInterface;
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
 use Override;
@@ -22,9 +23,16 @@ use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 
+use function array_intersect;
+use function array_map;
+use function class_exists;
 use function in_array;
+use function is_a;
 use function is_string;
 use function sprintf;
+use function trigger_error;
+
+use const E_USER_WARNING;
 
 /**
  * RouteCompilerPass.
@@ -49,14 +57,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             return;
         }
 
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
-        $routes = [];
-        /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
-        $cacheConfigs = [];
-        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
-        $rateLimits = [];
-        /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
-        $arguments = [];
+        $collected = new CollectedRoutes();
         /** @var array<string, Reference> $controllerReferences */
         $controllerReferences = [];
 
@@ -66,20 +67,21 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            if ($this->collectRoutes(new ReflectionClass($class), $serviceId, $routes, $cacheConfigs, $rateLimits, $arguments)) {
+            if ($this->collectController(new ReflectionClass($class), $serviceId, $container, $collected)) {
                 // Keep the controller fetchable from the locator even though it stays a private service.
                 $controllerReferences[$serviceId] = new Reference($serviceId);
             }
         }
 
-        $locator = ServiceLocatorTagPass::register($container, $controllerReferences);
-
         $registry = $container->getDefinition(RouteRegistry::class);
-        $registry->setArgument('$routes', $routes);
-        $registry->setArgument('$controllerLocator', $locator);
-        $registry->setArgument('$cacheConfigs', $cacheConfigs);
-        $registry->setArgument('$rateLimits', $rateLimits);
-        $registry->setArgument('$arguments', $arguments);
+        $registry->setArgument('$routes', $collected->routes);
+        $registry->setArgument('$controllerLocator', ServiceLocatorTagPass::register($container, $controllerReferences));
+        $registry->setArgument('$authenticatorLocator', ServiceLocatorTagPass::register($container, $collected->authenticatorReferences));
+        $registry->setArgument('$cacheConfigs', $collected->cacheConfigs);
+        $registry->setArgument('$rateLimits', $collected->rateLimits);
+        $registry->setArgument('$arguments', $collected->arguments);
+        $registry->setArgument('$authenticators', $collected->authenticators);
+        $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
     }
 
     /**
@@ -113,13 +115,9 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     }
 
     /**
-     * @param ReflectionClass<object>                                                                                                              $reflection
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes
-     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                  $cacheConfigs
-     * @param array<string, array{limit: int, interval: string, policy: string}>                                                                   $rateLimits
-     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>        $arguments
+     * @param ReflectionClass<object> $reflection
      */
-    private function collectRoutes(ReflectionClass $reflection, string $serviceId, array &$routes, array &$cacheConfigs, array &$rateLimits, array &$arguments): bool
+    private function collectController(ReflectionClass $reflection, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
     {
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -127,36 +125,131 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $cache = $this->resolveCache($method);
-            $rateLimit = $this->resolveRateLimit($method, $serviceId);
-
-            foreach ($method->getAttributes(Route::class) as $attribute) {
-                $route = $attribute->newInstance();
-                $name = $route->name ?? $this->deriveRouteName($serviceId, $method->getName());
-
-                if (isset($routes[$name])) {
-                    throw new LogicException(sprintf('Duplicate attribute route name "%s": already defined by "%s", redefined by "%s::%s()". Set an explicit "name" on the #[Route] attribute to disambiguate.', $name, $routes[$name]['controller'], $serviceId, $method->getName()), 1750000000);
-                }
-
-                $routes[$name] = [
-                    'path' => $route->path,
-                    'methods' => array_map(strtoupper(...), $route->methods),
-                    'controller' => $serviceId.'::'.$method->getName(),
-                    'env' => $route->env,
-                    'requirements' => $route->requirements,
-                ];
-                if (null !== $cache) {
-                    $cacheConfigs[$name] = $cache;
-                }
-                if (null !== $rateLimit) {
-                    $rateLimits[$name] = $rateLimit;
-                }
-                $arguments[$name] = $this->argumentSpecs->build($method, $route->path, $serviceId);
-                $found = true;
-            }
+            $found = $this->collectMethod($method, $serviceId, $container, $collected) || $found;
         }
 
         return $found;
+    }
+
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
+    {
+        $cache = $this->resolveCache($method);
+        $rateLimit = $this->resolveRateLimit($method, $serviceId);
+        $auth = $this->resolveAuthenticators($method, $serviceId, $container, $collected);
+        $requestToken = $this->resolveRequestToken($method);
+
+        $found = false;
+        foreach ($method->getAttributes(Route::class) as $attribute) {
+            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $collected);
+            $found = true;
+        }
+
+        return $found;
+    }
+
+    /**
+     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cache
+     * @param array{limit: int, interval: string, policy: string}|null                  $rateLimit
+     * @param list<array{service: string, options: array<string, mixed>}>               $auth
+     */
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, CollectedRoutes $collected): void
+    {
+        $name = $route->name ?? $this->deriveRouteName($serviceId, $method->getName());
+
+        if (isset($collected->routes[$name])) {
+            throw new LogicException(sprintf('Duplicate attribute route name "%s": already defined by "%s", redefined by "%s::%s()". Set an explicit "name" on the #[Route] attribute to disambiguate.', $name, $collected->routes[$name]['controller'], $serviceId, $method->getName()), 1750000000);
+        }
+
+        $methods = array_map(strtoupper(...), $route->methods);
+        $collected->routes[$name] = [
+            'path' => $route->path,
+            'methods' => $methods,
+            'controller' => $serviceId.'::'.$method->getName(),
+            'env' => $route->env,
+            'requirements' => $route->requirements,
+        ];
+        $collected->arguments[$name] = $this->argumentSpecs->build($method, $route->path, $serviceId);
+
+        if (null !== $rateLimit) {
+            $collected->rateLimits[$name] = $rateLimit;
+        }
+        if ([] !== $auth) {
+            $collected->authenticators[$name] = $auth;
+        }
+
+        $this->applyCache($cache, $auth, $name, $serviceId, $method, $collected);
+        $this->applyRequestToken($requestToken, $methods, $name, $serviceId, $method, $collected);
+    }
+
+    /**
+     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cache
+     * @param list<array{service: string, options: array<string, mixed>}>               $auth
+     */
+    private function applyCache(?array $cache, array $auth, string $name, string $serviceId, ReflectionMethod $method, CollectedRoutes $collected): void
+    {
+        if (null === $cache) {
+            return;
+        }
+
+        $collected->cacheConfigs[$name] = $cache;
+
+        if ([] !== $auth) {
+            // The response cache is force-disabled for authenticated routes (see RouteDispatcher),
+            // because its key does not vary by identity and would leak data across clients.
+            trigger_error(sprintf('Route "%s" (%s::%s()) combines #[Cache] with #[Authenticate]; the response cache is disabled (no-store) for authenticated routes to avoid leaking identity-specific data. Remove #[Cache] to silence this warning.', $name, $serviceId, $method->getName()), E_USER_WARNING);
+        }
+    }
+
+    /**
+     * @param list<string> $methods
+     */
+    private function applyRequestToken(?RequireRequestToken $requestToken, array $methods, string $name, string $serviceId, ReflectionMethod $method, CollectedRoutes $collected): void
+    {
+        if (null === $requestToken) {
+            return;
+        }
+
+        if ([] === array_intersect(['POST', 'PUT', 'PATCH'], $methods)) {
+            throw new LogicException(sprintf('#[RequireRequestToken] on "%s::%s()" (route "%s") is pointless: the route only allows "%s". Request tokens are verified for POST/PUT/PATCH only.', $serviceId, $method->getName(), $name, implode('", "', $methods)), 1750000012);
+        }
+
+        $collected->requestTokenScopes[$name] = $requestToken->scope ?? 'routing/'.$name;
+    }
+
+    /**
+     * Resolves the route's #[Authenticate] attributes (OR-combined) and registers each referenced
+     * authenticator class in the locator. Fails the build on an unknown class, a class that does not
+     * implement the contract, or one that is not a registered service.
+     *
+     * @return list<array{service: string, options: array<string, mixed>}>
+     */
+    private function resolveAuthenticators(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): array
+    {
+        $result = [];
+        foreach ($method->getAttributes(Authenticate::class) as $attribute) {
+            $authenticate = $attribute->newInstance();
+            $class = $authenticate->authenticator;
+
+            if (!class_exists($class) || !is_a($class, RouteAuthenticatorInterface::class, true)) {
+                throw new LogicException(sprintf('#[Authenticate] on "%s::%s()" references "%s", which does not implement %s.', $serviceId, $method->getName(), $class, RouteAuthenticatorInterface::class), 1750000010);
+            }
+
+            if (!$container->hasDefinition($class) && !$container->hasAlias($class)) {
+                throw new LogicException(sprintf('#[Authenticate] authenticator "%s" on "%s::%s()" is not a registered service. Register it (autoconfiguration in Services.yaml is enough).', $class, $serviceId, $method->getName()), 1750000011);
+            }
+
+            $collected->authenticatorReferences[$class] ??= new Reference($class);
+            $result[] = ['service' => $class, 'options' => $authenticate->options];
+        }
+
+        return $result;
+    }
+
+    private function resolveRequestToken(ReflectionMethod $method): ?RequireRequestToken
+    {
+        $attributes = $method->getAttributes(RequireRequestToken::class);
+
+        return [] === $attributes ? null : $attributes[0]->newInstance();
     }
 
     /**

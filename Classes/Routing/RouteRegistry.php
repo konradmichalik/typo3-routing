@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use LogicException;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Routing\Matcher\UrlMatcher;
 use Symfony\Component\Routing\{RequestContext, Route as SymfonyRoute, RouteCollection};
@@ -31,6 +32,8 @@ final class RouteRegistry
      * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                  $cacheConfigs
      * @param array<string, array{limit: int, interval: string, policy: string}>                                                                   $rateLimits
      * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>        $arguments
+     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                           $authenticators
+     * @param array<string, string>                                                                                                                $requestTokenScopes
      */
     public function __construct(
         private readonly array $routes,
@@ -38,6 +41,9 @@ final class RouteRegistry
         private readonly array $cacheConfigs = [],
         private readonly array $rateLimits = [],
         private readonly array $arguments = [],
+        private readonly array $authenticators = [],
+        private readonly array $requestTokenScopes = [],
+        private readonly ?ContainerInterface $authenticatorLocator = null,
     ) {}
 
     public function getRouteCollection(): RouteCollection
@@ -73,6 +79,30 @@ final class RouteRegistry
     public function getControllerLocator(): ContainerInterface
     {
         return $this->controllerLocator;
+    }
+
+    public function getAuthenticatorLocator(): ContainerInterface
+    {
+        // Always populated by the compiler pass; only ever reached for routes that declare authenticators.
+        return $this->authenticatorLocator ?? throw new LogicException('No authenticator locator was provided to the route registry.', 1750000021);
+    }
+
+    /**
+     * The route's authenticators (OR-combined). An empty list means the route is public.
+     *
+     * @return list<array{service: string, options: array<string, mixed>}>
+     */
+    public function getAuthenticators(string $routeName): array
+    {
+        return $this->authenticators[$routeName] ?? [];
+    }
+
+    /**
+     * The expected request-token scope for the route, or null when CSRF protection is not opted in.
+     */
+    public function getRequestTokenScope(string $routeName): ?string
+    {
+        return $this->requestTokenScopes[$routeName] ?? null;
     }
 
     /**

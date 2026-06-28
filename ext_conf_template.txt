@@ -1,2 +1,5 @@
 # cat=basic/enable/010; type=string; label=Path prefix gate:Only request paths starting with this prefix (after stripping the site/language base) are matched against attribute routes. This is a pure performance gate; route paths in the #[Route] attribute are still written in full (including the prefix). Leave empty to match every path (with a performance penalty for every page request).
 prefix = /api/
+
+# cat=authentication/enable/010; type=string; label=Bearer token env variable name:Default name of the process environment variable that holds the expected bearer token for BearerTokenAuthenticator. Only the variable NAME is stored here, never the secret value. Overridable per route via #[Authenticate(BearerTokenAuthenticator::class, options: ['envName' => '...'])]. Defaults to ROUTING_BEARER_TOKEN when left empty.
+bearerTokenEnvName = ROUTING_BEARER_TOKEN

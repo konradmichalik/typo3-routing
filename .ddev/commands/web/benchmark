@@ -1,0 +1,42 @@
+#!/bin/bash
+
+## Description: Benchmark typo3-routing attribute routes against an equivalent plain PSR-15 middleware (uses typo3-request-profiler).
+## Usage: benchmark [version] [count]
+## Example: "ddev benchmark" or "ddev benchmark 13" or "ddev benchmark 14 100"
+
+set -e
+
+. .ddev/.setup/scripts/utils.sh
+
+VERSION=${1}
+COUNT=${2:-50}
+
+if [ -z "$VERSION" ]; then
+    VERSION=$(get_lowest_supported_typo3_versions)
+else
+    if ! check_typo3_version "$VERSION"; then
+        exit 1
+    fi
+fi
+
+BASE_PATH="/var/www/html/.Build/$VERSION"
+TYPO3_BIN="$BASE_PATH/vendor/bin/typo3"
+PROFILES_DIR="$BASE_PATH/var/log/profiles"
+BASE_URL="https://${VERSION}.typo3-routing.ddev.site"
+SCRIPT="$BASE_PATH/packages/routing_benchmark/Resources/Private/Scripts/benchmark.php"
+
+if [ ! -d "$BASE_PATH" ]; then
+    message red "TYPO3 v${VERSION} is not installed. Run 'ddev install ${VERSION}' first."
+    exit 1
+fi
+
+if [ ! -f "$SCRIPT" ]; then
+    message red "Benchmark script not found. Is konradmichalik/routing-benchmark installed in v${VERSION}?"
+    exit 1
+fi
+
+# Make sure the freshly compiled routes + middleware are picked up.
+message magenta "[TYPO3 v${VERSION}] Flushing caches"
+/usr/bin/php "$TYPO3_BIN" cache:flush >/dev/null
+
+/usr/bin/php "$SCRIPT" "$BASE_URL" "$COUNT" "$PROFILES_DIR"

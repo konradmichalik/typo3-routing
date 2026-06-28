@@ -294,6 +294,8 @@ function install_composer_packages() {
             bk2k/bootstrap-package:'*' \
             $PACKAGE_NAME:'*@dev' \
             konradmichalik/routing-test:'*@dev' \
+            konradmichalik/routing-benchmark:'*@dev' \
+            konradmichalik/typo3-request-profiler:'dev-main' \
             helhum/typo3-console:'*' \
             --no-progress -n -d $BASE_PATH
   _done

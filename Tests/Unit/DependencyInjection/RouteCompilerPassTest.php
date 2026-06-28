@@ -15,11 +15,17 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, DuplicateNameController, FixtureController, InvalidRateLimitPolicyController, PlainService, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, PlainService, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
+
+use function restore_error_handler;
+use function set_error_handler;
+
+use const E_USER_WARNING;
 
 /**
  * RouteCompilerPassTest.
@@ -208,6 +214,111 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000004);
 
         $this->discover($this->buildContainer(['unsupported' => UnsupportedArgumentController::class]));
+    }
+
+    #[Test]
+    public function capturesOrCombinedAuthenticatorsWithOptions(): void
+    {
+        $container = $this->buildContainer([
+            'auth_controller' => AuthenticatedController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = $container->getDefinition(RouteRegistry::class)->getArgument('$authenticators');
+
+        self::assertSame([
+            ['service' => PassAuthenticator::class, 'options' => []],
+            ['service' => DenyAuthenticator::class, 'options' => ['role' => 'admin']],
+        ], $authenticators['fixture_secure']);
+    }
+
+    #[Test]
+    public function injectsAnAuthenticatorServiceLocatorReference(): void
+    {
+        $container = $this->buildContainer([
+            'auth_controller' => AuthenticatedController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        $locator = $container->getDefinition(RouteRegistry::class)->getArgument('$authenticatorLocator');
+
+        self::assertInstanceOf(Reference::class, $locator);
+    }
+
+    #[Test]
+    public function throwsWhenAnAuthenticatorDoesNotImplementTheContract(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000010);
+
+        $this->discover($this->buildContainer(['broken' => InvalidAuthenticatorController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenAnAuthenticatorIsNotARegisteredService(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000011);
+
+        // The controller references PassAuthenticator, but it is not registered as a service.
+        $this->discover($this->buildContainer(['auth_controller' => AuthenticatedController::class]));
+    }
+
+    #[Test]
+    public function capturesExplicitAndDerivedRequestTokenScopes(): void
+    {
+        $container = $this->buildContainer([
+            'auth_controller' => AuthenticatedController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, string> $scopes */
+        $scopes = $container->getDefinition(RouteRegistry::class)->getArgument('$requestTokenScopes');
+
+        self::assertSame('routing/account-update', $scopes['fixture_account_update']);
+        // Derived from the route name when no scope is given.
+        self::assertSame('routing/fixture_token_default', $scopes['fixture_token_default']);
+    }
+
+    #[Test]
+    public function throwsWhenRequestTokenIsRequiredOnAGetOnlyRoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000012);
+
+        $this->discover($this->buildContainer(['get_token' => GetOnlyRequestTokenController::class]));
+    }
+
+    #[Test]
+    public function warnsWhenCacheIsCombinedWithAuthentication(): void
+    {
+        $container = $this->buildContainer([
+            'cached_auth' => CachedAuthenticatedController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+        ]);
+
+        $warnings = [];
+        set_error_handler(static function (int $errno, string $errstr) use (&$warnings): bool {
+            $warnings[] = $errstr;
+
+            return true;
+        }, E_USER_WARNING);
+
+        try {
+            (new RouteCompilerPass())->process($container);
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('combines #[Cache] with #[Authenticate]', $warnings[0]);
     }
 
     /**

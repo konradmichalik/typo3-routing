@@ -14,7 +14,8 @@ declare(strict_types=1);
 namespace KonradMichalik\RoutingTest\Controller;
 
 use KonradMichalik\RoutingTest\Enum\Status;
-use KonradMichalik\Typo3Routing\Attribute\{Cache, Param, RateLimit, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Param, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
@@ -30,6 +31,22 @@ final class ExampleController implements RouteControllerInterface
     public function count(): JsonResponse
     {
         return new JsonResponse(['count' => 3]);
+    }
+
+    #[Route(path: '/api/example/secure', name: 'example_secure')]
+    #[Authenticate(BearerTokenAuthenticator::class, options: ['envName' => 'ROUTING_TEST_TOKEN'])]
+    public function secure(): JsonResponse
+    {
+        // Reachable only with a valid "Authorization: Bearer <token>" matching the env variable.
+        return new JsonResponse(['secure' => true]);
+    }
+
+    #[Route(path: '/api/example/token', methods: ['POST'], name: 'example_token')]
+    #[RequireRequestToken(scope: 'routing/example-token')]
+    public function token(): JsonResponse
+    {
+        // Reachable only with a valid request token of the matching scope.
+        return new JsonResponse(['ok' => true]);
     }
 
     #[Route(path: '/api/example/limited', name: 'example_limited')]

@@ -73,6 +73,64 @@ final class RouteDebugCommandTest extends TestCase
         self::assertStringContainsString('No attribute routes', $tester->getDisplay());
     }
 
+    #[Test]
+    public function rendersAuthAndCsrfColumns(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute([]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Acme\\TokenAuthenticator', $display);
+        self::assertStringContainsString('routing/secure', $display);
+    }
+
+    #[Test]
+    public function includesAuthAndCsrfInJson(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, auth: list<string>, csrf: string|null}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+
+        // Public route.
+        self::assertSame([], $data[0]['auth']);
+        self::assertNull($data[0]['csrf']);
+        // Protected route.
+        self::assertSame(['Acme\\TokenAuthenticator'], $data[2]['auth']);
+        self::assertSame('routing/secure', $data[2]['csrf']);
+    }
+
+    #[Test]
+    public function listsOnlyUnprotectedRoutesWithTheFilter(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--unprotected' => true]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Unprotected Attribute Routes', $display);
+        self::assertStringContainsString('example_count', $display);
+        self::assertStringNotContainsString('example_secure', $display);
+    }
+
+    #[Test]
+    public function warnsWhenNoUnprotectedRoutesExist(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), [], [], [], ['example_secure' => [['service' => 'Acme\\TokenAuthenticator', 'options' => []]]]);
+
+        $tester = $this->tester($registry);
+        $tester->execute(['--unprotected' => true]);
+
+        self::assertStringContainsString('No unprotected attribute routes', $tester->getDisplay());
+    }
+
     private function tester(RouteRegistry $registry): CommandTester
     {
         return new CommandTester(new RouteDebugCommand($registry));
@@ -84,8 +142,14 @@ final class RouteDebugCommandTest extends TestCase
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
+            'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => []],
         ];
 
-        return new RouteRegistry($routes, new ServiceLocator([]));
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = ['example_secure' => [['service' => 'Acme\\TokenAuthenticator', 'options' => []]]];
+        /** @var array<string, string> $requestTokenScopes */
+        $requestTokenScopes = ['example_secure' => 'routing/secure'];
+
+        return new RouteRegistry($routes, new ServiceLocator([]), [], [], [], $authenticators, $requestTokenScopes);
     }
 }

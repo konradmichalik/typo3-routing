@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
@@ -156,6 +157,46 @@ final class RouteRegistryTest extends TestCase
 
         self::assertArrayHasKey('x', $registry->getRoutes());
         self::assertSame($locator, $registry->getControllerLocator());
+    }
+
+    #[Test]
+    public function exposesAuthenticatorsPerRouteName(): void
+    {
+        $authenticators = ['secure' => [['service' => 'auth_a', 'options' => ['role' => 'admin']]]];
+        $registry = new RouteRegistry([], new ServiceLocator([]), [], [], [], $authenticators);
+
+        self::assertSame($authenticators['secure'], $registry->getAuthenticators('secure'));
+        // A route without authenticators is public.
+        self::assertSame([], $registry->getAuthenticators('public'));
+    }
+
+    #[Test]
+    public function exposesRequestTokenScopePerRouteName(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), [], [], [], [], ['token' => 'routing/token']);
+
+        self::assertSame('routing/token', $registry->getRequestTokenScope('token'));
+        self::assertNull($registry->getRequestTokenScope('open'));
+    }
+
+    #[Test]
+    public function exposesTheAuthenticatorLocatorWhenProvided(): void
+    {
+        $authenticatorLocator = new ServiceLocator([]);
+        $registry = new RouteRegistry([], new ServiceLocator([]), [], [], [], [], [], $authenticatorLocator);
+
+        self::assertSame($authenticatorLocator, $registry->getAuthenticatorLocator());
+    }
+
+    #[Test]
+    public function throwsWhenTheAuthenticatorLocatorIsMissing(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]));
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000021);
+
+        $registry->getAuthenticatorLocator();
     }
 
     private function createRegistry(): RouteRegistry

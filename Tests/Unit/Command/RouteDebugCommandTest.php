@@ -104,6 +104,169 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function includesCacheRateLimitAndArgumentsInJson(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, cache: array{lifetime: int}|null, rateLimit: array{policy: string}|null, arguments: list<array{name: string, source: string}>}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+
+        // Cached route.
+        self::assertNotNull($data[0]['cache']);
+        self::assertSame(3600, $data[0]['cache']['lifetime']);
+        self::assertNull($data[0]['rateLimit']);
+        // Rate-limited route with a resolved argument.
+        self::assertNotNull($data[1]['rateLimit']);
+        self::assertSame('sliding_window', $data[1]['rateLimit']['policy']);
+        self::assertSame('id', $data[1]['arguments'][0]['name']);
+        self::assertSame('path', $data[1]['arguments'][0]['source']);
+    }
+
+    #[Test]
+    public function showsFullDetailForAnExactName(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_dev']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('/api/example/dev', $display);
+        self::assertStringContainsString('Development', $display);
+        self::assertStringContainsString('sliding_window', $display);
+        self::assertStringContainsString('$id', $display);
+        self::assertStringContainsString('from path', $display);
+    }
+
+    #[Test]
+    public function detailRendersCacheAndAnyMethodsAndEmptyFallbacks(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_count']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('lifetime: 3600', $display);
+        self::assertStringContainsString('pages', $display);
+
+        $tester->execute(['name' => 'example_any']);
+        $any = $tester->getDisplay();
+
+        self::assertStringContainsString('ANY', $any);
+    }
+
+    #[Test]
+    public function filtersByNameSubstring(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'count']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_count', $display);
+        self::assertStringNotContainsString('example_dev', $display);
+    }
+
+    #[Test]
+    public function filtersByMethodCaseInsensitivelyIncludingAnyMethodRoutes(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--method' => 'post']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_dev', $display);
+        self::assertStringContainsString('example_secure', $display);
+        self::assertStringContainsString('example_any', $display); // empty methods accept any
+        self::assertStringNotContainsString('example_count', $display);
+    }
+
+    #[Test]
+    public function filtersByPathSubstring(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--path' => '/dev']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_dev', $display);
+        self::assertStringNotContainsString('example_count', $display);
+    }
+
+    #[Test]
+    public function filtersByEnv(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--env' => 'Development']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_dev', $display);
+        self::assertStringNotContainsString('example_count', $display);
+    }
+
+    #[Test]
+    public function filtersProtectedRoutes(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--protected' => true]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_secure', $display);
+        self::assertStringNotContainsString('example_count', $display);
+    }
+
+    #[Test]
+    public function filtersCachedRoutes(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--cached' => true]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_count', $display);
+        self::assertStringNotContainsString('example_secure', $display);
+    }
+
+    #[Test]
+    public function filtersRateLimitedRoutes(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--rate-limited' => true]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_dev', $display);
+        self::assertStringNotContainsString('example_count', $display);
+    }
+
+    #[Test]
+    public function filtersCsrfRoutes(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--csrf' => true]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_secure', $display);
+        self::assertStringNotContainsString('example_count', $display);
+    }
+
+    #[Test]
+    public function combinesFiltersWithAndSemantics(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--method' => 'POST', '--protected' => true]);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('example_secure', $display); // POST + auth
+        self::assertStringNotContainsString('example_dev', $display);  // POST but unprotected
+    }
+
+    #[Test]
     public function listsOnlyUnprotectedRoutesWithTheFilter(): void
     {
         $tester = $this->tester($this->registry());
@@ -111,24 +274,33 @@ final class RouteDebugCommandTest extends TestCase
         $tester->execute(['--unprotected' => true]);
         $display = $tester->getDisplay();
 
-        self::assertStringContainsString('Unprotected Attribute Routes', $display);
+        self::assertStringContainsString('unprotected', $display); // active-filter comment
         self::assertStringContainsString('example_count', $display);
         self::assertStringNotContainsString('example_secure', $display);
     }
 
     #[Test]
-    public function warnsWhenNoUnprotectedRoutesExist(): void
+    public function warnsWhenNoRouteMatchesTheFilter(): void
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
-        $routes = [
-            'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => []],
-        ];
-        $registry = new RouteRegistry($routes, new ServiceLocator([]), [], [], [], ['example_secure' => [['service' => 'Acme\\TokenAuthenticator', 'options' => []]]]);
+        $tester = $this->tester($this->registry());
 
-        $tester = $this->tester($registry);
-        $tester->execute(['--unprotected' => true]);
+        $tester->execute(['--env' => 'Nonexistent']);
 
-        self::assertStringContainsString('No unprotected attribute routes', $tester->getDisplay());
+        self::assertStringContainsString('No matching attribute routes', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function honoursFiltersInJsonOutput(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['--cached' => true, '--json' => true]);
+
+        /** @var list<array{name: string}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertCount(1, $data);
+        self::assertSame('example_count', $data[0]['name']);
     }
 
     private function tester(RouteRegistry $registry): CommandTester
@@ -143,13 +315,20 @@ final class RouteDebugCommandTest extends TestCase
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
             'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => []],
+            'example_any' => ['path' => '/api/example/any', 'methods' => [], 'controller' => 'ctrl::any', 'env' => null, 'requirements' => []],
         ];
 
+        /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
+        $cacheConfigs = ['example_count' => ['lifetime' => 3600, 'tags' => ['pages'], 'ignoreParams' => []]];
+        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
+        $rateLimits = ['example_dev' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window']];
+        /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
+        $arguments = ['example_dev' => [['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]]];
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
         $authenticators = ['example_secure' => [['service' => 'Acme\\TokenAuthenticator', 'options' => []]]];
         /** @var array<string, string> $requestTokenScopes */
         $requestTokenScopes = ['example_secure' => 'routing/secure'];
 
-        return new RouteRegistry($routes, new ServiceLocator([]), [], [], [], $authenticators, $requestTokenScopes);
+        return new RouteRegistry($routes, new ServiceLocator([]), $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes);
     }
 }

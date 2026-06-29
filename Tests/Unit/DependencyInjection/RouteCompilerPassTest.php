@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, PlainService, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -180,6 +180,16 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000001);
 
         $this->discover($this->buildContainer(['bogus' => InvalidRateLimitPolicyController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenModifierAttributesAreUsedWithoutARoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000013);
+        $this->expectExceptionMessageMatches('/#\[Cache\], #\[RateLimit\].*without a #\[Route\]/');
+
+        $this->discover($this->buildContainer(['orphaned' => OrphanedModifierController::class]));
     }
 
     #[Test]

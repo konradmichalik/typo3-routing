@@ -46,6 +46,18 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      */
     private const SUPPORTED_RATE_LIMIT_POLICIES = ['sliding_window', 'fixed_window'];
 
+    /**
+     * Attributes that only take effect alongside a #[Route] on the same method.
+     *
+     * @var array<class-string, string>
+     */
+    private const MODIFIER_ATTRIBUTES = [
+        Cache::class => '#[Cache]',
+        RateLimit::class => '#[RateLimit]',
+        Authenticate::class => '#[Authenticate]',
+        RequireRequestToken::class => '#[RequireRequestToken]',
+    ];
+
     public function __construct(
         private ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
     ) {}
@@ -133,18 +145,43 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
     private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
     {
+        $routeAttributes = $method->getAttributes(Route::class);
+        if ([] === $routeAttributes) {
+            $this->assertNoOrphanedModifiers($method, $serviceId);
+
+            return false;
+        }
+
         $cache = $this->resolveCache($method);
         $rateLimit = $this->resolveRateLimit($method, $serviceId);
         $auth = $this->resolveAuthenticators($method, $serviceId, $container, $collected);
         $requestToken = $this->resolveRequestToken($method);
 
-        $found = false;
-        foreach ($method->getAttributes(Route::class) as $attribute) {
+        foreach ($routeAttributes as $attribute) {
             $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $collected);
-            $found = true;
         }
 
-        return $found;
+        return true;
+    }
+
+    /**
+     * Fails the build when a route-modifier attribute sits on a method without a #[Route]: such
+     * attributes would be silently dropped, and a missing #[Authenticate] is a security trap.
+     */
+    private function assertNoOrphanedModifiers(ReflectionMethod $method, string $serviceId): void
+    {
+        $orphaned = [];
+        foreach (self::MODIFIER_ATTRIBUTES as $class => $label) {
+            if ([] !== $method->getAttributes($class)) {
+                $orphaned[] = $label;
+            }
+        }
+
+        if ([] === $orphaned) {
+            return;
+        }
+
+        throw new LogicException(sprintf('%s on "%s::%s()" cannot take effect without a #[Route] attribute on the same method. Add a #[Route] or remove the listed attribute(s).', implode(', ', $orphaned), $serviceId, $method->getName()), 1750000013);
     }
 
     /**

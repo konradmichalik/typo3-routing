@@ -27,7 +27,7 @@ final readonly class Route
      * @param list<string>          $methods      Allowed HTTP methods (upper-case)
      * @param string|null           $name         Explicit route name; auto-derived from service id + method when null
      * @param string|null           $env          Top-level application context this route is bound to (e.g. "Development"); null = always active
-     * @param array<string, string> $requirements Constraints by parameter name → regex. A name matching a path placeholder ({id}) is enforced by the matcher (404). Any other name is a required query/body parameter validated at dispatch (400; '' = presence only). E.g. ['id' => '\d+', 'q' => '']
+     * @param array<string, string> $requirements Constraints by parameter name → regex. A name matching a path placeholder ({id}) is enforced by the matcher (404). Any other name is a required query/body parameter validated at dispatch (400; '' = presence only). E.g. ['id' => '\d+', 'q' => '']. Named patterns from Symfony\Component\Routing\Requirement\Requirement may be used as values, e.g. ['id' => Requirement::DIGITS]
      */
     public function __construct(
         public string $path,

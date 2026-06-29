@@ -56,6 +56,33 @@ public function show(int $id, int $q): ResponseInterface
 }
 ```
 
+### Named requirement patterns
+
+Common patterns are available as named constants on Symfony's `Requirement` enum — already bundled with this extension via `symfony/routing`, so there is nothing extra to install:
+
+```php
+use KonradMichalik\Typo3Routing\Attribute\Route;
+use Symfony\Component\Routing\Requirement\Requirement;
+
+#[Route(
+    path: '/api/item/{id}',
+    name: 'item_show',
+    requirements: ['id' => Requirement::DIGITS],
+)]
+```
+
+| Constant                 | Matches                                            |
+|--------------------------|----------------------------------------------------|
+| `Requirement::DIGITS`    | One or more digits (`0`, `42`, `007`).             |
+| `Requirement::POSITIVE_INT` | A positive integer without leading zeros (`1`, `42`). |
+| `Requirement::ASCII_SLUG`   | A hyphenated ASCII slug (`my-article-title`).   |
+| `Requirement::UUID`      | Any RFC 4122 UUID.                                 |
+| `Requirement::UID_BASE58`   | A base58-encoded UID (e.g. a Symfony `Ulid`/`Uuid` in short form). |
+| `Requirement::DATE_YMD`  | A `YYYY-MM-DD` date.                               |
+| `Requirement::CATCH_ALL` | Everything, including slashes (`.+`).              |
+
+Any plain regex string still works, so the enum is opt-in and freely mixable: `['id' => Requirement::DIGITS, 'q' => '']`.
+
 ## Typed controller arguments
 
 Instead of reading values off the request by hand, declare them as **typed method parameters**. The extension reflects each routed method's signature at container-compile time and resolves the arguments at dispatch:

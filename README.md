@@ -80,7 +80,9 @@ That's it — `GET /api/course-search/count` now returns your JSON.
 Everything else is opt-in on top of that. A route can take typed arguments, validate input, cache its response, and throttle clients — all declared with attributes, the controller stays plain:
 
 ```php
-#[Route(path: '/api/courses/{id}', name: 'course_show', requirements: ['id' => '\d+'])]
+use Symfony\Component\Routing\Requirement\Requirement;
+
+#[Route(path: '/api/courses/{id}', name: 'course_show', requirements: ['id' => Requirement::DIGITS])]
 #[Cache(lifetime: 3600, tags: ['tx_courses_domain_model_course'])]
 #[RateLimit(limit: 60, interval: '1 minute')]
 public function show(int $id, int $page = 1): ResponseInterface

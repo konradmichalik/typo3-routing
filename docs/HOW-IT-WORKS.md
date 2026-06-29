@@ -14,6 +14,33 @@ vendor/bin/typo3 routing:debug          # human-readable table
 vendor/bin/typo3 routing:debug --json   # machine-readable (tooling / LLM)
 ```
 
+### Filtering and inspecting
+
+Pass a route name as an argument: an **exact** name prints a full detail view (including cache, rate limit, and the resolved controller arguments — which the overview table omits); any other value is treated as a **name substring** filter.
+
+``` bash
+vendor/bin/typo3 routing:debug course_show     # detail view for one route
+vendor/bin/typo3 routing:debug course          # substring search over names
+```
+
+Filters narrow the table (and `--json`) and combine with AND. The active filters are echoed above the table.
+
+| Option           | Keeps routes that…                                  |
+| ---------------- | --------------------------------------------------- |
+| `--method=POST`  | accept the HTTP method (case-insensitive; routes with no method restriction always match) |
+| `--path=/api`    | contain the substring in their path                 |
+| `--env=Development` | are bound to that application context             |
+| `--unprotected`  | have no authenticator (audit open endpoints)        |
+| `--protected`    | are guarded by an authenticator                     |
+| `--cached`       | have response caching                               |
+| `--rate-limited` | have rate limiting                                  |
+| `--csrf`         | require a CSRF request token                        |
+
+``` bash
+vendor/bin/typo3 routing:debug --method=POST --protected   # protected write endpoints
+vendor/bin/typo3 routing:debug --cached --json             # cached routes, machine-readable
+```
+
 The table lists every route with its path, methods, controller, environment binding, and requirements:
 
 ```
@@ -39,7 +66,14 @@ The table lists every route with its path, methods, controller, environment bind
         "methods": ["GET"],
         "controller": "CourseController::show",
         "env": null,
-        "requirements": {"id": "\\d+"}
+        "requirements": {"id": "\\d+"},
+        "auth": [],
+        "csrf": null,
+        "cache": {"lifetime": 3600, "tags": ["pages"], "ignoreParams": []},
+        "rateLimit": null,
+        "arguments": [
+            {"name": "id", "type": "int", "source": "path", "nullable": false, "hasDefault": false, "default": null}
+        ]
     }
 ]
 ```

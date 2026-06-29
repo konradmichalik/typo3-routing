@@ -1,6 +1,7 @@
 # Authentication & CSRF
 
-Routes are **public by default**. Add the optional `#[Authenticate]` attribute to require authentication, and `#[RequireRequestToken]` to add CSRF protection to state-changing endpoints.
+> [!IMPORTANT]
+> Routes are **public by default**. Add the optional `#[Authenticate]` attribute to require authentication, and `#[RequireRequestToken]` to add CSRF protection to state-changing endpoints.
 
 ## `#[Authenticate]`
 
@@ -94,7 +95,8 @@ Render a token for the scope into the page that hosts the calling JavaScript wit
 ```html
 <script>
   const token = '{routing:requestToken(scope: "routing/account-update")}';
-  fetch('/api/account/update', {
+  const url = '{routing:uri(route: \'account_update\')}';
+  fetch(url, {
     method: 'POST',
     headers: { 'X-TYPO3-RequestToken': token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ /* … */ }),

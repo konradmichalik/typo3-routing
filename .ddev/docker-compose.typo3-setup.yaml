@@ -17,3 +17,10 @@ services:
             - TYPO3_SETUP_ADMIN_PASSWORD=Password1!
             - TYPO3_PROJECT_NAME=EXT:typo3-routing Dev Environment
             - TYPO3_SERVER_TYPE=apache
+
+            # typo3-request-profiler — drives the `ddev benchmark` comparison.
+            # FORCE keeps it recording regardless of application context; KEEP must exceed the
+            # number of requests a benchmark run produces so none get auto-pruned mid-run.
+            - TYPO3_REQUEST_PROFILER_FORCE=1
+            - TYPO3_REQUEST_PROFILER_MIN_MS=0
+            - TYPO3_REQUEST_PROFILER_KEEP=5000

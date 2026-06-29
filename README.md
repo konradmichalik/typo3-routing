@@ -13,10 +13,13 @@
 
 </div>
 
-This extension lets you register **frontend endpoints via PHP attributes** on controller methods — the attribute-based counterpart to the backend-only [`Configuration/Backend/AjaxRoutes.php`](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Backend/AjaxControllers.html). It is response-format agnostic: return JSON, HTML, XML, or a download.
+This extension lets you register **frontend endpoints via PHP attributes** on controller methods — the attribute-based counterpart to the backend-only [`Configuration/Backend/AjaxRoutes.php`](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Backend/Ajax.html). It is response-format agnostic: return JSON, HTML, XML, or a download.
+
+> [!WARNING]
+> This package is in early development stage and may change significantly in the future. I am working steadily to release a stable version as soon as possible.
 
 > [!NOTE]
-> TYPO3 ships attribute-like AJAX route registration for the **backend** (`AjaxRoutes.php`), but there is no frontend equivalent — you end up wiring a custom middleware and duplicating the path in PHP and JavaScript. This extension closes that gap with a single `#[Route]` attribute, the same way the core exposes `TYPO3.settings.ajaxUrls[...]` in the backend.
+> The goal is a familiar, Symfony-Routing-like developer experience: declare a frontend endpoint with a single `#[Route]` attribute instead of wiring a custom middleware and duplicating the path across PHP and JavaScript.
 
 ## ✨ Features
 
@@ -84,6 +87,18 @@ public function show(int $id, int $page = 1): ResponseInterface
 {
     // $id  ← path placeholder, cast to int (404 if not digits)
     // $page ← ?page=… query param, defaults to 1
+    return new JsonResponse(/* … */);
+}
+```
+
+Protecting a route is just as declarative — require a logged-in frontend user (or a bearer token / BE user, OR-combined):
+
+```php
+#[Route(path: '/api/account', name: 'account')]
+#[Authenticate(FrontendUserAuthenticator::class)]
+public function account(): ResponseInterface
+{
+    // Reached only when a frontend user is logged in — 401 otherwise.
     return new JsonResponse(/* … */);
 }
 ```

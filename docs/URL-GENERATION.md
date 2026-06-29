@@ -32,3 +32,21 @@ Generated URLs automatically include the current site/language base, so they are
 
 > [!TIP]
 > In PHP, inject [`RouteUrlGenerator`](../Classes/Http/RouteUrlGenerator.php) and call `generate($request, $routeName, $parameters)`.
+
+```php
+use KonradMichalik\Typo3Routing\Http\RouteUrlGenerator;
+use Psr\Http\Message\ServerRequestInterface;
+
+final readonly class CourseLinkProvider
+{
+    public function __construct(
+        private RouteUrlGenerator $urlGenerator,
+    ) {}
+
+    public function courseUrl(ServerRequestInterface $request, int $id): string
+    {
+        // e.g. "/api/courses/5" — already includes the current site/language base.
+        return $this->urlGenerator->generate($request, 'course_show', ['id' => $id]);
+    }
+}
+```

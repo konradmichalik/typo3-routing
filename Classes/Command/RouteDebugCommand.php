@@ -142,7 +142,7 @@ final class RouteDebugCommand extends Command
         if (null !== $method) {
             $needle = strtoupper($method);
             $filters['method='.$needle] = static fn (array $row): bool => [] === $row['methods']
-                || in_array($needle, array_map('strtoupper', $row['methods']), true);
+                || in_array($needle, array_map(strtoupper(...), $row['methods']), true);
         }
 
         $path = $this->stringOption($input, 'path');

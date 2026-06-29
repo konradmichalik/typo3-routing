@@ -21,7 +21,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Cache\Backend\TransientMemoryBackend;
 use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
 use TYPO3\CMS\Core\Context\{Context, SecurityAspect};
-use TYPO3\CMS\Core\Http\{Response, ServerRequest};
+use TYPO3\CMS\Core\Http\{Response, ServerRequest, Stream};
 use TYPO3\CMS\Core\Security\RequestToken;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
@@ -30,6 +30,7 @@ use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
  * RouteDispatcherTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
+ * @license GPL-2.0-or-later
  */
 final class RouteDispatcherTest extends FunctionalTestCase
 {
@@ -310,6 +311,33 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function bindsJsonBodyToTypedArgumentsOnPost(): void
+    {
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/json', '{"title":"hello","priority":5}'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"title":"hello","priority":5}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function bindsJsonBodyToTypedArgumentsOnPut(): void
+    {
+        $response = $this->process($this->jsonRequest('PUT', 'https://example.com/api/example/json', '{"title":"updated"}'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"title":"updated","priority":0}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsBadRequestWhenJsonBodyMissesARequiredParameter(): void
+    {
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/json', '{"priority":5}'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"Missing required parameter: title","status":400}', (string) $response->getBody());
+    }
+
+    #[Test]
     public function generatesReachableUrlIncludingSiteBase(): void
     {
         $generator = $this->get(RouteUrlGenerator::class);
@@ -345,6 +373,17 @@ final class RouteDispatcherTest extends FunctionalTestCase
             ->withAttribute('site', $site)
             ->withAttribute('language', $site->getDefaultLanguage())
             ->withQueryParams($query);
+    }
+
+    private function jsonRequest(string $method, string $url, string $body): ServerRequest
+    {
+        $stream = new Stream('php://temp', 'wb+');
+        $stream->write($body);
+        $stream->rewind();
+
+        return $this->request($method, $url)
+            ->withBody($stream)
+            ->withHeader('Content-Type', 'application/json');
     }
 
     private function handler(ResponseInterface $response): RequestHandlerInterface

@@ -17,12 +17,13 @@ use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, Controller
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
-use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Http\{ServerRequest, Stream};
 
 /**
  * ControllerArgumentResolverTest.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
+ * @license GPL-2.0-or-later
  */
 #[CoversClass(ControllerArgumentResolver::class)]
 final class ControllerArgumentResolverTest extends TestCase
@@ -69,6 +70,15 @@ final class ControllerArgumentResolverTest extends TestCase
     {
         $specs = [$this->spec('n', 'input', 'int')];
         $request = $this->request('POST')->withParsedBody(['n' => '9']);
+
+        self::assertSame([9], $this->resolver->resolve($specs, [], $request));
+    }
+
+    #[Test]
+    public function resolvesBodyParamFromJsonPayload(): void
+    {
+        $specs = [$this->spec('n', 'body', 'int')];
+        $request = $this->jsonRequest('PUT', '{"n":9}');
 
         self::assertSame([9], $this->resolver->resolve($specs, [], $request));
     }
@@ -324,5 +334,16 @@ final class ControllerArgumentResolverTest extends TestCase
     private function request(string $method = 'GET'): ServerRequest
     {
         return new ServerRequest('https://example.com/', $method);
+    }
+
+    private function jsonRequest(string $method, string $body): ServerRequest
+    {
+        $stream = new Stream('php://temp', 'wb+');
+        $stream->write($body);
+        $stream->rewind();
+
+        return (new ServerRequest('https://example.com/', $method))
+            ->withBody($stream)
+            ->withHeader('Content-Type', 'application/json');
     }
 }

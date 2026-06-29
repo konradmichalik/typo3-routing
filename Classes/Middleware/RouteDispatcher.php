@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
-use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, RequestBody, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, RouteRegistry};
 use Override;
@@ -41,6 +41,7 @@ use function time;
  * RouteDispatcher.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
+ * @license GPL-2.0-or-later
  */
 final readonly class RouteDispatcher implements MiddlewareInterface
 {
@@ -176,8 +177,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     private function firstInputRequirementError(array $match, ServerRequestInterface $request): ?string
     {
         $requirements = $match['_requirements'] ?? null;
-        $body = $request->getParsedBody();
-        $inputs = array_merge($request->getQueryParams(), is_array($body) ? $body : []);
+        $inputs = array_merge($request->getQueryParams(), RequestBody::toArray($request));
 
         foreach (is_array($requirements) ? $requirements : [] as $name => $pattern) {
             $key = (string) $name;

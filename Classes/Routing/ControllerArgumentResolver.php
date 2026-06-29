@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use KonradMichalik\Typo3Routing\Http\RequestBody;
 use Psr\Http\Message\ServerRequestInterface;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
@@ -37,6 +38,7 @@ use function strtolower;
  * ControllerArgumentResolver.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
+ * @license GPL-2.0-or-later
  */
 final class ControllerArgumentResolver
 {
@@ -49,8 +51,7 @@ final class ControllerArgumentResolver
     public function resolve(array $specs, array $match, ServerRequestInterface $request): array
     {
         $query = $request->getQueryParams();
-        $body = $request->getParsedBody();
-        $body = is_array($body) ? $body : [];
+        $body = RequestBody::toArray($request);
         $inputs = array_merge($query, $body);
 
         $arguments = [];

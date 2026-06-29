@@ -64,9 +64,12 @@ Instead of reading values off the request by hand, declare them as **typed metho
 |-----------------------------------|----------------------------------------|
 | `ServerRequestInterface $request` | The PSR-7 request itself.              |
 | A name matching a `{placeholder}` | The matched path segment.              |
-| Any other scalar name             | Query string, then parsed POST body.   |
+| Any other scalar name             | Query string, then request body.       |
 
 Values are coerced to the declared type (`int`, `float`, `bool`, `string`, `array`, `mixed`; untyped = raw string) — including **backed enums**. A value that cannot be coerced, or a missing parameter without a default, yields a **400** before the controller runs. Optional parameters use their PHP default; nullable parameters become `null` when absent.
+
+> [!NOTE]
+> The request **body** is read as form fields for `application/x-www-form-urlencoded`/`multipart` POSTs, and decoded from the raw stream for `application/json` requests — so JSON payloads (and any `PUT`/`PATCH` body) bind to parameters the same way. The body stream stays rewound, so a controller that injects `ServerRequestInterface` can still read it.
 
 ```php
 #[Route(path: '/api/courses/{id}', name: 'course_show', requirements: ['id' => '\d+'])]
@@ -118,7 +121,7 @@ By default the lookup key is the parameter name and the source is auto-derived. 
 | Argument | Description                                                            |
 |----------|------------------------------------------------------------------------|
 | `name`   | Read a different input/path key than the parameter name.               |
-| `source` | Pin the source: `path`, `query`, `body`, or `input` (query + body).    |
+| `source` | Pin the source: `path`, `query`, `body` (form or JSON), or `input` (query + body). |
 
 ```php
 use KonradMichalik\Typo3Routing\Attribute\Param;
@@ -126,7 +129,7 @@ use KonradMichalik\Typo3Routing\Attribute\Param;
 #[Route(path: '/api/search', name: 'search')]
 public function search(
     #[Param(name: 'q')] string $term,        // reads ?q=… into $term
-    #[Param(source: 'body')] int $page = 1,  // only from the parsed POST body
+    #[Param(source: 'body')] int $page = 1,  // only from the request body (form or JSON)
 ): ResponseInterface {
     // …
 }

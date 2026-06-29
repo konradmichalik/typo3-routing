@@ -24,6 +24,7 @@ use TYPO3\CMS\Core\Http\JsonResponse;
  * ExampleController.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
+ * @license GPL-2.0-or-later
  */
 final class ExampleController implements RouteControllerInterface
 {
@@ -117,5 +118,12 @@ final class ExampleController implements RouteControllerInterface
     {
         // A fresh token each call — identical across requests proves a cache hit.
         return new JsonResponse(['token' => bin2hex(random_bytes(8))]);
+    }
+
+    #[Route(path: '/api/example/json', methods: ['POST', 'PUT'], name: 'example_json')]
+    public function json(string $title, int $priority = 0): JsonResponse
+    {
+        // Typed arguments resolved from an application/json body (POST and PUT alike).
+        return new JsonResponse(['title' => $title, 'priority' => $priority]);
     }
 }

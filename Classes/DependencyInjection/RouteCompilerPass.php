@@ -204,6 +204,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'controller' => $serviceId.'::'.$method->getName(),
             'env' => $route->env,
             'requirements' => $route->requirements,
+            'priority' => $route->priority,
         ];
         $collected->arguments[$name] = $this->argumentSpecs->build($method, $route->path, $serviceId);
 

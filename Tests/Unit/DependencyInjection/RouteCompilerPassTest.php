@@ -76,6 +76,16 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesRoutePriority(): void
+    {
+        $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
+
+        self::assertSame(10, $routes['fixture_preferred']['priority']);
+        // Routes without an explicit priority default to 0.
+        self::assertSame(0, $routes['fixture_count']['priority']);
+    }
+
+    #[Test]
     public function ignoresServicesNotImplementingMarkerInterface(): void
     {
         $routes = $this->discover($this->buildContainer(['plain' => PlainService::class]));

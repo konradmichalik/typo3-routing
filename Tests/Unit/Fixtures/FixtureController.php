@@ -51,6 +51,12 @@ final class FixtureController implements RouteControllerInterface
         return new JsonResponse(['dev' => true]);
     }
 
+    #[Route(path: '/api/preferred', name: 'fixture_preferred', priority: 10)]
+    public function preferred(ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse(['preferred' => true]);
+    }
+
     #[Route(path: '/api/alias-a', name: 'fixture_alias_a')]
     #[Route(path: '/api/alias-b', name: 'fixture_alias_b')]
     public function repeatable(ServerRequestInterface $request): JsonResponse

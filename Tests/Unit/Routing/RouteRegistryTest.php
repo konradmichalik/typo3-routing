@@ -101,6 +101,25 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function higherPriorityRouteMatchesFirstOnOverlap(): void
+    {
+        // The placeholder route is registered first, so insertion order alone would let it win; the
+        // static route only takes precedence because of its higher priority.
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}> $routes */
+        $routes = [
+            'item_show' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => [], 'priority' => 0],
+            'item_new' => ['path' => '/api/item/new', 'methods' => ['GET'], 'controller' => 'ctrl::new', 'env' => null, 'requirements' => [], 'priority' => 10],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        $context = new RequestContext();
+        $context->setMethod('GET');
+
+        self::assertSame('item_new', $registry->getMatcher($context)->match('/api/item/new')['_route']);
+        self::assertSame('item_show', $registry->getMatcher($context)->match('/api/item/42')['_route']);
+    }
+
+    #[Test]
     public function exposesCacheConfigPerRouteName(): void
     {
         $registry = new RouteRegistry(

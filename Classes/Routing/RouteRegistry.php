@@ -28,7 +28,7 @@ final class RouteRegistry
     private ?RouteCollection $collection = null;
 
     /**
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}> $routes
      * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                  $cacheConfigs
      * @param array<string, array{limit: int, interval: string, policy: string}>                                                                   $rateLimits
      * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>        $arguments
@@ -63,7 +63,7 @@ final class RouteRegistry
                     '',
                     [],
                     $route['methods'],
-                ));
+                ), $route['priority'] ?? 0);
             }
             $this->collection = $collection;
         }
@@ -133,7 +133,7 @@ final class RouteRegistry
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}>
      */
     public function getRoutes(): array
     {

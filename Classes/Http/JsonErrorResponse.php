@@ -19,7 +19,7 @@ use function array_merge;
 use function json_encode;
 
 /**
- * Builds an RFC 9457 "Problem Details" error response (application/problem+json).
+ * JsonErrorResponse.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */

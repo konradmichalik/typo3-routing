@@ -80,9 +80,9 @@ final class RouteCompilerPassTest extends TestCase
     {
         $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
 
-        self::assertSame(10, $routes['fixture_preferred']['priority']);
+        self::assertSame(10, $routes['fixture_preferred']['priority'] ?? null);
         // Routes without an explicit priority default to 0.
-        self::assertSame(0, $routes['fixture_count']['priority']);
+        self::assertSame(0, $routes['fixture_count']['priority'] ?? null);
     }
 
     #[Test]
@@ -362,13 +362,13 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}>
      */
     private function discover(ContainerBuilder $container): array
     {
         (new RouteCompilerPass())->process($container);
 
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}> $routes */
         $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
 
         return $routes;

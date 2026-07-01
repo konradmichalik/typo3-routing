@@ -34,6 +34,21 @@ The attribute is repeatable. Its parameters:
 | `name`         | `?string`               | `null`    | Route name; auto-derived from service id + method when omitted.          |
 | `env`          | `?string`               | `null`    | Bind the route to a top-level application context (e.g. `Development`).  |
 | `requirements` | `array<string, string>` | `[]`      | Constraints by parameter name → regex (`''` = presence only). See below. |
+| `priority`     | `int`                   | `0`       | Match priority; higher is matched first when paths overlap. See below.   |
+
+## Priority
+
+When a static path and a placeholder path can both match the same URL, the one with the higher `priority` wins. Give the more specific route the higher value:
+
+```php
+#[Route(path: '/api/item/new', name: 'item_new', priority: 10)]
+public function new(): ResponseInterface { /* … */ }
+
+#[Route(path: '/api/item/{id}', name: 'item_show', requirements: ['id' => '\d+'])]
+public function show(int $id): ResponseInterface { /* … */ }
+```
+
+`priority` affects match order only; `routing:debug` and URL generation are unaffected. (Often unnecessary — a `requirements` constraint like `['id' => '\d+']` already keeps `/api/item/new` from matching the `{id}` route.)
 
 ## Requirements
 

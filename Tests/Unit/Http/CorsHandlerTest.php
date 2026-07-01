@@ -16,6 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 use KonradMichalik\Typo3Routing\Http\CorsHandler;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
 
@@ -42,6 +43,15 @@ final class CorsHandlerTest extends TestCase
     public function isEnabledOnceAnOriginIsConfigured(): void
     {
         self::assertTrue($this->handler(['allowedOrigins' => 'https://app.example.com'])->isEnabled());
+    }
+
+    #[Test]
+    public function staysDisabledWhenExtensionConfigurationThrows(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
+
+        self::assertFalse((new CorsHandler($extensionConfiguration))->isEnabled());
     }
 
     #[Test]

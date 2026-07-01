@@ -353,6 +353,21 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function answersPreflightForRouteThatExplicitlyAllowsOptions(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('OPTIONS', 'https://example.com/api/optionated')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'GET');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        // The route lists OPTIONS, so the matcher succeeds and the methods come from the route itself.
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('GET, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+    }
+
+    #[Test]
     public function preflightForUnknownPathFallsThroughToNotFound(): void
     {
         $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
@@ -415,6 +430,7 @@ final class RouteDispatcherTest extends TestCase
             'limited' => ['path' => '/api/limited', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'denied' => ['path' => '/api/denied', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'securecached' => ['path' => '/api/securecached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
+            'optionated' => ['path' => '/api/optionated', 'methods' => ['GET', 'OPTIONS'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -445,6 +461,7 @@ final class RouteDispatcherTest extends TestCase
             'limited' => [],
             'denied' => [],
             'securecached' => [],
+            'optionated' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\Status;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
@@ -108,12 +108,127 @@ final class OpenApiGeneratorTest extends TestCase
         self::assertSame('integer', $schema['properties']['status']['type']);
     }
 
+    #[Test]
+    public function mapsScalarVariadicAndUntypedQueryParameterSchemas(): void
+    {
+        $params = $this->schemasByName($this->features()['paths']['/api/types']['get']['parameters']);
+
+        self::assertSame(['type' => 'number'], $params['f']);
+        self::assertSame(['type' => 'boolean'], $params['b']);
+        // items is an empty schema object ({} in JSON), so compare structurally.
+        self::assertSame('array', $params['arr']['type']);
+        self::assertArrayHasKey('items', $params['arr']);
+        self::assertSame([], $params['m']);
+        // Untyped input becomes a raw string, and a requirement regex becomes the pattern.
+        self::assertSame(['type' => 'string', 'pattern' => '[a-z]+'], $params['raw']);
+        // A variadic parameter is exposed as a query parameter.
+        self::assertSame(['type' => 'integer'], $params['ids']);
+    }
+
+    #[Test]
+    public function mapsIntBackedEnumToIntegerSchema(): void
+    {
+        $params = $this->schemasByName($this->features()['paths']['/api/types']['get']['parameters']);
+
+        self::assertSame(['type' => 'integer', 'enum' => [1, 5]], $params['level']);
+    }
+
+    #[Test]
+    public function buildsOptionalRequestBodyWithoutRequiredList(): void
+    {
+        $operation = $this->features()['paths']['/api/note']['post'];
+
+        $schema = $operation['requestBody']['content']['application/json']['schema'];
+        self::assertSame(['type' => 'string'], $schema['properties']['note']);
+        self::assertArrayNotHasKey('required', $schema);
+        self::assertFalse($operation['requestBody']['required']);
+    }
+
+    #[Test]
+    public function mapsUnknownAuthenticatorToBearerSchemeNamedAfterClass(): void
+    {
+        $document = $this->features();
+        $operation = $document['paths']['/api/custom']['get'];
+
+        self::assertSame([['apiKeyAuthenticator' => []]], $operation['security']);
+        self::assertSame(['type' => 'http', 'scheme' => 'bearer'], $document['components']['securitySchemes']['apiKeyAuthenticator']);
+    }
+
+    #[Test]
+    public function mentionsTheApplicationContextForEnvBoundRoutes(): void
+    {
+        $operation = $this->features()['paths']['/api/dev']['get'];
+
+        self::assertStringContainsString('Development', $operation['description']);
+    }
+
     /**
      * @return array<string, mixed>
      */
     private function generate(): array
     {
         return (new OpenApiGenerator($this->registry()))->generate('My API', '2.0.0', '/api/');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function features(): array
+    {
+        return (new OpenApiGenerator($this->featureRegistry()))->generate('My API', '1.0.0', '/api/');
+    }
+
+    /**
+     * @param list<array{name: string, schema: array<string, mixed>}> $parameters
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function schemasByName(array $parameters): array
+    {
+        $schemas = [];
+        foreach ($parameters as $parameter) {
+            $schemas[$parameter['name']] = $parameter['schema'];
+        }
+
+        return $schemas;
+    }
+
+    private function featureRegistry(): RouteRegistry
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'types' => ['path' => '/api/types', 'methods' => ['GET'], 'controller' => 'ctrl::types', 'env' => null, 'requirements' => ['raw' => '[a-z]+']],
+            'note' => ['path' => '/api/note', 'methods' => ['POST'], 'controller' => 'ctrl::note', 'env' => null, 'requirements' => []],
+            'custom' => ['path' => '/api/custom', 'methods' => ['GET'], 'controller' => 'ctrl::custom', 'env' => null, 'requirements' => []],
+            'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
+        ];
+
+        $arguments = [
+            'types' => [
+                ['name' => 'f', 'type' => 'float', 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+                ['name' => 'b', 'type' => 'bool', 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+                ['name' => 'arr', 'type' => 'array', 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+                ['name' => 'm', 'type' => 'mixed', 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+                ['name' => 'raw', 'type' => null, 'source' => 'input', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+                ['name' => 'ids', 'type' => 'int', 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null],
+                ['name' => 'level', 'type' => Priority::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+            ],
+            'note' => [
+                // Optional body parameter → not in the required list.
+                ['name' => 'note', 'type' => 'string', 'source' => 'body', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+            ],
+            'custom' => [],
+            'dev' => [],
+        ];
+
+        return new RouteRegistry(
+            $routes,
+            new ServiceLocator([]),
+            [],
+            [],
+            $arguments,
+            ['custom' => [['service' => 'App\\Security\\ApiKeyAuthenticator', 'options' => []]]],
+        );
     }
 
     private function registry(): RouteRegistry

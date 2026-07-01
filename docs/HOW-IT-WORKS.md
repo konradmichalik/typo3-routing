@@ -77,3 +77,27 @@ The table lists every route with its path, methods, controller, environment bind
     }
 ]
 ```
+
+## OpenAPI export
+
+`routing:openapi` turns the same compiled registry into an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) document — so the routes stay the single source of truth for your API contract, Swagger UI, and client generators.
+
+``` bash
+vendor/bin/typo3 routing:openapi                 # compact JSON to stdout
+vendor/bin/typo3 routing:openapi --pretty        # pretty-printed
+vendor/bin/typo3 routing:openapi --pretty > openapi.json
+```
+
+| Option              | Effect                                                            |
+| ------------------- | ----------------------------------------------------------------- |
+| `--title=…`         | API title (default `TYPO3 Routing API`)                           |
+| `--api-version=…`   | API version (default `1.0.0`)                                     |
+| `--server=…`        | Server base URL (defaults to the configured path prefix)          |
+| `--pretty`          | Pretty-print the JSON                                             |
+
+What is derived automatically from the attributes:
+
+- **Paths & operations** — one operation per HTTP method; `{placeholder}` path segments become path parameters.
+- **Parameters & request bodies** — from the typed method signature: path/query parameters for `GET`-style routes, a JSON request body for `POST`/`PUT`/`PATCH`. Scalar types map to JSON Schema, backed enums become `enum` schemas, and a `requirements` regex becomes a `pattern`.
+- **Security** — `#[Authenticate]` routes reference a matching security scheme (`BearerTokenAuthenticator` → HTTP bearer; FE/BE user → cookie API key). OR-combined authenticators emit multiple requirements.
+- **Responses** — a generic `200` plus the error responses each route can actually produce (`400`/`401`/`403`/`404`/`405`/`429`), all sharing the `{error, status}` `Error` schema.

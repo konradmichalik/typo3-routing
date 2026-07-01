@@ -48,3 +48,9 @@ services:
             - name: console.command
               command: 'routing:debug'
               description: 'List all registered attribute routes'
+
+    KonradMichalik\Typo3Routing\Command\OpenApiCommand:
+        tags:
+            - name: console.command
+              command: 'routing:openapi'
+              description: 'Export all registered attribute routes as an OpenAPI 3.1 document'

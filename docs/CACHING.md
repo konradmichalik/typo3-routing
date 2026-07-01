@@ -28,5 +28,18 @@ public function list(ServerRequestInterface $request): ResponseInterface
 
 - Routes carrying an [`#[Authenticate]`](AUTHENTICATION.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.
 
+## ETag / conditional GET
+
+Cached `200` GET responses automatically carry a strong `ETag` — a SHA-256 hash of the **response body**. Because it hashes the payload (not the request), the validator changes whenever the content does, e.g. after a tag flush regenerates a different response.
+
+A client that sends the value back in an `If-None-Match` header gets a body-less `304 Not Modified` when the body is unchanged, saving bandwidth:
+
+```
+GET /api/news                          →  200 OK        ETag: "9f2b…"
+GET /api/news   If-None-Match: "9f2b…" →  304 Not Modified
+```
+
+Matching follows RFC 9110 (weak comparison, understands `*` and comma-separated lists). ETag/304 handling is scoped to cacheable routes only; uncached responses are unaffected.
+
 > [!CAUTION]
 > Only cache responses that are the **same for everyone**. `#[Cache]` is intended for public routes; `Set-Cookie` headers are never cached.

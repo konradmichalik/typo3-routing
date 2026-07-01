@@ -50,7 +50,7 @@ final class AccessGuardTest extends TestCase
 
         self::assertNotNull($response);
         self::assertSame(401, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Unauthorized","status":401}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Unauthorized","status":401}', (string) $response->getBody());
     }
 
     #[Test]
@@ -77,7 +77,7 @@ final class AccessGuardTest extends TestCase
 
         self::assertNotNull($response);
         self::assertSame(403, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Forbidden","status":403}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Forbidden","status":403}', (string) $response->getBody());
     }
 
     #[Test]

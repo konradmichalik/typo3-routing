@@ -26,13 +26,30 @@ use PHPUnit\Framework\TestCase;
 final class JsonErrorResponseTest extends TestCase
 {
     #[Test]
-    public function buildsTheJsonErrorEnvelopeWithContentType(): void
+    public function buildsAProblemDetailsDocumentWithContentType(): void
     {
         $response = JsonErrorResponse::create(404, 'Not Found');
 
         self::assertSame(404, $response->getStatusCode());
-        self::assertSame('application/json', $response->getHeaderLine('Content-Type'));
-        self::assertJsonStringEqualsJsonString('{"error":"Not Found","status":404}', (string) $response->getBody());
+        self::assertSame('application/problem+json', $response->getHeaderLine('Content-Type'));
+        // The message equals the generic title, so "detail" is omitted to avoid duplication.
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function includesDetailWhenItAddsInformationBeyondTheTitle(): void
+    {
+        $response = JsonErrorResponse::create(400, 'Missing required parameter: id');
+
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Missing required parameter: id"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function fallsBackToAGenericTitleForUnmappedStatus(): void
+    {
+        $response = JsonErrorResponse::create(418, '');
+
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Error","status":418}', (string) $response->getBody());
     }
 
     #[Test]

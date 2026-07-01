@@ -72,7 +72,7 @@ final class RouteDispatcherTest extends TestCase
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/missing'));
 
         self::assertSame(404, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Not Found","status":404}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
     }
 
     #[Test]
@@ -246,7 +246,7 @@ final class RouteDispatcherTest extends TestCase
 
         self::assertSame(200, $first->getStatusCode());
         self::assertSame(429, $second->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Too Many Requests","status":429}', (string) $second->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Too Many Requests","status":429}', (string) $second->getBody());
         self::assertNotSame('', $second->getHeaderLine('Retry-After'));
     }
 
@@ -276,7 +276,7 @@ final class RouteDispatcherTest extends TestCase
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/denied'));
 
         self::assertSame(401, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Unauthorized","status":401}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Unauthorized","status":401}', (string) $response->getBody());
     }
 
     #[Test]

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
-use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, RequestBody, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, JsonErrorResponse, RequestBody, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, RouteRegistry};
 use Override;
@@ -216,7 +216,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             $cacheKey = $this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']);
             $cached = $this->cache->get($cacheKey);
             if ($cached instanceof ResponseInterface) {
-                return $cached;
+                // A cached entry already carries its ETag, so a conditional GET can short-circuit.
+                return ConditionalGet::notModified($request, $cached) ?? $cached;
             }
         }
 
@@ -225,7 +226,11 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         // A non-null cache key is only set inside the block above, which already proved $cacheConfig
         // non-null — so it needs no repeated null check here.
         if (null !== $cacheKey && 200 === $response->getStatusCode()) {
+            // Attach the ETag before storing so this first response and later cache hits share the validator.
+            $response = $this->cache->withETag($response);
             $this->cache->store($cacheKey, $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
+
+            return ConditionalGet::notModified($request, $response) ?? $response;
         }
 
         return $response;

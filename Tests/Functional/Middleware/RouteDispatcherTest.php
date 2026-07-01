@@ -52,6 +52,12 @@ final class RouteDispatcherTest extends FunctionalTestCase
                         'frontend' => VariableFrontend::class,
                         'backend' => TransientMemoryBackend::class,
                     ],
+                    // Keeps the response cache in-process so ETag/conditional-GET behaviour is testable
+                    // without a database cache table.
+                    'typo3_routing' => [
+                        'frontend' => VariableFrontend::class,
+                        'backend' => TransientMemoryBackend::class,
+                    ],
                 ],
             ],
         ],
@@ -335,6 +341,30 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
         self::assertSame(400, $response->getStatusCode());
         self::assertJsonStringEqualsJsonString('{"error":"Missing required parameter: title","status":400}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function attachesAnETagToCachedGetResponses(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('"'.hash('sha256', (string) $response->getBody()).'"', $response->getHeaderLine('ETag'));
+    }
+
+    #[Test]
+    public function answersConditionalGetWithNotModified(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $etag = $first->getHeaderLine('ETag');
+
+        $second = $this->process(
+            $this->request('GET', 'https://example.com/api/example/cached')->withHeader('If-None-Match', $etag),
+        );
+
+        self::assertSame(304, $second->getStatusCode());
+        self::assertSame($etag, $second->getHeaderLine('ETag'));
+        self::assertSame('', (string) $second->getBody());
     }
 
     #[Test]

@@ -79,6 +79,22 @@ final class ResponseCacheManagerTest extends TestCase
     }
 
     #[Test]
+    public function withETagAddsAStrongBodyHashAndIsIdempotent(): void
+    {
+        $response = new Response('php://temp', 200);
+        $response->getBody()->write('{"ok":true}');
+
+        $tagged = $this->subject->withETag($response);
+        $etag = $tagged->getHeaderLine('ETag');
+
+        self::assertSame('"'.hash('sha256', '{"ok":true}').'"', $etag);
+        // The body stays readable after hashing.
+        self::assertSame('{"ok":true}', (string) $tagged->getBody());
+        // An existing ETag is preserved untouched.
+        self::assertSame($etag, $this->subject->withETag($tagged)->getHeaderLine('ETag'));
+    }
+
+    #[Test]
     public function buildKeyIsStableAndHonoursIgnoredParameters(): void
     {
         $base = $this->subject->buildKey('r', $this->requestWithQuery(['page' => '1', 'search' => 'foo']), ['search']);

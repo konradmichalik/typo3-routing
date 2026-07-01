@@ -82,6 +82,25 @@ final class ResponseCacheManager
     }
 
     /**
+     * Attaches a strong ETag derived from the response body, unless one is already present. Hashing
+     * the body (not the request) makes the validator track the payload: it changes when the content
+     * changes — e.g. after a cache-tag flush regenerates a different response for the same request.
+     */
+    public function withETag(ResponseInterface $response): ResponseInterface
+    {
+        if ($response->hasHeader('ETag')) {
+            return $response;
+        }
+
+        $body = $response->getBody();
+        $body->rewind();
+        $contents = $body->getContents();
+        $body->rewind();
+
+        return $response->withHeader('ETag', '"'.hash('sha256', $contents).'"');
+    }
+
+    /**
      * @param list<string> $ignoreParams
      */
     public function buildKey(string $routeName, ServerRequestInterface $request, array $ignoreParams): string

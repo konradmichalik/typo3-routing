@@ -222,7 +222,9 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         $response = $this->invokeController($match, $request);
 
-        if (null !== $cacheKey && null !== $cacheConfig && 200 === $response->getStatusCode()) {
+        // A non-null cache key is only set inside the block above, which already proved $cacheConfig
+        // non-null — so it needs no repeated null check here.
+        if (null !== $cacheKey && 200 === $response->getStatusCode()) {
             $this->cache->store($cacheKey, $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
         }
 

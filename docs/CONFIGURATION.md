@@ -2,11 +2,13 @@
 
 ## Path prefix gate
 
-The dispatcher first checks whether the request path (after stripping the site/language base) starts with a configurable prefix. Paths outside the prefix fall through to normal page rendering at zero cost — this is a pure performance gate. Configure it via **Settings → Extension Configuration → typo3_routing**:
+The dispatcher first checks whether the request path (after stripping the site/language base) starts with one or more configurable prefixes. Paths outside every prefix fall through to normal page rendering at zero cost — this is a pure performance gate. Configure it via **Settings → Extension Configuration → typo3_routing**:
 
 | Setting  | Description                                                                                     | Default  |
 |----------|-------------------------------------------------------------------------------------------------|----------|
-| `prefix` | Only paths starting with this are matched. Leave **empty** to match every path (see warning).   | `/api/`  |
+| `prefix` | Comma-separated list; only paths starting with one of these are matched. Leave **empty** to match every path (see warning). | `/api/`  |
+
+Use a comma-separated list to serve multiple namespaces, e.g. `/api/, /va/`.
 
 > [!WARNING]
 > Setting an **empty prefix** means every request path is matched against your routes. Any path that does not match a registered route returns `404` instead of falling through to the page router. Only use an empty prefix if attribute routes own your entire URL space.

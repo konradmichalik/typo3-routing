@@ -28,15 +28,19 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 
+use function array_filter;
 use function array_key_exists;
+use function array_map;
 use function array_values;
 use function assert;
+use function explode;
 use function is_array;
 use function is_object;
 use function is_string;
 use function max;
 use function sprintf;
 use function time;
+use function trim;
 
 /**
  * RouteDispatcher.
@@ -46,7 +50,10 @@ use function time;
  */
 final readonly class RouteDispatcher implements MiddlewareInterface
 {
-    private string $prefix;
+    /**
+     * @var list<string>
+     */
+    private array $prefixes;
 
     public function __construct(
         private RouteRegistry $registry,
@@ -67,7 +74,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         } catch (Throwable) {
             // Extension not configured yet — fall back to the default prefix.
         }
-        $this->prefix = $prefix;
+        // Comma-separated list, mirroring CorsHandler::$allowedOrigins parsing.
+        $this->prefixes = array_values(array_filter(array_map(trim(...), explode(',', $prefix)), static fn (string $item): bool => '' !== $item));
     }
 
     #[Override]
@@ -75,8 +83,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     {
         $path = $this->basePathResolver->stripSiteBase($request);
 
-        // 1. Prefix gate (pure performance filter): outside the prefix → regular page request.
-        if ('' !== $this->prefix && !str_starts_with($path, $this->prefix)) {
+        // 1. Prefix gate (pure performance filter): outside every configured prefix → regular page request.
+        if ([] !== $this->prefixes && !$this->matchesAnyPrefix($path)) {
             return $handler->handle($request);
         }
 
@@ -89,6 +97,11 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         // Every attribute-route response (success or error) gets the CORS headers stamped on.
         return $this->cors->decorate($this->handleApiRequest($request, $path), $request);
+    }
+
+    private function matchesAnyPrefix(string $path): bool
+    {
+        return [] !== array_filter($this->prefixes, static fn (string $prefix): bool => str_starts_with($path, $prefix));
     }
 
     private function handleApiRequest(ServerRequestInterface $request, string $path): ResponseInterface

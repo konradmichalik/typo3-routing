@@ -78,7 +78,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
         $response = $this->process($this->request('GET', 'https://example.com/api/example/missing'));
 
         self::assertSame(404, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Not Found","status":404}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
     }
 
     #[Test]
@@ -177,7 +177,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
         $response = $this->process($this->request('GET', 'https://example.com/api/example/range'));
 
         self::assertSame(400, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Missing required parameter: from","status":400}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Missing required parameter: from"}', (string) $response->getBody());
     }
 
     #[Test]
@@ -186,7 +186,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
         $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=abc'));
 
         self::assertSame(400, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Invalid value for parameter: from","status":400}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Invalid value for parameter: from"}', (string) $response->getBody());
     }
 
     #[Test]
@@ -244,7 +244,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
         self::assertSame(200, $first->getStatusCode());
         self::assertSame(429, $second->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Too Many Requests","status":429}', (string) $second->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Too Many Requests","status":429}', (string) $second->getBody());
         self::assertNotSame('', $second->getHeaderLine('Retry-After'));
     }
 
@@ -278,7 +278,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
             $response = $this->process($request);
 
             self::assertSame(401, $response->getStatusCode());
-            self::assertJsonStringEqualsJsonString('{"error":"Unauthorized","status":401}', (string) $response->getBody());
+            self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Unauthorized","status":401}', (string) $response->getBody());
         } finally {
             unset($_ENV['ROUTING_TEST_TOKEN']);
         }
@@ -300,7 +300,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
         $response = $this->process($this->request('POST', 'https://example.com/api/example/token'));
 
         self::assertSame(403, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Forbidden","status":403}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Forbidden","status":403}', (string) $response->getBody());
     }
 
     #[Test]
@@ -340,7 +340,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
         $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/json', '{"priority":5}'));
 
         self::assertSame(400, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"Missing required parameter: title","status":400}', (string) $response->getBody());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Missing required parameter: title"}', (string) $response->getBody());
     }
 
     #[Test]

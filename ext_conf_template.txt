@@ -3,3 +3,18 @@ prefix = /api/
 
 # cat=authentication/enable/010; type=string; label=Bearer token env variable name:Default name of the process environment variable that holds the expected bearer token for BearerTokenAuthenticator. Only the variable NAME is stored here, never the secret value. Overridable per route via #[Authenticate(BearerTokenAuthenticator::class, options: ['envName' => '...'])]. Defaults to ROUTING_BEARER_TOKEN when left empty.
 bearerTokenEnvName = ROUTING_BEARER_TOKEN
+
+# cat=cors/enable/010; type=string; label=CORS allowed origins:Comma-separated list of origins allowed to call the API (e.g. https://app.example.com, https://admin.example.com). Use * to allow any origin. Leave EMPTY to disable CORS entirely (default). Applies to every matched attribute route; preflight OPTIONS requests are answered automatically.
+cors.allowedOrigins =
+
+# cat=cors/enable/020; type=string; label=CORS allowed request headers:Comma-separated list of request headers the browser may send (Access-Control-Allow-Headers). Defaults to Content-Type, Authorization.
+cors.allowedHeaders = Content-Type, Authorization
+
+# cat=cors/enable/030; type=boolean; label=CORS allow credentials:Allow credentialed requests (cookies, Authorization header). When enabled, the concrete request origin is echoed instead of * (as required by the CORS spec).
+cors.allowCredentials = 0
+
+# cat=cors/enable/040; type=string; label=CORS exposed response headers:Comma-separated list of response headers exposed to the browser (Access-Control-Expose-Headers). Empty by default.
+cors.exposeHeaders =
+
+# cat=cors/enable/050; type=int+; label=CORS preflight max age:How long (seconds) the browser may cache the preflight result (Access-Control-Max-Age). Defaults to 3600.
+cors.maxAge = 3600

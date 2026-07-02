@@ -13,6 +13,23 @@ The dispatcher first checks whether the request path (after stripping the site/l
 
 Route paths in the `#[Route]` attribute are always written in full, including the prefix.
 
+## CORS
+
+Browser clients on a different origin need CORS headers. CORS is **off by default** and applies globally to every matched attribute route once at least one origin is configured (via **Settings → Extension Configuration → typo3_routing**). Preflight `OPTIONS` requests are answered automatically with a `204`.
+
+| Setting                | Description                                                                                       | Default                        |
+|------------------------|---------------------------------------------------------------------------------------------------|--------------------------------|
+| `cors.allowedOrigins`  | Comma-separated allowed origins, or `*` for any. **Empty disables CORS.**                         | *(empty)*                      |
+| `cors.allowedHeaders`  | Comma-separated request headers a client may send (`Access-Control-Allow-Headers`).               | `Content-Type, Authorization`  |
+| `cors.allowCredentials`| Allow credentialed requests. With credentials the concrete origin is echoed instead of `*`.       | `0`                            |
+| `cors.exposeHeaders`   | Comma-separated response headers exposed to the browser (`Access-Control-Expose-Headers`).        | *(empty)*                      |
+| `cors.maxAge`          | Seconds the browser may cache the preflight result (`Access-Control-Max-Age`).                    | `3600`                         |
+
+The allowed **methods** for a preflight are derived automatically from the route(s) matching the path (plus `OPTIONS`). An origin that is not on the allow-list simply receives no CORS headers.
+
+> [!NOTE]
+> The CORS spec forbids the `*` wildcard together with credentials. When `cors.allowCredentials` is enabled and `cors.allowedOrigins` is `*`, the extension echoes the concrete request origin instead.
+
 ## Environment-bound routes
 
 A route with `env: 'Development'` only exists while the top-level application context matches (case-insensitive). Outside that context the route behaves as if it does not exist (`404`) — no ExpressionLanguage, just a match-time check against `Environment::getContext()`.

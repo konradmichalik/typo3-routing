@@ -207,6 +207,9 @@ public function show(News $news): ResponseInterface
 
 A malformed identifier (not an integer) yields a **400**, same as an invalid `int` parameter. A well-formed identifier with no matching record yields a **404** — regardless of whether the parameter is nullable; nullability only governs a *missing* input, not one that fails to resolve. Variadic entity parameters (`News ...$items`) are rejected at compile time.
 
+> [!NOTE]
+> `getObjectByIdentifier()` respects Extbase's enable-fields (a hidden/deleted record resolves as **404**), but does not restrict by storage page or apply a workspace overlay — a record on any page/pid is resolvable by uid.
+
 ### Variadics
 
 A **variadic** parameter collects zero or more values from a single input array (`?ids[]=1&ids[]=2`), each coerced to the element type. An absent input yields no arguments.

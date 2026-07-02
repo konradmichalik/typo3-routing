@@ -4,14 +4,13 @@
 
 The dispatcher first checks whether the request path (after stripping the site/language base) starts with one or more configurable prefixes. Paths outside every prefix fall through to normal page rendering at zero cost — this is a pure performance gate. Configure it via **Settings → Extension Configuration → typo3_routing**:
 
-| Setting  | Description                                                                                     | Default  |
-|----------|-------------------------------------------------------------------------------------------------|----------|
-| `prefix` | Comma-separated list; only paths starting with one of these are matched. Leave **empty** to match every path (see warning). | `/api/`  |
+| Setting  | Description                                                                                                                  | Default |
+|----------|-------------------------------------------------------------------------------------------------------------------------------|---------|
+| `prefix` | Comma-separated list; only paths starting with one of these are matched against attribute routes. Leave **empty** to disable the gate. | `/api/` |
 
 Use a comma-separated list to serve multiple namespaces, e.g. `/api/, /va/`.
 
-> [!WARNING]
-> Setting an **empty prefix** means every request path is matched against your routes. Any path that does not match a registered route returns `404` instead of falling through to the page router. Only use an empty prefix if attribute routes own your entire URL space.
+Leaving `prefix` **empty** disables the gate: every request path is checked against your routes, at a performance cost for every page request. A path that still matches nothing falls through to normal page rendering, same as a path outside a configured prefix — so routes can declare their full path individually per controller and coexist with ordinary pages anywhere on the site. A path that matches a route's shape but the wrong HTTP method still gets a hard `405`, since that path was deliberately claimed by that route.
 
 Route paths in the `#[Route]` attribute are always written in full, including the prefix.
 

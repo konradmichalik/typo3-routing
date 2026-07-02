@@ -120,6 +120,45 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function dispatchesMatchingRouteWithNoPrefixConfigured(): void
+    {
+        $dispatcher = $this->dispatcherWithPrefix('');
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/api/count'),
+            $this->handler(new Response('php://temp', 200)),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function fallsThroughInsteadOfNotFoundWhenNoPrefixIsConfiguredAndNothingMatches(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+        $dispatcher = $this->dispatcherWithPrefix('');
+
+        $response = $dispatcher->process($this->request('GET', 'https://example.com/some/page'), $this->handler($sentinel));
+
+        self::assertSame($sentinel, $response);
+    }
+
+    #[Test]
+    public function stillReturnsMethodNotAllowedWhenNoPrefixIsConfigured(): void
+    {
+        $dispatcher = $this->dispatcherWithPrefix('');
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/api/submit'),
+            $this->handler(new Response('php://temp', 200)),
+        );
+
+        self::assertSame(405, $response->getStatusCode());
+        self::assertSame('POST', $response->getHeaderLine('Allow'));
+    }
+
+    #[Test]
     public function passesPathPlaceholderAsTypedControllerArgument(): void
     {
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/item/7'));

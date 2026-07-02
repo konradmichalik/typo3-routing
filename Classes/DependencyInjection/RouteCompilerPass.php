@@ -26,6 +26,7 @@ use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Referen
 use function array_intersect;
 use function array_map;
 use function class_exists;
+use function count;
 use function in_array;
 use function is_a;
 use function is_string;
@@ -131,19 +132,40 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      */
     private function collectController(ReflectionClass $reflection, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
     {
+        $classRoute = $this->resolveClassRoute($reflection, $serviceId);
+
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
             if ($method->isStatic() || $method->isConstructor()) {
                 continue;
             }
 
-            $found = $this->collectMethod($method, $serviceId, $container, $collected) || $found;
+            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute) || $found;
         }
 
         return $found;
     }
 
-    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
+    /**
+     * Reads the optional class-level #[Route] that prefixes every method route. At most one is allowed.
+     *
+     * @param ReflectionClass<object> $reflection
+     */
+    private function resolveClassRoute(ReflectionClass $reflection, string $serviceId): ?Route
+    {
+        $attributes = $reflection->getAttributes(Route::class);
+        if ([] === $attributes) {
+            return null;
+        }
+
+        if (count($attributes) > 1) {
+            throw new LogicException(sprintf('Multiple class-level #[Route] attributes on "%s" are not supported; a controller may declare at most one route prefix.', $serviceId), 1750000014);
+        }
+
+        return $attributes[0]->newInstance();
+    }
+
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute): bool
     {
         $routeAttributes = $method->getAttributes(Route::class);
         if ([] === $routeAttributes) {
@@ -158,7 +180,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $requestToken = $this->resolveRequestToken($method);
 
         foreach ($routeAttributes as $attribute) {
-            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $collected);
+            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $collected, $classRoute);
         }
 
         return true;
@@ -189,23 +211,37 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      * @param array{limit: int, interval: string, policy: string}|null                  $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
-    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, CollectedRoutes $collected): void
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, CollectedRoutes $collected, ?Route $classRoute): void
     {
-        $name = $route->name ?? $this->deriveRouteName($serviceId, $method->getName());
+        // Class-level #[Route] prefixes the path/name, defaults the env and provides base requirements.
+        $namePrefix = '';
+        $pathPrefix = '';
+        $classRequirements = [];
+        if ($classRoute instanceof Route) {
+            $namePrefix = $classRoute->name ?? '';
+            $pathPrefix = $classRoute->path;
+            $classRequirements = $classRoute->requirements;
+        }
+
+        $name = $namePrefix.($route->name ?? $this->deriveRouteName($serviceId, $method->getName()));
 
         if (isset($collected->routes[$name])) {
             throw new LogicException(sprintf('Duplicate attribute route name "%s": already defined by "%s", redefined by "%s::%s()". Set an explicit "name" on the #[Route] attribute to disambiguate.', $name, $collected->routes[$name]['controller'], $serviceId, $method->getName()), 1750000000);
         }
 
+        // The method wins per requirement key; a method env overrides the class default.
+        $path = $pathPrefix.$route->path;
+        $requirements = [...$classRequirements, ...$route->requirements];
+
         $methods = array_map(strtoupper(...), $route->methods);
         $collected->routes[$name] = [
-            'path' => $route->path,
+            'path' => $path,
             'methods' => $methods,
             'controller' => $serviceId.'::'.$method->getName(),
-            'env' => $route->env,
-            'requirements' => $route->requirements,
+            'env' => $route->env ?? $classRoute?->env,
+            'requirements' => $requirements,
         ];
-        $collected->arguments[$name] = $this->argumentSpecs->build($method, $route->path, $serviceId);
+        $collected->arguments[$name] = $this->argumentSpecs->build($method, $path, $serviceId);
 
         if (null !== $rateLimit) {
             $collected->rateLimits[$name] = $rateLimit;

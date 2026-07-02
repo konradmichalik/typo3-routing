@@ -35,6 +35,37 @@ The attribute is repeatable. Its parameters:
 | `env`          | `?string`               | `null`    | Bind the route to a top-level application context (e.g. `Development`).  |
 | `requirements` | `array<string, string>` | `[]`      | Constraints by parameter name → regex (`''` = presence only). See below. |
 
+## Class-level prefix (route groups)
+
+Placing `#[Route]` on the **controller class** turns it into a prefix shared by every method route — handy for grouping related endpoints or versioning an API (`/api/v1`, `/api/v2`). At most one class-level `#[Route]` is allowed.
+
+```php
+use KonradMichalik\Typo3Routing\Attribute\Route;
+use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
+
+#[Route(path: '/api/v1/courses', name: 'v1_courses_', requirements: ['id' => '\d+'])]
+final class CourseController implements RouteControllerInterface
+{
+    // → GET /api/v1/courses/{id}, route name "v1_courses_course_show"
+    #[Route(path: '/{id}', name: 'course_show')]
+    public function show(int $id): ResponseInterface { /* … */ }
+
+    // → GET /api/v1/courses, route name "v1_courses_course_list"
+    #[Route(path: '', name: 'course_list')]
+    public function list(): ResponseInterface { /* … */ }
+}
+```
+
+How the class-level values combine with each method:
+
+| Parameter      | Combination                                                                                   |
+|----------------|-----------------------------------------------------------------------------------------------|
+| `path`         | Class path is **prepended** to each method path.                                              |
+| `name`         | Class name is **prepended** to each resolved method name (auto-derived name still applies).   |
+| `env`          | Used as the **default** for methods that do not set their own `env`; a method `env` wins.     |
+| `requirements` | **Merged** with method requirements; the method wins per key.                                 |
+| `methods`      | **Ignored** at class level — the method default (`['GET']`) is indistinguishable from "unset". |
+
 ## Requirements
 
 `requirements` constrains parameters by name, with two enforcement layers depending on where the parameter lives:

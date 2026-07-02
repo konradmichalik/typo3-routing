@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -73,6 +73,39 @@ final class RouteCompilerPassTest extends TestCase
         $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
 
         self::assertSame('Development', $routes['fixture_dev']['env']);
+    }
+
+    #[Test]
+    public function appliesClassLevelRoutePrefixToPathNameEnvAndRequirements(): void
+    {
+        $routes = $this->discover($this->buildContainer(['prefixed' => PrefixedController::class]));
+
+        // Class path + name prefix; class env and requirements inherited by the method.
+        self::assertArrayHasKey('v1_items_show', $routes);
+        self::assertSame('/api/v1/items/{id}', $routes['v1_items_show']['path']);
+        self::assertSame('Development', $routes['v1_items_show']['env']);
+        self::assertSame(['id' => '\d+'], $routes['v1_items_show']['requirements']);
+    }
+
+    #[Test]
+    public function methodRouteOverridesClassLevelEnvAndRequirementsPerKey(): void
+    {
+        $routes = $this->discover($this->buildContainer(['prefixed' => PrefixedController::class]));
+
+        // Name prefix + auto-derived method name; method env and requirement win.
+        self::assertArrayHasKey('v1_prefixed_ping', $routes);
+        self::assertSame('/api/v1/ping', $routes['v1_prefixed_ping']['path']);
+        self::assertSame('Production', $routes['v1_prefixed_ping']['env']);
+        self::assertSame(['id' => '[a-z]+'], $routes['v1_prefixed_ping']['requirements']);
+    }
+
+    #[Test]
+    public function throwsOnMultipleClassLevelRoutePrefixes(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000014);
+
+        $this->discover($this->buildContainer(['double' => DoubleClassRouteController::class]));
     }
 
     #[Test]

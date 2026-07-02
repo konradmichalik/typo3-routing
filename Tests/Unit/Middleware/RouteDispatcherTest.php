@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Middleware;
 use KonradMichalik\RoutingTest\Controller\ExampleController;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
-use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
+use KonradMichalik\Typo3Routing\Http\{CorsHandler, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, RouteRegistry};
@@ -208,7 +208,7 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
 
         $registry = $this->registry();
-        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), new AccessGuard($registry, new Context()), $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), new AccessGuard($registry, new Context()), new CorsHandler($extensionConfiguration), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -290,6 +290,96 @@ final class RouteDispatcherTest extends TestCase
         self::assertNotSame((string) $first->getBody(), (string) $second->getBody());
     }
 
+    #[Test]
+    public function addsNoCorsHeadersWhenCorsIsDisabled(): void
+    {
+        $request = $this->request('GET', 'https://example.com/api/count')->withHeader('Origin', 'https://app.example.com');
+
+        $response = $this->dispatch($request);
+
+        self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function decoratesResponseWithAllowOriginForAllowedOrigin(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('GET', 'https://example.com/api/count')->withHeader('Origin', 'https://app.example.com');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('https://app.example.com', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('Origin', $response->getHeaderLine('Vary'));
+    }
+
+    #[Test]
+    public function echoesWildcardOriginWhenConfigured(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => '*']);
+        $request = $this->request('GET', 'https://example.com/api/count')->withHeader('Origin', 'https://anywhere.example');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function omitsAllowOriginForDisallowedOrigin(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('GET', 'https://example.com/api/count')->withHeader('Origin', 'https://evil.example');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function answersPreflightWith204AndCorsHeaders(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('OPTIONS', 'https://example.com/api/submit')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'POST');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('https://app.example.com', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        // The route allows POST; OPTIONS is always added for the preflight itself.
+        self::assertSame('POST, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+        self::assertNotSame('', $response->getHeaderLine('Access-Control-Max-Age'));
+    }
+
+    #[Test]
+    public function answersPreflightForRouteThatExplicitlyAllowsOptions(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('OPTIONS', 'https://example.com/api/optionated')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'GET');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        // The route lists OPTIONS, so the matcher succeeds and the methods come from the route itself.
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('GET, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+    }
+
+    #[Test]
+    public function preflightForUnknownPathFallsThroughToNotFound(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('OPTIONS', 'https://example.com/api/missing')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'GET');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
     private function dispatch(ServerRequestInterface $request, ?ResponseInterface $fallThrough = null, ?Context $context = null): ResponseInterface
     {
         return $this->dispatcher($context)->process($request, $this->handler($fallThrough ?? new Response('php://temp', 200)));
@@ -300,10 +390,29 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn('/api/');
 
+        return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, $context);
+    }
+
+    /**
+     * @param array<string, mixed> $cors
+     */
+    private function dispatcherWithCors(array $cors, ?Context $context = null): RouteDispatcher
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        // The path-less get() feeds CorsHandler the full config; the get(..., 'prefix') call resolves the prefix.
+        $extensionConfiguration->method('get')->willReturnCallback(
+            static fn (string $extension, string $path = ''): mixed => '' === $path ? ['cors' => $cors] : '/api/',
+        );
+
+        return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, $context);
+    }
+
+    private function dispatcherWith(CorsHandler $cors, ExtensionConfiguration $extensionConfiguration, ?Context $context = null): RouteDispatcher
+    {
         $registry = $this->registry();
         $accessGuard = new AccessGuard($registry, $context ?? new Context());
 
-        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), $accessGuard, $extensionConfiguration);
+        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver(), $accessGuard, $cors, $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -321,6 +430,7 @@ final class RouteDispatcherTest extends TestCase
             'limited' => ['path' => '/api/limited', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'denied' => ['path' => '/api/denied', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'securecached' => ['path' => '/api/securecached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
+            'optionated' => ['path' => '/api/optionated', 'methods' => ['GET', 'OPTIONS'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -351,6 +461,7 @@ final class RouteDispatcherTest extends TestCase
             'limited' => [],
             'denied' => [],
             'securecached' => [],
+            'optionated' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

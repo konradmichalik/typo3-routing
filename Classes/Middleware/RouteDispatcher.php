@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
-use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, RequestBody, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{CorsHandler, JsonErrorResponse, RequestBody, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, RouteRegistry};
 use Override;
@@ -29,6 +29,7 @@ use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 
 use function array_key_exists;
+use function array_values;
 use function assert;
 use function is_array;
 use function is_object;
@@ -54,6 +55,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private RateLimitEnforcer $rateLimiter,
         private ControllerArgumentResolver $argumentResolver,
         private AccessGuard $accessGuard,
+        private CorsHandler $cors,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $prefix = '/api/';
@@ -78,6 +80,19 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $handler->handle($request);
         }
 
+        // CORS preflight is answered up front — before env/auth — so the browser gets its 204 without
+        // credentials ever being required. A path that matches no route falls through to the gauntlet.
+        $preflight = $this->preflight($request, $path);
+        if ($preflight instanceof ResponseInterface) {
+            return $preflight;
+        }
+
+        // Every attribute-route response (success or error) gets the CORS headers stamped on.
+        return $this->cors->decorate($this->handleApiRequest($request, $path), $request);
+    }
+
+    private function handleApiRequest(ServerRequestInterface $request, string $path): ResponseInterface
+    {
         // 2. Matching → 404 / 405.
         $match = $this->matchRoute($request, $path);
         if ($match instanceof ResponseInterface) {
@@ -118,13 +133,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface
     {
-        $context = new RequestContext();
-        $context->setMethod($request->getMethod());
-        $context->setHost($request->getUri()->getHost());
-        $context->setScheme($request->getUri()->getScheme());
-
         try {
-            return $this->registry->getMatcher($context)->match($path);
+            return $this->registry->getMatcher($this->requestContext($request))->match($path);
         } catch (ResourceNotFoundException) {
             return JsonErrorResponse::create(404, 'Not Found');
         } catch (MethodNotAllowedException $exception) {
@@ -132,6 +142,42 @@ final readonly class RouteDispatcher implements MiddlewareInterface
                 'Allow' => implode(', ', $exception->getAllowedMethods()),
             ]);
         }
+    }
+
+    /**
+     * Answers a CORS preflight for a path that matches at least one route. Returns null when CORS is
+     * off, the request is not a preflight, or the path matches nothing (so it continues the gauntlet).
+     */
+    private function preflight(ServerRequestInterface $request, string $path): ?ResponseInterface
+    {
+        if (!$this->cors->isEnabled() || 'OPTIONS' !== $request->getMethod() || '' === $request->getHeaderLine('Access-Control-Request-Method')) {
+            return null;
+        }
+
+        try {
+            // OPTIONS is rarely a declared method, so the matcher usually reports the allowed methods
+            // for the path via MethodNotAllowedException — exactly what the preflight needs.
+            $match = $this->registry->getMatcher($this->requestContext($request))->match($path);
+        } catch (MethodNotAllowedException $exception) {
+            return $this->cors->preflightResponse(array_values($exception->getAllowedMethods()), $request);
+        } catch (ResourceNotFoundException) {
+            return null;
+        }
+
+        $routeName = (string) ($match['_route'] ?? '');
+        $methods = $this->registry->getRoutes()[$routeName]['methods'] ?? [];
+
+        return $this->cors->preflightResponse($methods, $request);
+    }
+
+    private function requestContext(ServerRequestInterface $request): RequestContext
+    {
+        $context = new RequestContext();
+        $context->setMethod($request->getMethod());
+        $context->setHost($request->getUri()->getHost());
+        $context->setScheme($request->getUri()->getScheme());
+
+        return $context;
     }
 
     /**
@@ -188,7 +234,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             if (!array_key_exists($key, $inputs)) {
                 return sprintf('Missing required parameter: %s', $key);
             }
-            if (is_string($pattern) && '' !== $pattern && (!is_string($inputs[$key]) || 1 !== preg_match('#^(?:'.$pattern.')$#', $inputs[$key]))) {
+            if (is_string($pattern) && $this->inputViolatesPattern($pattern, $inputs[$key])) {
                 return sprintf('Invalid value for parameter: %s', $key);
             }
         }
@@ -197,38 +243,63 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
+     * A non-empty pattern is violated when the value is not a string or does not fully match the regex.
+     */
+    private function inputViolatesPattern(string $pattern, mixed $value): bool
+    {
+        return '' !== $pattern && (!is_string($value) || 1 !== preg_match('#^(?:'.$pattern.')$#', $value));
+    }
+
+    /**
      * @param array<string, mixed> $match
      */
     private function dispatch(array $match, ServerRequestInterface $request): ResponseInterface
     {
         $routeName = (string) ($match['_route'] ?? '');
-        $cacheConfig = $this->registry->getCacheConfig($routeName);
-        $cacheKey = null;
 
         // Authenticated routes are never cached: the cache key does not vary by identity, so a shared
         // entry would leak one client's response to another. Force no-store regardless of #[Cache].
-        if ([] !== $this->registry->getAuthenticators($routeName)) {
-            $cacheConfig = null;
-        }
+        $cacheConfig = [] === $this->registry->getAuthenticators($routeName)
+            ? $this->registry->getCacheConfig($routeName)
+            : null;
 
-        // Only safe GET requests are cached; the success response format stays the controller's choice.
-        if (null !== $cacheConfig && 'GET' === $request->getMethod()) {
-            $cacheKey = $this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']);
-            $cached = $this->cache->get($cacheKey);
-            if ($cached instanceof ResponseInterface) {
-                return $cached;
-            }
+        $cached = $this->readCache($cacheConfig, $routeName, $request);
+        if ($cached instanceof ResponseInterface) {
+            return $cached;
         }
 
         $response = $this->invokeController($match, $request);
-
-        // A non-null cache key is only set inside the block above, which already proved $cacheConfig
-        // non-null — so it needs no repeated null check here.
-        if (null !== $cacheKey && 200 === $response->getStatusCode()) {
-            $this->cache->store($cacheKey, $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
-        }
+        $this->writeCache($cacheConfig, $routeName, $request, $response);
 
         return $response;
+    }
+
+    /**
+     * Serves a cached response for a cacheable GET, or null (miss, non-GET, or caching not opted in).
+     *
+     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
+     */
+    private function readCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request): ?ResponseInterface
+    {
+        if (null === $cacheConfig || 'GET' !== $request->getMethod()) {
+            return null;
+        }
+
+        return $this->cache->get($this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']));
+    }
+
+    /**
+     * Stores a successful GET response when caching is opted in; the success format stays the controller's.
+     *
+     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
+     */
+    private function writeCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request, ResponseInterface $response): void
+    {
+        if (null === $cacheConfig || 'GET' !== $request->getMethod() || 200 !== $response->getStatusCode()) {
+            return;
+        }
+
+        $this->cache->store($this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']), $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
     }
 
     /**

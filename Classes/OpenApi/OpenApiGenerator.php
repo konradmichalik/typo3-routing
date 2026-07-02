@@ -346,24 +346,28 @@ final readonly class OpenApiGenerator
     {
         return [
             'description' => $description,
-            'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/Error']]],
+            'content' => ['application/problem+json' => ['schema' => ['$ref' => '#/components/schemas/Error']]],
         ];
     }
 
     /**
-     * Matches the body emitted by JsonErrorResponse.
+     * Matches the RFC 9457 problem+json body emitted by JsonErrorResponse.
      *
      * @return array<string, mixed>
      */
     private function errorSchema(): array
     {
+        $properties = [
+            'type' => ['type' => 'string'],
+            'title' => ['type' => 'string'],
+            'status' => ['type' => 'integer'],
+            'detail' => ['type' => 'string'],
+        ];
+
         return [
             'type' => 'object',
-            'properties' => [
-                'error' => ['type' => 'string'],
-                'status' => ['type' => 'integer'],
-            ],
-            'required' => ['error', 'status'],
+            'properties' => $properties,
+            'required' => ['type', 'title', 'status'],
         ];
     }
 }

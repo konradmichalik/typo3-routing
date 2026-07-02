@@ -35,6 +35,7 @@ final readonly class Route
      * @param string|null           $name         Explicit route name; auto-derived from service id + method when null. At class level: name prefix.
      * @param string|null           $env          Top-level application context this route is bound to (e.g. "Development"); null = always active. At class level: default for methods without their own env.
      * @param array<string, string> $requirements Constraints by parameter name → regex. A name matching a path placeholder ({id}) is enforced by the matcher (404). Any other name is a required query/body parameter validated at dispatch (400; '' = presence only). E.g. ['id' => '\d+', 'q' => '']. Named patterns from Symfony\Component\Routing\Requirement\Requirement may be used as values, e.g. ['id' => Requirement::DIGITS]. At class level: merged under method requirements.
+     * @param int                   $priority     Match priority; higher values are matched first. Use to disambiguate a static path from an overlapping placeholder path. Default 0
      */
     public function __construct(
         public string $path,
@@ -42,5 +43,6 @@ final readonly class Route
         public ?string $name = null,
         public ?string $env = null,
         public array $requirements = [],
+        public int $priority = 0,
     ) {}
 }

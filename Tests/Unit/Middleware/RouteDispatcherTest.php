@@ -95,6 +95,70 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function matchesPathUnderAnyCommaSeparatedPrefix(): void
+    {
+        $dispatcher = $this->dispatcherWithPrefix('/api/, /va/');
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/va/count'),
+            $this->handler(new Response('php://temp', 200)),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function fallsThroughForPathOutsideEveryCommaSeparatedPrefix(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+        $dispatcher = $this->dispatcherWithPrefix('/api/, /va/');
+
+        $response = $dispatcher->process($this->request('GET', 'https://example.com/some/page'), $this->handler($sentinel));
+
+        self::assertSame($sentinel, $response);
+    }
+
+    #[Test]
+    public function dispatchesMatchingRouteWithNoPrefixConfigured(): void
+    {
+        $dispatcher = $this->dispatcherWithPrefix('');
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/api/count'),
+            $this->handler(new Response('php://temp', 200)),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function fallsThroughInsteadOfNotFoundWhenNoPrefixIsConfiguredAndNothingMatches(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+        $dispatcher = $this->dispatcherWithPrefix('');
+
+        $response = $dispatcher->process($this->request('GET', 'https://example.com/some/page'), $this->handler($sentinel));
+
+        self::assertSame($sentinel, $response);
+    }
+
+    #[Test]
+    public function stillReturnsMethodNotAllowedWhenNoPrefixIsConfigured(): void
+    {
+        $dispatcher = $this->dispatcherWithPrefix('');
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/api/submit'),
+            $this->handler(new Response('php://temp', 200)),
+        );
+
+        self::assertSame(405, $response->getStatusCode());
+        self::assertSame('POST', $response->getHeaderLine('Allow'));
+    }
+
+    #[Test]
     public function passesPathPlaceholderAsTypedControllerArgument(): void
     {
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/item/7'));
@@ -430,6 +494,14 @@ final class RouteDispatcherTest extends TestCase
         return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, $context);
     }
 
+    private function dispatcherWithPrefix(string $prefix): RouteDispatcher
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn($prefix);
+
+        return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration);
+    }
+
     /**
      * @param array<string, mixed> $cors
      */
@@ -457,6 +529,7 @@ final class RouteDispatcherTest extends TestCase
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'vaCount' => ['path' => '/va/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []],
             'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
             'typed' => ['path' => '/api/typed/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => []],
@@ -488,6 +561,7 @@ final class RouteDispatcherTest extends TestCase
         /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
         $arguments = [
             'count' => [],
+            'vaCount' => [],
             'submit' => [$request],
             'item' => [$id],
             'typed' => [$id],

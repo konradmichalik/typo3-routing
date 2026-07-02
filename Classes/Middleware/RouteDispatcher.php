@@ -28,15 +28,19 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 
+use function array_filter;
 use function array_key_exists;
+use function array_map;
 use function array_values;
 use function assert;
+use function explode;
 use function is_array;
 use function is_object;
 use function is_string;
 use function max;
 use function sprintf;
 use function time;
+use function trim;
 
 /**
  * RouteDispatcher.
@@ -46,7 +50,10 @@ use function time;
  */
 final readonly class RouteDispatcher implements MiddlewareInterface
 {
-    private string $prefix;
+    /**
+     * @var list<string>
+     */
+    private array $prefixes;
 
     public function __construct(
         private RouteRegistry $registry,
@@ -67,7 +74,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         } catch (Throwable) {
             // Extension not configured yet — fall back to the default prefix.
         }
-        $this->prefix = $prefix;
+        // Comma-separated list, mirroring CorsHandler::$allowedOrigins parsing.
+        $this->prefixes = array_values(array_filter(array_map(trim(...), explode(',', $prefix)), static fn (string $item): bool => '' !== $item));
     }
 
     #[Override]
@@ -75,8 +83,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     {
         $path = $this->basePathResolver->stripSiteBase($request);
 
-        // 1. Prefix gate (pure performance filter): outside the prefix → regular page request.
-        if ('' !== $this->prefix && !str_starts_with($path, $this->prefix)) {
+        // 1. Prefix gate (pure performance filter): outside every configured prefix → regular page request.
+        if ([] !== $this->prefixes && !$this->matchesAnyPrefix($path)) {
             return $handler->handle($request);
         }
 
@@ -87,15 +95,30 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $preflight;
         }
 
+        $response = $this->handleApiRequest($request, $path);
+        if (null === $response) {
+            // No prefix claims this path exclusively, and it matched no route either — a page, presumably.
+            return $handler->handle($request);
+        }
+
         // Every attribute-route response (success or error) gets the CORS headers stamped on.
-        return $this->cors->decorate($this->handleApiRequest($request, $path), $request);
+        return $this->cors->decorate($response, $request);
     }
 
-    private function handleApiRequest(ServerRequestInterface $request, string $path): ResponseInterface
+    private function matchesAnyPrefix(string $path): bool
     {
-        // 2. Matching → 404 / 405.
+        return [] !== array_filter($this->prefixes, static fn (string $prefix): bool => str_starts_with($path, $prefix));
+    }
+
+    /**
+     * Returns null when nothing claims the path: no route matched, and no prefix reserves it exclusively
+     * for this middleware. The caller then falls through to normal page rendering.
+     */
+    private function handleApiRequest(ServerRequestInterface $request, string $path): ?ResponseInterface
+    {
+        // 2. Matching → 404 / 405, or null (unprefixed mode, let the page router try).
         $match = $this->matchRoute($request, $path);
-        if ($match instanceof ResponseInterface) {
+        if (null === $match || $match instanceof ResponseInterface) {
             return $match;
         }
 
@@ -129,14 +152,17 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
-     * @return array<string, mixed>|ResponseInterface the matched route attributes, or a 404/405 error response
+     * Null means: no route matched, and no prefix is configured — routes then declare their full path
+     * individually per controller and must coexist with ordinary pages everywhere else.
+     *
+     * @return array<string, mixed>|ResponseInterface|null the matched route attributes, or a 404/405 error response
      */
-    private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface
+    private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface|null
     {
         try {
             return $this->registry->getMatcher($this->requestContext($request))->match($path);
         } catch (ResourceNotFoundException) {
-            return JsonErrorResponse::create(404, 'Not Found');
+            return [] === $this->prefixes ? null : JsonErrorResponse::create(404, 'Not Found');
         } catch (MethodNotAllowedException $exception) {
             return JsonErrorResponse::create(405, 'Method Not Allowed', [
                 'Allow' => implode(', ', $exception->getAllowedMethods()),

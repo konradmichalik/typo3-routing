@@ -17,6 +17,7 @@ use KonradMichalik\Typo3Routing\Http\RequestBody;
 use Psr\Http\Message\ServerRequestInterface;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
+use Symfony\Component\DependencyInjection\Attribute\Lazy;
 use TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface;
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 use UnitEnum;
@@ -46,7 +47,10 @@ use function strtolower;
 final class ControllerArgumentResolver
 {
     public function __construct(
-        private readonly PersistenceManagerInterface $persistenceManager,
+        // Lazy: TYPO3's PersistenceManager pulls in PageRepository, whose constructor already
+        // queries the DB (a known TYPO3 core issue). This middleware runs before page-resolver,
+        // so eagerly building it would break every route, not just ones with an entity parameter.
+        #[Lazy] private readonly PersistenceManagerInterface $persistenceManager,
     ) {}
 
     /**

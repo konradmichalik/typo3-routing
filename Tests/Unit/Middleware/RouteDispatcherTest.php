@@ -239,6 +239,43 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function attachesAnETagToCachedGetResponses(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('"'.hash('sha256', (string) $response->getBody()).'"', $response->getHeaderLine('ETag'));
+    }
+
+    #[Test]
+    public function returnsNotModifiedWhenIfNoneMatchMatchesTheETag(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+        $etag = $first->getHeaderLine('ETag');
+
+        $second = $this->dispatch(
+            $this->request('GET', 'https://example.com/api/cached')->withHeader('If-None-Match', $etag),
+        );
+
+        self::assertSame(304, $second->getStatusCode());
+        self::assertSame($etag, $second->getHeaderLine('ETag'));
+        self::assertSame('', (string) $second->getBody());
+    }
+
+    #[Test]
+    public function servesTheFullResponseWhenIfNoneMatchDoesNotMatch(): void
+    {
+        $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        $response = $this->dispatch(
+            $this->request('GET', 'https://example.com/api/cached')->withHeader('If-None-Match', '"stale"'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertNotSame('', (string) $response->getBody());
+    }
+
+    #[Test]
     public function blocksRequestsExceedingTheRateLimitWith429AndRetryAfter(): void
     {
         $first = $this->dispatch($this->request('GET', 'https://example.com/api/limited'));

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
-use KonradMichalik\Typo3Routing\Http\{CorsHandler, JsonErrorResponse, RequestBody, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, JsonErrorResponse, RequestBody, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, RouteRegistry};
 use Override;
@@ -265,13 +265,15 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         $cached = $this->readCache($cacheConfig, $routeName, $request);
         if ($cached instanceof ResponseInterface) {
-            return $cached;
+            // A cached entry already carries its ETag, so a conditional GET can short-circuit.
+            return ConditionalGet::notModified($request, $cached) ?? $cached;
         }
 
         $response = $this->invokeController($match, $request);
-        $this->writeCache($cacheConfig, $routeName, $request, $response);
+        $response = $this->writeCache($cacheConfig, $routeName, $request, $response);
 
-        return $response;
+        // notModified is a no-op unless the response was cached (only then does it carry an ETag).
+        return ConditionalGet::notModified($request, $response) ?? $response;
     }
 
     /**
@@ -290,16 +292,22 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
     /**
      * Stores a successful GET response when caching is opted in; the success format stays the controller's.
+     * Returns the response to send — ETag-tagged when cached (so the first response and later cache hits
+     * share the validator), otherwise the response unchanged.
      *
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
      */
-    private function writeCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request, ResponseInterface $response): void
+    private function writeCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         if (null === $cacheConfig || 'GET' !== $request->getMethod() || 200 !== $response->getStatusCode()) {
-            return;
+            return $response;
         }
 
+        // Attach the ETag before storing so this first response and later cache hits share the validator.
+        $response = $this->cache->withETag($response);
         $this->cache->store($this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']), $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
+
+        return $response;
     }
 
     /**

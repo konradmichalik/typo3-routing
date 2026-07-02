@@ -44,14 +44,14 @@ use function strtolower;
  * @author Konrad Michalik <hej@konradmichalik.dev>
  * @license GPL-2.0-or-later
  */
-final class ControllerArgumentResolver
+final readonly class ControllerArgumentResolver
 {
     public function __construct(
         // Lazy: TYPO3's PersistenceManager pulls in PageRepository, whose constructor already
         // queries the DB (a known TYPO3 core issue). RouteDispatcher, the middleware that owns
         // this resolver, runs before page-resolver, so eagerly building it here would break
         // every route, not just ones with an entity parameter.
-        #[Lazy] private readonly PersistenceManagerInterface $persistenceManager,
+        #[Lazy] private PersistenceManagerInterface $persistenceManager,
     ) {}
 
     /**
@@ -199,7 +199,7 @@ final class ControllerArgumentResolver
 
         $entity = $this->persistenceManager->getObjectByIdentifier($value, $class);
         if (null === $entity) {
-            throw new EntityNotFoundException(sprintf('No "%s" found for identifier "%s".', $class, $value));
+            throw new EntityNotFoundException(sprintf('No "%s" found for identifier "%s".', $class, $value), 7017190502);
         }
 
         return $entity;

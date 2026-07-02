@@ -25,7 +25,7 @@ public function report(): ResponseInterface
 | `options`       | `array<string,mixed>` | `[]`    | Passed verbatim to `authenticate()`.                                 |
 
 - The attribute is **repeatable, and multiple attributes are combined with OR** — the route is reachable as soon as *one* authenticator accepts. The real case: "a logged-in FE user **or** a valid token".
-- When every authenticator rejects, the dispatcher returns `401 Unauthorized` (`{error, status}` JSON).
+- When every authenticator rejects, the dispatcher returns `401 Unauthorized` (RFC 9457 `application/problem+json`).
 - A referenced class that is not a registered service, or does not implement the interface, is a **build-time error**.
 
 > [!IMPORTANT]

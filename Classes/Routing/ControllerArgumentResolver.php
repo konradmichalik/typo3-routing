@@ -17,12 +17,15 @@ use KonradMichalik\Typo3Routing\Http\RequestBody;
 use Psr\Http\Message\ServerRequestInterface;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
+use TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface;
+use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 use UnitEnum;
 
 use function array_key_exists;
 use function array_map;
 use function array_values;
 use function in_array;
+use function is_a;
 use function is_array;
 use function is_bool;
 use function is_float;
@@ -42,6 +45,10 @@ use function strtolower;
  */
 final class ControllerArgumentResolver
 {
+    public function __construct(
+        private readonly PersistenceManagerInterface $persistenceManager,
+    ) {}
+
     /**
      * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs the controller method's parameters, in declaration order
      * @param array<string, mixed>                                                                                           $match the matcher result (path placeholders live here, meta keys are prefixed with "_")
@@ -121,6 +128,9 @@ final class ControllerArgumentResolver
         if (null !== $type && is_subclass_of($type, UnitEnum::class, true)) {
             return $this->toEnum($value, $type, $spec['name']);
         }
+        if (null !== $type && is_a($type, DomainObjectInterface::class, true)) {
+            return $this->toEntity($value, $type, $spec['name']);
+        }
 
         return match ($type) {
             'int' => $this->toInt($value, $spec['name']),
@@ -167,6 +177,27 @@ final class ControllerArgumentResolver
         }
 
         throw $this->invalid($name);
+    }
+
+    /**
+     * Resolves a path/query/body identifier to an Extbase domain object via the persistence manager.
+     * A malformed identifier is a 400 (same shape check as `toInt()`); a well-shaped identifier with
+     * no matching record is an `EntityNotFoundException`, mapped to a 404 by the dispatcher.
+     *
+     * @param class-string $class
+     */
+    private function toEntity(mixed $value, string $class, string $name): object
+    {
+        if (!is_int($value) && !(is_string($value) && 1 === preg_match('/^-?\d+$/', $value))) {
+            throw $this->invalid($name);
+        }
+
+        $entity = $this->persistenceManager->getObjectByIdentifier($value, $class);
+        if (null === $entity) {
+            throw new EntityNotFoundException(sprintf('No "%s" found for identifier "%s".', $class, $value));
+        }
+
+        return $entity;
     }
 
     private function toInt(mixed $value, string $name): int

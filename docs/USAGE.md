@@ -35,6 +35,7 @@ The attribute is repeatable. Its parameters:
 | `env`          | `?string`               | `null`    | Bind the route to a top-level application context (e.g. `Development`).  |
 | `requirements` | `array<string, string>` | `[]`      | Constraints by parameter name → regex (`''` = presence only). See below. |
 | `priority`     | `int`                   | `0`       | Match priority; higher is matched first when paths overlap. See below.   |
+| `defaults`     | `array<string, mixed>`  | `[]`      | Default values for path placeholders; a trailing placeholder with a default becomes optional. See below. |
 
 ## Priority
 
@@ -49,6 +50,20 @@ public function show(int $id): ResponseInterface { /* … */ }
 ```
 
 `priority` affects match order only; `routing:debug` and URL generation are unaffected. (Often unnecessary — a `requirements` constraint like `['id' => '\d+']` already keeps `/api/item/new` from matching the `{id}` route.)
+
+## Defaults (optional placeholders)
+
+A `defaults` entry supplies a value for a path placeholder. When the placeholder is **trailing**, this makes the segment optional: the shorter path matches too and the default is passed to your controller.
+
+```php
+// Both /api/blog and /api/blog/{page} match. Without a page, $page arrives as 1.
+#[Route(path: '/api/blog/{page}', name: 'blog', requirements: ['page' => '\d+'], defaults: ['page' => 1])]
+public function blog(int $page): ResponseInterface { /* … */ }
+```
+
+The default flows through everywhere the placeholder does: it is available as a request attribute, resolved into the matching controller argument, and used by URL generation — `{routing:uri(route: 'blog')}` produces `/api/blog`, while `{routing:uri(route: 'blog', parameters: {page: 5})}` produces `/api/blog/5`.
+
+Keys starting with `_` are reserved for internal metadata and are rejected at build time.
 
 ## Class-level prefix (route groups)
 
@@ -79,6 +94,7 @@ How the class-level values combine with each method:
 | `name`         | Class name is **prepended** to each resolved method name (auto-derived name still applies).   |
 | `env`          | Used as the **default** for methods that do not set their own `env`; a method `env` wins.     |
 | `requirements` | **Merged** with method requirements; the method wins per key.                                 |
+| `defaults`     | **Merged** with method defaults; the method wins per key.                                     |
 | `methods`      | **Ignored** at class level — the method default (`['GET']`) is indistinguishable from "unset". |
 
 ## Requirements

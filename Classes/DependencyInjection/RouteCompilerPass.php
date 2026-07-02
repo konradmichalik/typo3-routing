@@ -217,10 +217,12 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $namePrefix = '';
         $pathPrefix = '';
         $classRequirements = [];
+        $classDefaults = [];
         if ($classRoute instanceof Route) {
             $namePrefix = $classRoute->name ?? '';
             $pathPrefix = $classRoute->path;
             $classRequirements = $classRoute->requirements;
+            $classDefaults = $classRoute->defaults;
         }
 
         $name = $namePrefix.($route->name ?? $this->deriveRouteName($serviceId, $method->getName()));
@@ -229,9 +231,11 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             throw new LogicException(sprintf('Duplicate attribute route name "%s": already defined by "%s", redefined by "%s::%s()". Set an explicit "name" on the #[Route] attribute to disambiguate.', $name, $collected->routes[$name]['controller'], $serviceId, $method->getName()), 1750000000);
         }
 
-        // The method wins per requirement key; a method env overrides the class default.
+        // The method wins per requirement/default key; a method env overrides the class default.
         $path = $pathPrefix.$route->path;
         $requirements = [...$classRequirements, ...$route->requirements];
+        $defaults = [...$classDefaults, ...$route->defaults];
+        $this->assertNoReservedDefaultKeys($defaults, $serviceId, $method, $name);
 
         $methods = array_map(strtoupper(...), $route->methods);
         $collected->routes[$name] = [
@@ -241,6 +245,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'env' => $route->env ?? $classRoute?->env,
             'requirements' => $requirements,
             'priority' => $route->priority,
+            'defaults' => $defaults,
         ];
         $collected->arguments[$name] = $this->argumentSpecs->build($method, $path, $serviceId);
 
@@ -253,6 +258,22 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
         $this->applyCache($cache, $auth, $name, $serviceId, $method, $collected);
         $this->applyRequestToken($requestToken, $methods, $name, $serviceId, $method, $collected);
+    }
+
+    /**
+     * Rejects defaults whose key starts with "_": those collide with the internal metadata
+     * (_controller/_env/_requirements, and Symfony's own _route) carried in the compiled route.
+     *
+     * @param array<string, mixed> $defaults
+     */
+    private function assertNoReservedDefaultKeys(array $defaults, string $serviceId, ReflectionMethod $method, string $name): void
+    {
+        $reserved = array_filter(array_keys($defaults), static fn (string $key): bool => str_starts_with($key, '_'));
+        if ([] === $reserved) {
+            return;
+        }
+
+        throw new LogicException(sprintf('#[Route] default(s) "%s" on "%s::%s()" (route "%s") use a reserved key: default names starting with "_" are used internally. Rename them.', implode('", "', $reserved), $serviceId, $method->getName(), $name), 1750000022);
     }
 
     /**

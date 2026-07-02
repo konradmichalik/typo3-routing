@@ -57,6 +57,13 @@ final class FixtureController implements RouteControllerInterface
         return new JsonResponse(['preferred' => true]);
     }
 
+    // A trailing placeholder with a default becomes optional: /api/blog and /api/blog/{page} both match.
+    #[Route(path: '/api/blog/{page}', name: 'fixture_blog', defaults: ['page' => 1])]
+    public function blog(int $page): JsonResponse
+    {
+        return new JsonResponse(['page' => $page]);
+    }
+
     #[Route(path: '/api/alias-a', name: 'fixture_alias_a')]
     #[Route(path: '/api/alias-b', name: 'fixture_alias_b')]
     public function repeatable(ServerRequestInterface $request): JsonResponse

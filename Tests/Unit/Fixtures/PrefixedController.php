@@ -23,7 +23,7 @@ use TYPO3\CMS\Core\Http\JsonResponse;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-#[Route(path: '/api/v1', name: 'v1_', env: 'Development', requirements: ['id' => '\d+'])]
+#[Route(path: '/api/v1', name: 'v1_', env: 'Development', requirements: ['id' => '\d+'], defaults: ['format' => 'html', 'page' => 1])]
 final class PrefixedController implements RouteControllerInterface
 {
     #[Route(path: '/items/{id}', name: 'items_show')]
@@ -32,8 +32,8 @@ final class PrefixedController implements RouteControllerInterface
         return new JsonResponse(['item' => true]);
     }
 
-    // Method env overrides the class default; method requirement overrides the class base per key.
-    #[Route(path: '/ping', env: 'Production', requirements: ['id' => '[a-z]+'])]
+    // Method env overrides the class default; method requirement and default override the class base per key.
+    #[Route(path: '/ping', env: 'Production', requirements: ['id' => '[a-z]+'], defaults: ['format' => 'json'])]
     public function ping(ServerRequestInterface $request): JsonResponse
     {
         return new JsonResponse(['ping' => true]);

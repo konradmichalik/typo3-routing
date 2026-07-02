@@ -376,6 +376,36 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertSame('/sub/api/example/count', $generator->generate($request, 'example_count'));
     }
 
+    #[Test]
+    public function matchesShorterPathForTrailingPlaceholderWithDefault(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/blog'));
+
+        self::assertSame(200, $response->getStatusCode());
+        // The controller receives the default, type-cast to int.
+        self::assertJsonStringEqualsJsonString('{"page":1}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function explicitSegmentOverridesTheRouteDefault(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/blog/5'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"page":5}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function generatesUrlOmittingTrailingSegmentThatEqualsItsDefault(): void
+    {
+        $generator = $this->get(RouteUrlGenerator::class);
+        $request = $this->request('GET', 'https://example.com/');
+
+        // Omitted / equal to the default → shorter URL; a differing value keeps the segment.
+        self::assertSame('/api/example/blog', $generator->generate($request, 'example_blog'));
+        self::assertSame('/api/example/blog/5', $generator->generate($request, 'example_blog', ['page' => 5]));
+    }
+
     private function process(ServerRequestInterface $request, ?ResponseInterface $fallThrough = null): ResponseInterface
     {
         $dispatcher = $this->get(RouteDispatcher::class);

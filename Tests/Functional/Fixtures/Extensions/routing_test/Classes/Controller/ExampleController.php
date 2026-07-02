@@ -91,6 +91,13 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['from' => $from, 'to' => $to, 'label' => $label]);
     }
 
+    #[Route(path: '/api/example/blog/{page}', name: 'example_blog', requirements: ['page' => '\d+'], defaults: ['page' => 1])]
+    public function blog(int $page): JsonResponse
+    {
+        // A trailing placeholder with a default: /api/example/blog resolves page=1, /blog/5 resolves 5.
+        return new JsonResponse(['page' => $page]);
+    }
+
     #[Route(path: '/api/example/status/{status}', name: 'example_status')]
     public function status(Status $status): JsonResponse
     {

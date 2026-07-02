@@ -21,7 +21,7 @@ public function submit(ServerRequestInterface $request): ResponseInterface
 | `policy`   | `string` | `'sliding_window'` | Limiter policy: `'sliding_window'` or `'fixed_window'`.                      |
 
 - Built on [`symfony/rate-limiter`](https://symfony.com/doc/current/rate_limiter.html); buckets are stored in the dedicated `typo3_routing_ratelimit` cache and **survive a "Flush all caches"** (they expire on their own TTL).
-- Applies to **all HTTP methods** of the route. When the limit is exceeded the dispatcher returns `429 Too Many Requests` (`{error, status}` JSON) with a `Retry-After` header, **before** the response cache is consulted — a cacheable response cannot bypass the limit.
+- Applies to **all HTTP methods** of the route. When the limit is exceeded the dispatcher returns `429 Too Many Requests` (RFC 9457 `application/problem+json`) with a `Retry-After` header, **before** the response cache is consulted — a cacheable response cannot bypass the limit.
 - The client is keyed by the resolved remote address (`normalizedParams`, so reverse-proxy headers are honoured when configured). An unsupported `policy` raises a build-time exception.
 
 > [!NOTE]

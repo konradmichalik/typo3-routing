@@ -2,7 +2,7 @@
 
 1. **Compile time** — [`RouteCompilerPass`](../Classes/DependencyInjection/RouteCompilerPass.php) scans every service definition, picks those implementing `RouteControllerInterface`, reflects their `#[Route]` attributes **and method parameter signatures** into plain arrays, and injects those plus a `ServiceLocator` of the controllers into [`RouteRegistry`](../Classes/Routing/RouteRegistry.php). Duplicate route names, unsupported parameter shapes, and modifier attributes (`#[Cache]`, `#[RateLimit]`, `#[Authenticate]`, `#[RequireRequestToken]`) sitting on a method without a `#[Route]` all raise a build-time exception. There is no extra cache: invalidation rides on the DI container cache, which TYPO3 already clears correctly.
 
-2. **Runtime** — [`RouteDispatcher`](../Classes/Middleware/RouteDispatcher.php) applies the prefix gate, matches via `symfony/routing`, filters by environment, then resolves the controller method's typed arguments via [`ControllerArgumentResolver`](../Classes/Routing/ControllerArgumentResolver.php) and invokes it. `404`, `405` (with an `Allow` header), and `400` (unresolvable/invalid argument) responses are emitted as `{"error": "…", "status": …}`; the success response format is entirely the controller's choice.
+2. **Runtime** — [`RouteDispatcher`](../Classes/Middleware/RouteDispatcher.php) applies the prefix gate, matches via `symfony/routing`, filters by environment, then resolves the controller method's typed arguments via [`ControllerArgumentResolver`](../Classes/Routing/ControllerArgumentResolver.php) and invokes it. `404`, `405` (with an `Allow` header), and `400` (unresolvable/invalid argument) responses are emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details — `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}` (`detail` is omitted when it would only repeat the title); the success response format is entirely the controller's choice.
 
 ## Debug command
 
@@ -77,3 +77,27 @@ The table lists every route with its path, methods, controller, environment bind
     }
 ]
 ```
+
+## OpenAPI export
+
+`routing:openapi` turns the same compiled registry into an [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0) document — so the routes stay the single source of truth for your API contract, Swagger UI, and client generators.
+
+``` bash
+vendor/bin/typo3 routing:openapi                 # compact JSON to stdout
+vendor/bin/typo3 routing:openapi --pretty        # pretty-printed
+vendor/bin/typo3 routing:openapi --pretty > openapi.json
+```
+
+| Option              | Effect                                                            |
+| ------------------- | ----------------------------------------------------------------- |
+| `--title=…`         | API title (default `TYPO3 Routing API`)                           |
+| `--api-version=…`   | API version (default `1.0.0`)                                     |
+| `--server=…`        | Server base URL (defaults to the configured path prefix)          |
+| `--pretty`          | Pretty-print the JSON                                             |
+
+What is derived automatically from the attributes:
+
+- **Paths & operations** — one operation per HTTP method; `{placeholder}` path segments become path parameters.
+- **Parameters & request bodies** — from the typed method signature: path/query parameters for `GET`-style routes, a JSON request body for `POST`/`PUT`/`PATCH`. Scalar types map to JSON Schema, backed enums become `enum` schemas, and a `requirements` regex becomes a `pattern`.
+- **Security** — `#[Authenticate]` routes reference a matching security scheme (`BearerTokenAuthenticator` → HTTP bearer; FE/BE user → cookie API key). OR-combined authenticators emit multiple requirements.
+- **Responses** — a generic `200` plus the error responses each route can actually produce (`400`/`401`/`403`/`404`/`405`/`429`), all sharing the `{error, status}` `Error` schema.

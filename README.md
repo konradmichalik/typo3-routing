@@ -25,13 +25,16 @@ This extension lets you register **frontend endpoints via PHP attributes** on co
 ## ✨ Features
 
 - [**Attribute routing**](docs/USAGE.md) — declare an endpoint with `#[Route]` directly on a controller method
+- [**Route groups**](docs/USAGE.md#class-level-prefix-route-groups) — a class-level `#[Route]` prefixes every method route, e.g. for API versioning
 - [**Typed arguments**](docs/USAGE.md#typed-controller-arguments) — methods receive type-cast path/query/body values, no manual request reading
 - [**Zero-config discovery**](docs/HOW-IT-WORKS.md) — routes are collected at container compile time, no extra cache
 - [**URL generation**](docs/URL-GENERATION.md) — a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
 - [**Opt-in caching**](docs/CACHING.md) — cache responses with `#[Cache]`, with tag-based invalidation
 - [**Opt-in rate limiting**](docs/RATE-LIMITING.md) — throttle requests per client IP with `#[RateLimit]`
 - [**Opt-in authentication & CSRF**](docs/AUTHENTICATION.md) — protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
+- [**CORS**](docs/CONFIGURATION.md#cors) — opt-in cross-origin support with automatic preflight handling, configured globally
 - [**Debug command**](docs/HOW-IT-WORKS.md#debug-command) — list every registered route as a table or JSON, including an `--unprotected` audit
+- [**OpenAPI export**](docs/HOW-IT-WORKS.md#openapi-export) — generate an OpenAPI 3.1 document from your routes with `routing:openapi`
 
 ## 🔥 Installation
 

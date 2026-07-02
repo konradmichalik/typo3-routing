@@ -52,13 +52,13 @@ final class RouteTest extends TestCase
     }
 
     #[Test]
-    public function isRepeatableAndTargetsMethods(): void
+    public function isRepeatableAndTargetsMethodsAndClasses(): void
     {
         $reflection = new ReflectionClass(Route::class);
         $attribute = $reflection->getAttributes(Attribute::class)[0]->newInstance();
 
         self::assertSame(
-            Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE,
+            Attribute::TARGET_METHOD | Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE,
             $attribute->flags,
         );
     }

@@ -48,8 +48,9 @@ final class ControllerArgumentResolver
 {
     public function __construct(
         // Lazy: TYPO3's PersistenceManager pulls in PageRepository, whose constructor already
-        // queries the DB (a known TYPO3 core issue). This middleware runs before page-resolver,
-        // so eagerly building it would break every route, not just ones with an entity parameter.
+        // queries the DB (a known TYPO3 core issue). RouteDispatcher, the middleware that owns
+        // this resolver, runs before page-resolver, so eagerly building it here would break
+        // every route, not just ones with an entity parameter.
         #[Lazy] private readonly PersistenceManagerInterface $persistenceManager,
     ) {}
 

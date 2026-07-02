@@ -93,7 +93,7 @@ final class OpenApiGeneratorTest extends TestCase
         );
         self::assertSame(
             '#/components/schemas/Error',
-            $operation['responses'][400]['content']['application/json']['schema']['$ref'],
+            $operation['responses'][400]['content']['application/problem+json']['schema']['$ref'],
         );
     }
 
@@ -103,9 +103,11 @@ final class OpenApiGeneratorTest extends TestCase
         $schema = $this->generate()['components']['schemas']['Error'];
 
         self::assertSame('object', $schema['type']);
-        self::assertSame(['error', 'status'], $schema['required']);
-        self::assertSame('string', $schema['properties']['error']['type']);
+        self::assertSame(['type', 'title', 'status'], $schema['required']);
+        self::assertSame('string', $schema['properties']['type']['type']);
+        self::assertSame('string', $schema['properties']['title']['type']);
         self::assertSame('integer', $schema['properties']['status']['type']);
+        self::assertSame('string', $schema['properties']['detail']['type']);
     }
 
     #[Test]

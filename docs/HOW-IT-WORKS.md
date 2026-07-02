@@ -100,4 +100,4 @@ What is derived automatically from the attributes:
 - **Paths & operations** — one operation per HTTP method; `{placeholder}` path segments become path parameters.
 - **Parameters & request bodies** — from the typed method signature: path/query parameters for `GET`-style routes, a JSON request body for `POST`/`PUT`/`PATCH`. Scalar types map to JSON Schema, backed enums become `enum` schemas, and a `requirements` regex becomes a `pattern`.
 - **Security** — `#[Authenticate]` routes reference a matching security scheme (`BearerTokenAuthenticator` → HTTP bearer; FE/BE user → cookie API key). OR-combined authenticators emit multiple requirements.
-- **Responses** — a generic `200` plus the error responses each route can actually produce (`400`/`401`/`403`/`404`/`405`/`429`), all sharing the `{error, status}` `Error` schema.
+- **Responses** — a generic `200` plus the error responses each route can actually produce (`400`/`401`/`403`/`404`/`405`/`429`), all served as `application/problem+json` sharing the RFC 9457 `{type, title, status, detail}` `Error` schema.

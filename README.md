@@ -11,7 +11,6 @@
 [![Coverage](https://img.shields.io/coverallsCoverage/github/konradmichalik/typo3-routing?logo=coveralls)](https://coveralls.io/github/konradmichalik/typo3-routing)
 [![Tests](https://img.shields.io/github/actions/workflow/status/konradmichalik/typo3-routing/tests.yml?label=tests&logo=github)](https://github.com/konradmichalik/typo3-routing/actions/workflows/tests.yml)
 [![License](https://poser.pugx.org/konradmichalik/typo3-routing/license)](LICENSE.md)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/konradmichalik/typo3-routing/badge)](https://securityscorecards.dev/viewer/?uri=github.com/konradmichalik/typo3-routing)
 
 </div>
 

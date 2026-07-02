@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -90,11 +90,12 @@ final class RouteCompilerPassTest extends TestCase
     {
         $routes = $this->discover($this->buildContainer(['prefixed' => PrefixedController::class]));
 
-        // Class path + name prefix; class env and requirements inherited by the method.
+        // Class path + name prefix; class env, requirements and defaults inherited by the method.
         self::assertArrayHasKey('v1_items_show', $routes);
         self::assertSame('/api/v1/items/{id}', $routes['v1_items_show']['path']);
         self::assertSame('Development', $routes['v1_items_show']['env']);
         self::assertSame(['id' => '\d+'], $routes['v1_items_show']['requirements']);
+        self::assertSame(['format' => 'html', 'page' => 1], $routes['v1_items_show']['defaults'] ?? null);
     }
 
     #[Test]
@@ -102,11 +103,32 @@ final class RouteCompilerPassTest extends TestCase
     {
         $routes = $this->discover($this->buildContainer(['prefixed' => PrefixedController::class]));
 
-        // Name prefix + auto-derived method name; method env and requirement win.
+        // Name prefix + auto-derived method name; method env, requirement and default win per key.
         self::assertArrayHasKey('v1_prefixed_ping', $routes);
         self::assertSame('/api/v1/ping', $routes['v1_prefixed_ping']['path']);
         self::assertSame('Production', $routes['v1_prefixed_ping']['env']);
         self::assertSame(['id' => '[a-z]+'], $routes['v1_prefixed_ping']['requirements']);
+        // Method 'format' overrides the class default; class 'page' is still inherited.
+        self::assertSame(['format' => 'json', 'page' => 1], $routes['v1_prefixed_ping']['defaults'] ?? null);
+    }
+
+    #[Test]
+    public function bakesRouteDefaults(): void
+    {
+        $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
+
+        self::assertSame(['page' => 1], $routes['fixture_blog']['defaults'] ?? null);
+        // Routes without explicit defaults get an empty array.
+        self::assertSame([], $routes['fixture_count']['defaults'] ?? null);
+    }
+
+    #[Test]
+    public function throwsOnReservedDefaultKey(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000022);
+
+        $this->discover($this->buildContainer(['reserved' => ReservedDefaultKeyController::class]));
     }
 
     #[Test]
@@ -395,13 +417,13 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}>
      */
     private function discover(ContainerBuilder $container): array
     {
         (new RouteCompilerPass())->process($container);
 
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}> $routes */
         $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
 
         return $routes;

@@ -120,6 +120,38 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function bakesUserDefaultsIntoTheRouteAlongsideInternalKeys(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, defaults?: array<string, mixed>}> $routes */
+        $routes = [
+            'blog' => ['path' => '/api/blog/{page}', 'methods' => ['GET'], 'controller' => 'ctrl::blog', 'env' => null, 'requirements' => [], 'defaults' => ['page' => 1]],
+        ];
+        $route = (new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection()->get('blog');
+
+        self::assertNotNull($route);
+        self::assertSame(1, $route->getDefault('page'));
+        // Internal metadata is preserved next to the user default.
+        self::assertSame('ctrl::blog', $route->getDefault('_controller'));
+    }
+
+    #[Test]
+    public function trailingPlaceholderWithADefaultBecomesOptional(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, defaults?: array<string, mixed>}> $routes */
+        $routes = [
+            'blog' => ['path' => '/api/blog/{page}', 'methods' => ['GET'], 'controller' => 'ctrl::blog', 'env' => null, 'requirements' => [], 'defaults' => ['page' => 1]],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        $context = new RequestContext();
+        $context->setMethod('GET');
+
+        // The shorter path matches and yields the default; the explicit segment wins over it.
+        self::assertSame(1, $registry->getMatcher($context)->match('/api/blog')['page']);
+        self::assertSame('5', $registry->getMatcher($context)->match('/api/blog/5')['page']);
+    }
+
+    #[Test]
     public function exposesCacheConfigPerRouteName(): void
     {
         $registry = new RouteRegistry(

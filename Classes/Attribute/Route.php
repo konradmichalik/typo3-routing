@@ -36,6 +36,7 @@ final readonly class Route
      * @param string|null           $env          Top-level application context this route is bound to (e.g. "Development"); null = always active. At class level: default for methods without their own env.
      * @param array<string, string> $requirements Constraints by parameter name → regex. A name matching a path placeholder ({id}) is enforced by the matcher (404). Any other name is a required query/body parameter validated at dispatch (400; '' = presence only). E.g. ['id' => '\d+', 'q' => '']. Named patterns from Symfony\Component\Routing\Requirement\Requirement may be used as values, e.g. ['id' => Requirement::DIGITS]. At class level: merged under method requirements.
      * @param int                   $priority     Match priority; higher values are matched first. Use to disambiguate a static path from an overlapping placeholder path. Default 0
+     * @param array<string, mixed>  $defaults     Default values for path placeholders. A trailing placeholder with a default becomes optional (`/blog/{page}` + ['page' => 1] also matches `/blog`, yielding page=1) and is omitted from generated URLs when it equals the default. Keys starting with "_" are reserved (used internally) and rejected at build time. At class level: merged under method defaults (the method wins per key).
      */
     public function __construct(
         public string $path,
@@ -44,5 +45,6 @@ final readonly class Route
         public ?string $env = null,
         public array $requirements = [],
         public int $priority = 0,
+        public array $defaults = [],
     ) {}
 }

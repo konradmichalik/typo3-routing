@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures;
 
 use DateTimeImmutable;
 use KonradMichalik\Typo3Routing\Attribute\Param;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -36,6 +37,10 @@ final class ArgumentSpecFixtures
     public function variadicInts(int ...$ids): void {}
 
     public function variadicEnums(Status ...$states): void {}
+
+    public function entityPath(Item $item): void {}
+
+    public function variadicEntities(Item ...$items): void {}
 
     public function renamed(#[Param(name: 'foo')] string $bar): void {}
 

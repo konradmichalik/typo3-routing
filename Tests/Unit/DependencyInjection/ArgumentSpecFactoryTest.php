@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\ArgumentSpecFactory;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\ArgumentSpecFixtures;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -77,6 +78,24 @@ final class ArgumentSpecFactoryTest extends TestCase
         $enumSpec = $this->build('variadicEnums', '/api/x')[0];
         self::assertSame(Status::class, $enumSpec['type']);
         self::assertSame('variadic', $enumSpec['source']);
+    }
+
+    #[Test]
+    public function mapsExtbaseDomainObjectToItsClassNameForPath(): void
+    {
+        $spec = $this->build('entityPath', '/api/x/{item}')[0];
+
+        self::assertSame(Item::class, $spec['type']);
+        self::assertSame('path', $spec['source']);
+    }
+
+    #[Test]
+    public function rejectsVariadicEntityParameter(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000009);
+
+        $this->build('variadicEntities', '/api/x');
     }
 
     #[Test]

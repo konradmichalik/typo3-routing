@@ -1,2 +1,7 @@
 parameters:
-	ignoreErrors: []
+	ignoreErrors:
+		-
+			message: '#^Class cognitive complexity is 41, keep it under 40$#'
+			identifier: complexity.classLike
+			count: 1
+			path: ../../Classes/Middleware/RouteDispatcher.php

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\RoutingTest\Controller;
 
+use KonradMichalik\RoutingTest\Domain\Model\Item;
 use KonradMichalik\RoutingTest\Enum\Status;
 use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Param, RateLimit, RequireRequestToken, Route};
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
@@ -103,6 +104,13 @@ final class ExampleController implements RouteControllerInterface
     {
         // A backed enum resolved from a path placeholder.
         return new JsonResponse(['status' => $status->value]);
+    }
+
+    #[Route(path: '/api/example/entity/{item}', name: 'example_entity')]
+    public function entity(Item $item): JsonResponse
+    {
+        // A path placeholder resolved directly to the hydrated Extbase domain object.
+        return new JsonResponse(['id' => $item->getUid(), 'title' => $item->getTitle()]);
     }
 
     #[Route(path: '/api/example/tags', name: 'example_tags')]

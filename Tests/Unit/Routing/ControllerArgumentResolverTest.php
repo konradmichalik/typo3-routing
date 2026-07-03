@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
-use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver};
+use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Http\{ServerRequest, Stream};
+use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
  * ControllerArgumentResolverTest.
@@ -29,10 +32,12 @@ use TYPO3\CMS\Core\Http\{ServerRequest, Stream};
 final class ControllerArgumentResolverTest extends TestCase
 {
     private ControllerArgumentResolver $resolver;
+    private PersistenceManagerInterface&MockObject $persistenceManager;
 
     protected function setUp(): void
     {
-        $this->resolver = new ControllerArgumentResolver();
+        $this->persistenceManager = $this->createMock(PersistenceManagerInterface::class);
+        $this->resolver = new ControllerArgumentResolver($this->persistenceManager);
     }
 
     #[Test]
@@ -195,6 +200,40 @@ final class ControllerArgumentResolverTest extends TestCase
         $this->expectException(ArgumentResolutionException::class);
 
         $this->resolver->resolve($specs, [], $request);
+    }
+
+    #[Test]
+    public function resolvesExtbaseDomainObjectByIdentifier(): void
+    {
+        $item = new Item();
+        $this->persistenceManager->method('getObjectByIdentifier')->with('42', Item::class)->willReturn($item);
+
+        $specs = [$this->spec('item', 'path', Item::class)];
+
+        self::assertSame([$item], $this->resolver->resolve($specs, ['item' => '42'], $this->request()));
+    }
+
+    #[Test]
+    public function throwsEntityNotFoundWhenNoRecordMatchesTheIdentifier(): void
+    {
+        $this->persistenceManager->method('getObjectByIdentifier')->willReturn(null);
+
+        $specs = [$this->spec('item', 'path', Item::class)];
+
+        $this->expectException(EntityNotFoundException::class);
+
+        $this->resolver->resolve($specs, ['item' => '42'], $this->request());
+    }
+
+    #[Test]
+    public function rejectsMalformedEntityIdentifier(): void
+    {
+        $specs = [$this->spec('item', 'path', Item::class)];
+
+        $this->expectException(ArgumentResolutionException::class);
+        $this->expectExceptionMessage('Invalid value for parameter: item');
+
+        $this->resolver->resolve($specs, ['item' => 'abc'], $this->request());
     }
 
     #[Test]

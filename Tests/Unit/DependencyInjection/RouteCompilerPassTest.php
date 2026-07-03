@@ -86,6 +86,16 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesRouteSchemes(): void
+    {
+        $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
+
+        self::assertSame(['https'], $routes['fixture_secure_only']['schemes'] ?? null);
+        // Routes without an explicit scheme constraint default to an empty (any-scheme) list.
+        self::assertSame([], $routes['fixture_count']['schemes'] ?? null);
+    }
+
+    #[Test]
     public function appliesClassLevelRoutePrefixToPathNameEnvAndRequirements(): void
     {
         $routes = $this->discover($this->buildContainer(['prefixed' => PrefixedController::class]));
@@ -417,13 +427,13 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>}>
      */
     private function discover(ContainerBuilder $container): array
     {
         (new RouteCompilerPass())->process($container);
 
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>}> $routes */
         $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
 
         return $routes;

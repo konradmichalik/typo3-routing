@@ -157,6 +157,21 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function detailRendersSchemesWithAnyFallback(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_secure']);
+        $secure = $tester->getDisplay();
+        self::assertStringContainsString('Schemes', $secure);
+        self::assertStringContainsString('https', $secure);
+
+        $tester->execute(['name' => 'example_count']);
+        $count = $tester->getDisplay();
+        self::assertStringContainsString('ANY', $count);
+    }
+
+    #[Test]
     public function filtersByNameSubstring(): void
     {
         $tester = $this->tester($this->registry());
@@ -310,11 +325,11 @@ final class RouteDebugCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
-            'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => []],
+            'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https']],
             'example_any' => ['path' => '/api/example/any', 'methods' => [], 'controller' => 'ctrl::any', 'env' => null, 'requirements' => []],
         ];
 

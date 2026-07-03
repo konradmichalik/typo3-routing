@@ -61,9 +61,19 @@ final class RouteUrlGeneratorTest extends TestCase
         self::assertSame('/api/count?foo=bar', $this->createGenerator()->generate($request, 'fixture_count', ['foo' => 'bar']));
     }
 
+    #[Test]
+    public function returnsAbsoluteUrlUnprefixedWhenRouteRequiresADifferentScheme(): void
+    {
+        $request = $this->request('http://example.com/', 'http://example.com/');
+
+        $url = $this->createGenerator()->generate($request, 'fixture_secure_only');
+
+        self::assertStringStartsWith('https://example.com/api/secure-only', $url);
+    }
+
     private function createGenerator(): RouteUrlGenerator
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>}> $routes */
         $routes = [
             'fixture_count' => [
                 'path' => '/api/count',
@@ -78,6 +88,14 @@ final class RouteUrlGeneratorTest extends TestCase
                 'controller' => 'fixture::item',
                 'env' => null,
                 'requirements' => [],
+            ],
+            'fixture_secure_only' => [
+                'path' => '/api/secure-only',
+                'methods' => ['GET'],
+                'controller' => 'fixture::secureOnly',
+                'env' => null,
+                'requirements' => [],
+                'schemes' => ['https'],
             ],
         ];
         $registry = new RouteRegistry($routes, new ServiceLocator([]));

@@ -120,6 +120,27 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function matcherEnforcesRouteSchemes(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>}> $routes */
+        $routes = [
+            'secure' => ['path' => '/api/secure', 'methods' => ['GET'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https']],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        $httpsContext = new RequestContext();
+        $httpsContext->setMethod('GET');
+        $httpsContext->setScheme('https');
+        self::assertSame('secure', $registry->getMatcher($httpsContext)->match('/api/secure')['_route']);
+
+        $httpContext = new RequestContext();
+        $httpContext->setMethod('GET');
+        $httpContext->setScheme('http');
+        $this->expectException(ResourceNotFoundException::class);
+        $registry->getMatcher($httpContext)->match('/api/secure');
+    }
+
+    #[Test]
     public function bakesUserDefaultsIntoTheRouteAlongsideInternalKeys(): void
     {
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, defaults?: array<string, mixed>}> $routes */

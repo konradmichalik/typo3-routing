@@ -18,6 +18,8 @@ use Psr\Http\Message\ServerRequestInterface;
 use Symfony\Component\Routing\Generator\{UrlGenerator, UrlGeneratorInterface};
 use Symfony\Component\Routing\RequestContext;
 
+use function str_starts_with;
+
 /**
  * RouteUrlGenerator.
  *
@@ -41,6 +43,14 @@ final readonly class RouteUrlGenerator
 
         $generator = new UrlGenerator($this->registry->getRouteCollection(), $context);
         $path = $generator->generate($route, $parameters, UrlGeneratorInterface::ABSOLUTE_PATH);
+
+        // A route with a `schemes`/`host` constraint that differs from the current request forces the
+        // generator to return a full absolute URL regardless of the requested reference type — Symfony
+        // cannot target a different scheme/host with a relative path. Prepending the site base to an
+        // already-absolute URL would corrupt it, so it is returned unchanged in that case.
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
 
         return $this->basePathResolver->prependSiteBase($request, $path);
     }

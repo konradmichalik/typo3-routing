@@ -36,6 +36,7 @@ The attribute is repeatable. Its parameters:
 | `requirements` | `array<string, string>` | `[]`      | Constraints by parameter name → regex (`''` = presence only). See below. |
 | `priority`     | `int`                   | `0`       | Match priority; higher is matched first when paths overlap. See below.   |
 | `defaults`     | `array<string, mixed>`  | `[]`      | Default values for path placeholders; a trailing placeholder with a default becomes optional. See below. |
+| `schemes`      | `list<string>`          | `[]`      | Allowed URI schemes (e.g. `['https']`); empty = any scheme. See below.  |
 
 ## Priority
 
@@ -64,6 +65,19 @@ public function blog(int $page): ResponseInterface { /* … */ }
 The default flows through everywhere the placeholder does: it is available as a request attribute, resolved into the matching controller argument, and used by URL generation — `{routing:uri(route: 'blog')}` produces `/api/blog`, while `{routing:uri(route: 'blog', parameters: {page: 5})}` produces `/api/blog/5`.
 
 Keys starting with `_` are reserved for internal metadata and are rejected at build time.
+
+## Schemes
+
+Restrict a route to one or more URI schemes — most commonly to force HTTPS-only access:
+
+```php
+#[Route(path: '/api/payment/charge', methods: ['POST'], name: 'payment_charge', schemes: ['https'])]
+public function charge(): ResponseInterface { /* … */ }
+```
+
+A request over a scheme not in the list gets the same `404 Not Found` as an unmatched path — the constraint is invisible rather than producing a scheme-specific error. `{routing:uri(route: 'payment_charge')}` generates a full absolute URL (`https://…`) instead of a site-relative path when the current request's scheme differs, since a relative path cannot target a different scheme.
+
+Not inherited from a class-level `#[Route]` — same rule as `methods`.
 
 ## Class-level prefix (route groups)
 

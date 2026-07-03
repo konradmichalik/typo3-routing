@@ -191,6 +191,25 @@ public function byStatus(Status $status): ResponseInterface
 }
 ```
 
+### Entity resolution
+
+A parameter typed as an **Extbase domain object** — any class implementing `TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface` — resolves to the hydrated record. The raw identifier is read using the same source rules as any other parameter (path placeholder, query, or body), then looked up via TYPO3's `PersistenceManagerInterface::getObjectByIdentifier()` — no repository wiring needed.
+
+```php
+use MyVendor\MyExtension\Domain\Model\News;
+
+#[Route(path: '/api/news/{news}', name: 'news_show')]
+public function show(News $news): ResponseInterface
+{
+    // /api/news/42 → the News record with uid 42, already hydrated
+}
+```
+
+A malformed identifier (not an integer) yields a **400**, same as an invalid `int` parameter. A well-formed identifier with no matching record yields a **404** — regardless of whether the parameter is nullable; nullability only governs a *missing* input, not one that fails to resolve. Variadic entity parameters (`News ...$items`) are rejected at compile time.
+
+> [!NOTE]
+> `getObjectByIdentifier()` respects Extbase's enable-fields (a hidden/deleted record resolves as **404**), but does not restrict by storage page or apply a workspace overlay — a record on any page/pid is resolvable by uid.
+
 ### Variadics
 
 A **variadic** parameter collects zero or more values from a single input array (`?ids[]=1&ids[]=2`), each coerced to the element type. An absent input yields no arguments.

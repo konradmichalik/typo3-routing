@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\RoutingBenchmark\Controller;
 
+use KonradMichalik\RoutingBenchmark\Domain\Model\Item;
 use KonradMichalik\Typo3Routing\Attribute\Route;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
@@ -48,5 +49,12 @@ final class BenchmarkController implements RouteControllerInterface
     {
         // Query parameter resolved + type-cast to int by the routing layer.
         return new JsonResponse(['q' => $q]);
+    }
+
+    #[Route(path: '/api/bench/routing/entity/{item}', name: 'bench_routing_entity', requirements: ['item' => '\d+'])]
+    public function entity(Item $item): JsonResponse
+    {
+        // Path placeholder resolved directly to a hydrated Extbase domain object by the routing layer.
+        return new JsonResponse(['id' => $item->getUid(), 'title' => $item->getTitle()]);
     }
 }

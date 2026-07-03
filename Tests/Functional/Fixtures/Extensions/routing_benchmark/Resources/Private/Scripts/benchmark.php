@@ -46,6 +46,10 @@ $scenarios = [
         'routing' => '/api/bench/routing/search?q=42',
         'plain' => '/api/bench/plain/search?q=42',
     ],
+    'entity resolution {item}' => [
+        'routing' => '/api/bench/routing/entity/1',
+        'plain' => '/api/bench/plain/entity/1',
+    ],
 ];
 
 function request(string $url): void

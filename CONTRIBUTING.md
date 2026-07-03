@@ -103,10 +103,15 @@ ddev benchmark            # lowest supported version
 ddev benchmark 13 100     # version 13, 100 requests per endpoint
 ```
 
-Each scenario (no arguments, path parameter, query parameter) is run interleaved after a warmup,
-then `timing.total_ms` is reported per variant with the routing-vs-plain delta. The dispatch
-overhead is in the order of ~0.1 ms per request — negligible against a full frontend request, so
-the large percentage delta is an artifact of the near-zero plain-middleware baseline.
+Each scenario (no arguments, path parameter, query parameter, entity resolution) is run
+interleaved after a warmup, then `timing.total_ms` is reported per variant with the
+routing-vs-plain delta. The dispatch overhead is in the order of ~0.1-0.3 ms per request —
+negligible against a full frontend request, so the large percentage delta on the cheaper
+scenarios is an artifact of the near-zero plain-middleware baseline. The entity-resolution
+scenario's plain counterpart performs the same `PersistenceManagerInterface::getObjectByIdentifier()`
+lookup as the routing side, so that comparison isolates dispatch overhead from the DB round trip;
+its delta lands in the same absolute range as the scalar scenarios, showing entity resolution
+adds no disproportionate cost beyond typo3-routing's normal argument-resolution overhead.
 
 ## Submit a pull request
 

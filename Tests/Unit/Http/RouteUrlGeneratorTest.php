@@ -81,6 +81,19 @@ final class RouteUrlGeneratorTest extends TestCase
         self::assertStringStartsWith('https://api.example.com/api/tenant', $url);
     }
 
+    #[Test]
+    public function returnsAbsoluteUrlUnprefixedWhenBothSchemeAndHostDiffer(): void
+    {
+        // Symfony escalates straight to an absolute URL (scheme mismatch alone already forces this),
+        // so a route requiring both a different scheme and a different host still produces one clean
+        // "https://…" URL rather than the "//…" network-path shape a host-only mismatch produces.
+        $request = $this->request('http://example.com/', 'http://example.com/');
+
+        $url = $this->createGenerator()->generate($request, 'fixture_secure_tenant');
+
+        self::assertStringStartsWith('https://api.example.com/api/secure-tenant', $url);
+    }
+
     private function createGenerator(): RouteUrlGenerator
     {
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null}> $routes */
@@ -113,6 +126,15 @@ final class RouteUrlGeneratorTest extends TestCase
                 'controller' => 'fixture::tenant',
                 'env' => null,
                 'requirements' => [],
+                'host' => 'api.example.com',
+            ],
+            'fixture_secure_tenant' => [
+                'path' => '/api/secure-tenant',
+                'methods' => ['GET'],
+                'controller' => 'fixture::secureTenant',
+                'env' => null,
+                'requirements' => [],
+                'schemes' => ['https'],
                 'host' => 'api.example.com',
             ],
         ];

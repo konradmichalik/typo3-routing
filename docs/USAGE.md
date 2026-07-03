@@ -91,6 +91,8 @@ public function status(): ResponseInterface { /* … */ }
 
 A request from a different host gets the same `404 Not Found` as an unmatched path. `{routing:uri(route: 'api_status')}` generates a full absolute URL when the current request's host differs, for the same reason as `schemes` above.
 
+`host` is a **matching filter, not an authorization boundary** — use [`#[Authenticate]`](AUTHENTICATION.md) for access control. It is matched against the request's URI host, the same source TYPO3's own `trustedHostsPattern` validates upstream of this middleware.
+
 Not inherited from a class-level `#[Route]` — same rule as `methods`.
 
 ## Class-level prefix (route groups)

@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
-use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
+use KonradMichalik\Typo3Routing\RateLimit\RateLimitCheck;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -37,9 +37,7 @@ use function explode;
 use function is_array;
 use function is_object;
 use function is_string;
-use function max;
 use function sprintf;
-use function time;
 use function trim;
 
 /**
@@ -59,7 +57,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private RouteRegistry $registry,
         private SiteBasePathResolver $basePathResolver,
         private ResponseCacheManager $cache,
-        private RateLimitEnforcer $rateLimiter,
+        private RateLimitCheck $rateLimitCheck,
         private ControllerArgumentResolver $argumentResolver,
         private AccessGuard $accessGuard,
         private CorsHandler $cors,
@@ -138,20 +136,21 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         // 5. Rate limiting (opt-in). Enforced before auth so a coarse per-IP limit absorbs token
-        //    brute-force attempts before any authentication logic runs.
-        $rateLimited = $this->enforceRateLimit($match, $request);
-        if (null !== $rateLimited) {
-            return $rateLimited;
+        //    brute-force attempts before any authentication logic runs. Its headers ride on every
+        //    response from here on — success or error — so a client always sees its quota.
+        $rateLimit = $this->checkRateLimit($match, $request);
+        if (null !== $rateLimit['blocked']) {
+            return $this->withHeaders($rateLimit['blocked'], $rateLimit['headers']);
         }
 
         // 6. Access control (opt-in): authentication (401) then CSRF/request token (403).
         $denied = $this->accessGuard->enforce($match, $request);
         if (null !== $denied) {
-            return $denied;
+            return $this->withHeaders($denied, $rateLimit['headers']);
         }
 
         // 7. Dispatch (with optional opt-in response cache; disabled for authenticated routes).
-        return $this->dispatch($match, $request);
+        return $this->withHeaders($this->dispatch($match, $request), $rateLimit['headers']);
     }
 
     /**
@@ -211,23 +210,30 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
     /**
      * @param array<string, mixed> $match
+     *
+     * @return array{blocked: ResponseInterface|null, headers: array<string, string>}
      */
-    private function enforceRateLimit(array $match, ServerRequestInterface $request): ?ResponseInterface
+    private function checkRateLimit(array $match, ServerRequestInterface $request): array
     {
         $routeName = (string) ($match['_route'] ?? '');
         $config = $this->registry->getRateLimit($routeName);
         if (null === $config) {
-            return null;
+            return ['blocked' => null, 'headers' => []];
         }
 
-        $result = $this->rateLimiter->consume($routeName, $config, $this->clientId($request));
-        if ($result->isAccepted()) {
-            return null;
+        return $this->rateLimitCheck->evaluate($routeName, $config, $this->clientId($request));
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    private function withHeaders(ResponseInterface $response, array $headers): ResponseInterface
+    {
+        foreach ($headers as $name => $value) {
+            $response = $response->withHeader($name, $value);
         }
 
-        return JsonErrorResponse::create(429, 'Too Many Requests', [
-            'Retry-After' => (string) max(0, $result->getRetryAfter()->getTimestamp() - time()),
-        ]);
+        return $response;
     }
 
     private function clientId(ServerRequestInterface $request): string

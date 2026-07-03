@@ -18,7 +18,7 @@ use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
-use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
+use KonradMichalik\Typo3Routing\RateLimit\{RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, RouteRegistry};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController};
@@ -51,12 +51,12 @@ final class RouteDispatcherTest extends TestCase
 
     private ResponseCacheManager $responseCache;
 
-    private RateLimitEnforcer $rateLimiter;
+    private RateLimitCheck $rateLimitCheck;
 
     protected function setUp(): void
     {
         $this->responseCache = $this->createResponseCacheManager();
-        $this->rateLimiter = new RateLimitEnforcer(new InMemoryStorage());
+        $this->rateLimitCheck = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()));
     }
 
     #[Test]
@@ -284,7 +284,7 @@ final class RouteDispatcherTest extends TestCase
 
         $registry = $this->registry();
         $context = new Context();
-        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, $context), new CorsHandler($extensionConfiguration), new CacheBypassGuard($context), $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, $context), new CorsHandler($extensionConfiguration), new CacheBypassGuard($context), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -371,6 +371,35 @@ final class RouteDispatcherTest extends TestCase
 
         self::assertSame(200, $first->getStatusCode());
         self::assertSame(200, $second->getStatusCode());
+    }
+
+    #[Test]
+    public function includesRateLimitHeadersOnAnAcceptedResponse(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/limited'));
+
+        self::assertSame('1', $response->getHeaderLine('X-RateLimit-Limit'));
+        self::assertSame('0', $response->getHeaderLine('X-RateLimit-Remaining'));
+        self::assertNotSame('', $response->getHeaderLine('X-RateLimit-Reset'));
+    }
+
+    #[Test]
+    public function includesRateLimitHeadersOnABlockedResponse(): void
+    {
+        $this->dispatch($this->request('GET', 'https://example.com/api/limited'));
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/limited'));
+
+        self::assertSame(429, $response->getStatusCode());
+        self::assertSame('1', $response->getHeaderLine('X-RateLimit-Limit'));
+        self::assertSame('0', $response->getHeaderLine('X-RateLimit-Remaining'));
+    }
+
+    #[Test]
+    public function omitsRateLimitHeadersForRoutesWithoutTheAttribute(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
+
+        self::assertSame('', $response->getHeaderLine('X-RateLimit-Limit'));
     }
 
     #[Test]
@@ -642,7 +671,7 @@ final class RouteDispatcherTest extends TestCase
         $context ??= new Context();
         $accessGuard = new AccessGuard($registry, $context);
 
-        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, new CacheBypassGuard($context), $extensionConfiguration);
+        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, new CacheBypassGuard($context), $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry

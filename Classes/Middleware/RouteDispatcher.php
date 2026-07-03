@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
-use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
+use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, RouteRegistry};
@@ -63,6 +63,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private ControllerArgumentResolver $argumentResolver,
         private AccessGuard $accessGuard,
         private CorsHandler $cors,
+        private CacheBypassGuard $cacheBypass,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $prefix = '/api/';
@@ -294,11 +295,14 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $cached = $this->readCache($cacheConfig, $routeName, $request);
         if ($cached instanceof ResponseInterface) {
             // A cached entry already carries its ETag, so a conditional GET can short-circuit.
+            $cached = $this->cache->withCacheStatus($cached, $cacheConfig, $request, 'HIT');
+
             return ConditionalGet::notModified($request, $cached) ?? $cached;
         }
 
         $response = $this->invokeController($match, $request);
         $response = $this->writeCache($cacheConfig, $routeName, $request, $response);
+        $response = $this->cache->withCacheStatus($response, $cacheConfig, $request, 'MISS');
 
         // notModified is a no-op unless the response was cached (only then does it carry an ETag).
         return ConditionalGet::notModified($request, $response) ?? $response;
@@ -311,7 +315,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function readCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request): ?ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $request->getMethod()) {
+        if (null === $cacheConfig || 'GET' !== $request->getMethod() || $this->cacheBypass->skipsRead($request)) {
             return null;
         }
 
@@ -327,7 +331,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function writeCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $request->getMethod() || 200 !== $response->getStatusCode()) {
+        if (null === $cacheConfig || 'GET' !== $request->getMethod() || 200 !== $response->getStatusCode() || $this->cacheBypass->skipsWrite($request)) {
             return $response;
         }
 

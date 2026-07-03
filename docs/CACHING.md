@@ -27,6 +27,7 @@ public function list(ServerRequestInterface $request): ResponseInterface
 - Invalidation rides on the TYPO3 caching framework: changing a record of a tagged table flushes the matching entries immediately; `lifetime` is the fallback. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).
 
 - Routes carrying an [`#[Authenticate]`](AUTHENTICATION.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.
+- The cache is bypassed entirely — neither read nor written — for a **logged-in backend user** (so editors always see live content while previewing) and for a request sending `Cache-Control: no-store`. A plain `Cache-Control: no-cache` only skips **reading** the stored entry; the fresh response still refreshes the cache for later requests.
 
 ## ETag / conditional GET
 
@@ -43,3 +44,10 @@ Matching follows RFC 9110 (weak comparison, understands `*` and comma-separated 
 
 > [!CAUTION]
 > Only cache responses that are the **same for everyone**. `#[Cache]` is intended for public routes; `Set-Cookie` headers are never cached.
+
+## Cache status header
+
+Every response from a `#[Cache]`-enabled `GET` route carries an `X-TYPO3-API-Cache` header — `HIT` when served from the stored entry, `MISS` when computed fresh (including whenever the cache was bypassed, see above). Routes without `#[Cache]`, or non-`GET` requests, never receive the header — its mere presence tells a client whether caching applies at all.
+
+> [!NOTE]
+> The header is not echoed on a `304 Not Modified` response — only `ETag` is (RFC 9110 §15.4.5).

@@ -15,12 +15,12 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Middleware;
 
 use KonradMichalik\RoutingTest\Controller\ExampleController;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
-use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
+use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, RouteRegistry};
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -31,7 +31,7 @@ use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
-use TYPO3\CMS\Core\Context\Context;
+use TYPO3\CMS\Core\Context\{Context, UserAspect};
 use TYPO3\CMS\Core\Core\{ApplicationContext, Environment};
 use TYPO3\CMS\Core\Http\{NormalizedParams, Response, ServerRequest};
 use TYPO3\CMS\Core\Site\Entity\Site;
@@ -283,7 +283,8 @@ final class RouteDispatcherTest extends TestCase
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
 
         $registry = $this->registry();
-        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, new Context()), new CorsHandler($extensionConfiguration), $extensionConfiguration);
+        $context = new Context();
+        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, $context), new CorsHandler($extensionConfiguration), new CacheBypassGuard($context), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -493,6 +494,87 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function marksACacheMissThenHitViaTheStatusHeader(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+        $second = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $second->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function omitsTheCacheStatusHeaderForRoutesWithoutCache(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
+
+        self::assertSame('', $response->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function bypassesTheCacheWhenTheClientSendsNoCache(): void
+    {
+        $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        $response = $this->dispatch(
+            $this->request('GET', 'https://example.com/api/cached')->withHeader('Cache-Control', 'no-cache'),
+        );
+
+        self::assertSame('MISS', $response->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function noCacheStillRefreshesTheStoredEntry(): void
+    {
+        $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+        $refreshed = $this->dispatch(
+            $this->request('GET', 'https://example.com/api/cached')->withHeader('Cache-Control', 'no-cache'),
+        );
+        $third = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame('HIT', $third->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame((string) $refreshed->getBody(), (string) $third->getBody());
+    }
+
+    #[Test]
+    public function noStoreNeitherReadsNorWritesTheCache(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+        $bypassed = $this->dispatch(
+            $this->request('GET', 'https://example.com/api/cached')->withHeader('Cache-Control', 'no-store'),
+        );
+        $third = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame('MISS', $bypassed->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertNotSame((string) $first->getBody(), (string) $bypassed->getBody());
+        // The no-store response was never written back, so the original cached entry still serves the third call.
+        self::assertSame((string) $first->getBody(), (string) $third->getBody());
+    }
+
+    #[Test]
+    public function bypassesTheCacheForALoggedInBackendUser(): void
+    {
+        $backendUserContext = $this->backendUserContext();
+
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'), null, $backendUserContext);
+        $second = $this->dispatch($this->request('GET', 'https://example.com/api/cached'), null, $backendUserContext);
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('MISS', $second->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertNotSame((string) $first->getBody(), (string) $second->getBody());
+    }
+
+    #[Test]
+    public function aBackendUsersResponseIsNeverStoredForLaterAnonymousRequests(): void
+    {
+        $this->dispatch($this->request('GET', 'https://example.com/api/cached'), null, $this->backendUserContext());
+
+        $anonymous = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame('MISS', $anonymous->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
     public function stampsAGeneratedRequestIdOnASuccessResponse(): void
     {
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
@@ -557,9 +639,10 @@ final class RouteDispatcherTest extends TestCase
     private function dispatcherWith(CorsHandler $cors, ExtensionConfiguration $extensionConfiguration, ?Context $context = null): RouteDispatcher
     {
         $registry = $this->registry();
-        $accessGuard = new AccessGuard($registry, $context ?? new Context());
+        $context ??= new Context();
+        $accessGuard = new AccessGuard($registry, $context);
 
-        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, $extensionConfiguration);
+        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimiter, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, new CacheBypassGuard($context), $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -634,6 +717,17 @@ final class RouteDispatcherTest extends TestCase
         ]);
 
         return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator);
+    }
+
+    private function backendUserContext(): Context
+    {
+        $user = new FakeUser();
+        $user->user = ['uid' => 1];
+
+        $context = new Context();
+        $context->setAspect('backend.user', new UserAspect($user));
+
+        return $context;
     }
 
     private function request(string $method, string $url, string $base = 'https://example.com/'): ServerRequest

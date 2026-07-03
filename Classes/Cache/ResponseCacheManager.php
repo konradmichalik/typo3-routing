@@ -101,6 +101,22 @@ final class ResponseCacheManager
     }
 
     /**
+     * Reports whether a cacheable GET route served a stored response or computed one fresh. Absent for
+     * routes that never opted into #[Cache] (or a non-GET method) — the header's mere presence tells a
+     * client whether caching applies to this route at all.
+     *
+     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
+     */
+    public function withCacheStatus(ResponseInterface $response, ?array $cacheConfig, ServerRequestInterface $request, string $status): ResponseInterface
+    {
+        if (null === $cacheConfig || 'GET' !== $request->getMethod()) {
+            return $response;
+        }
+
+        return $response->withHeader('X-TYPO3-API-Cache', $status);
+    }
+
+    /**
      * @param list<string> $ignoreParams
      */
     public function buildKey(string $routeName, ServerRequestInterface $request, array $ignoreParams): string

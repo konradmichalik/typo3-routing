@@ -95,6 +95,32 @@ final class ResponseCacheManagerTest extends TestCase
     }
 
     #[Test]
+    public function withCacheStatusAddsTheHeaderForACacheableGetRoute(): void
+    {
+        $cacheConfig = ['lifetime' => 3600, 'tags' => [], 'ignoreParams' => []];
+        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), $cacheConfig, new ServerRequest('https://example.com/api/x', 'GET'), 'HIT');
+
+        self::assertSame('HIT', $response->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function withCacheStatusOmitsTheHeaderWhenCachingIsNotConfigured(): void
+    {
+        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), null, new ServerRequest('https://example.com/api/x', 'GET'), 'MISS');
+
+        self::assertSame('', $response->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function withCacheStatusOmitsTheHeaderForNonGetRequests(): void
+    {
+        $cacheConfig = ['lifetime' => 3600, 'tags' => [], 'ignoreParams' => []];
+        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), $cacheConfig, new ServerRequest('https://example.com/api/x', 'POST'), 'MISS');
+
+        self::assertSame('', $response->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
     public function buildKeyIsStableAndHonoursIgnoredParameters(): void
     {
         $base = $this->subject->buildKey('r', $this->requestWithQuery(['page' => '1', 'search' => 'foo']), ['search']);

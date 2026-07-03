@@ -258,6 +258,16 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function reportsACacheMissThenHitViaTheStatusHeader(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $second = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $second->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
     public function stampsACorrelationIdOnEveryResponse(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/count'));

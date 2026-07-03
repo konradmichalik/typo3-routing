@@ -93,6 +93,22 @@ A request from a different host gets the same `404 Not Found` as an unmatched pa
 
 `host` is a **matching filter, not an authorization boundary** — use [`#[Authenticate]`](AUTHENTICATION.md) for access control. It is matched against the request's URI host, the same source TYPO3's own `trustedHostsPattern` validates upstream of this middleware.
 
+### Wildcards and multiple hosts
+
+`host` supports the same `{placeholder}` syntax as `path`, constrained via `requirements` — useful for subdomain patterns:
+
+```php
+#[Route(path: '/api/status', name: 'tenant_status', host: '{subdomain}.example.com', requirements: ['subdomain' => '\w+'])]
+public function status(): ResponseInterface { /* … */ }
+```
+
+There is no `hosts` (plural) parameter — a route has exactly one `host` pattern, matching Symfony's own `Route` API. To accept a fixed set of exact hostnames, match the whole host with a placeholder and constrain it with an alternation:
+
+```php
+#[Route(path: '/api/status', name: 'multi_host_status', host: '{host}', requirements: ['host' => 'api\.example\.com|admin\.example\.com'])]
+public function status(): ResponseInterface { /* … */ }
+```
+
 Not inherited from a class-level `#[Route]` — same rule as `methods`.
 
 ## Class-level prefix (route groups)

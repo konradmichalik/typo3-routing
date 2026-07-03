@@ -141,6 +141,27 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function matcherEnforcesRouteHost(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, host?: string|null}> $routes */
+        $routes = [
+            'tenant' => ['path' => '/api/tenant', 'methods' => ['GET'], 'controller' => 'ctrl::tenant', 'env' => null, 'requirements' => [], 'host' => 'api.example.com'],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        $matchingContext = new RequestContext();
+        $matchingContext->setMethod('GET');
+        $matchingContext->setHost('api.example.com');
+        self::assertSame('tenant', $registry->getMatcher($matchingContext)->match('/api/tenant')['_route']);
+
+        $otherContext = new RequestContext();
+        $otherContext->setMethod('GET');
+        $otherContext->setHost('other.example.com');
+        $this->expectException(ResourceNotFoundException::class);
+        $registry->getMatcher($otherContext)->match('/api/tenant');
+    }
+
+    #[Test]
     public function bakesUserDefaultsIntoTheRouteAlongsideInternalKeys(): void
     {
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, defaults?: array<string, mixed>}> $routes */

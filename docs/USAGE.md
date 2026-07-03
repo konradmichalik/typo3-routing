@@ -37,6 +37,7 @@ The attribute is repeatable. Its parameters:
 | `priority`     | `int`                   | `0`       | Match priority; higher is matched first when paths overlap. See below.   |
 | `defaults`     | `array<string, mixed>`  | `[]`      | Default values for path placeholders; a trailing placeholder with a default becomes optional. See below. |
 | `schemes`      | `list<string>`          | `[]`      | Allowed URI schemes (e.g. `['https']`); empty = any scheme. See below.  |
+| `host`         | `?string`               | `null`    | Restrict the route to a specific hostname (e.g. `'api.example.com'`); null = any host. See below. |
 
 ## Priority
 
@@ -76,6 +77,19 @@ public function charge(): ResponseInterface { /* … */ }
 ```
 
 A request over a scheme not in the list gets the same `404 Not Found` as an unmatched path — the constraint is invisible rather than producing a scheme-specific error. `{routing:uri(route: 'payment_charge')}` generates a full absolute URL (`https://…`) instead of a site-relative path when the current request's scheme differs, since a relative path cannot target a different scheme.
+
+Not inherited from a class-level `#[Route]` — same rule as `methods`.
+
+## Host
+
+Restrict a route to a specific hostname — useful for a dedicated API subdomain that coexists with the main site:
+
+```php
+#[Route(path: '/v1/status', name: 'api_status', host: 'api.example.com')]
+public function status(): ResponseInterface { /* … */ }
+```
+
+A request from a different host gets the same `404 Not Found` as an unmatched path. `{routing:uri(route: 'api_status')}` generates a full absolute URL when the current request's host differs, for the same reason as `schemes` above.
 
 Not inherited from a class-level `#[Route]` — same rule as `methods`.
 

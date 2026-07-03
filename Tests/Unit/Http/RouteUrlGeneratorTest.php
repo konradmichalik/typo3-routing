@@ -71,9 +71,19 @@ final class RouteUrlGeneratorTest extends TestCase
         self::assertStringStartsWith('https://example.com/api/secure-only', $url);
     }
 
+    #[Test]
+    public function returnsAbsoluteUrlUnprefixedWhenRouteRequiresADifferentHost(): void
+    {
+        $request = $this->request('https://example.com/', 'https://example.com/');
+
+        $url = $this->createGenerator()->generate($request, 'fixture_tenant');
+
+        self::assertStringStartsWith('https://api.example.com/api/tenant', $url);
+    }
+
     private function createGenerator(): RouteUrlGenerator
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null}> $routes */
         $routes = [
             'fixture_count' => [
                 'path' => '/api/count',
@@ -96,6 +106,14 @@ final class RouteUrlGeneratorTest extends TestCase
                 'env' => null,
                 'requirements' => [],
                 'schemes' => ['https'],
+            ],
+            'fixture_tenant' => [
+                'path' => '/api/tenant',
+                'methods' => ['GET'],
+                'controller' => 'fixture::tenant',
+                'env' => null,
+                'requirements' => [],
+                'host' => 'api.example.com',
             ],
         ];
         $registry = new RouteRegistry($routes, new ServiceLocator([]));

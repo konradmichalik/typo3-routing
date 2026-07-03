@@ -16,6 +16,7 @@ namespace KonradMichalik\RoutingBenchmark\Middleware;
 use KonradMichalik\RoutingBenchmark\Domain\Model\Item;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
+use Symfony\Component\DependencyInjection\Attribute\Lazy;
 use TYPO3\CMS\Core\Http\JsonResponse;
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
@@ -38,7 +39,11 @@ use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private PersistenceManagerInterface $persistenceManager,
+        // Lazy: this middleware runs on every frontend request at this stack position, not just
+        // /api/bench/plain/entity/*. Eagerly building PersistenceManagerInterface would pull in
+        // PageRepository's constructor-time DB query for every scenario, not only the one that
+        // actually needs it.
+        #[Lazy] private PersistenceManagerInterface $persistenceManager,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface

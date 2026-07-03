@@ -12,3 +12,4 @@ php-cs-fixer.xml
 phpstan.xml
 .Build/
 .phpunit.result.cache
+.superpowers/

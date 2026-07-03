@@ -15,9 +15,9 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, JsonErrorResponse, RequestBody, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitEnforcer;
-use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
@@ -102,7 +102,9 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $handler->handle($request);
         }
 
-        // Every attribute-route response (success or error) gets the CORS headers stamped on.
+        // Every attribute-route response gets a correlation id and, finally, the CORS headers stamped on.
+        $response = RequestIdResolver::decorate($response, $request);
+
         return $this->cors->decorate($response, $request);
     }
 
@@ -349,24 +351,37 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $controller = $this->registry->getControllerLocator()->get($serviceId);
         assert(is_object($controller));
 
-        // Path placeholders stay available as request attributes for controllers that take the request.
-        foreach ($match as $key => $value) {
-            if (!str_starts_with($key, '_')) {
-                $request = $request->withAttribute($key, $value);
-            }
-        }
+        $request = $this->withPathAttributes($match, $request);
 
         $routeName = (string) ($match['_route'] ?? '');
         try {
             $arguments = $this->argumentResolver->resolve($this->registry->getArguments($routeName), $match, $request);
         } catch (ArgumentResolutionException $exception) {
             return JsonErrorResponse::create(400, $exception->getMessage());
+        } catch (EntityNotFoundException) {
+            return JsonErrorResponse::create(404, 'Not Found');
         }
 
         /** @var callable(mixed...): ResponseInterface $target */
         $target = [$controller, $method];
 
         return $target(...$arguments);
+    }
+
+    /**
+     * Path placeholders stay available as request attributes for controllers that take the request.
+     *
+     * @param array<string, mixed> $match
+     */
+    private function withPathAttributes(array $match, ServerRequestInterface $request): ServerRequestInterface
+    {
+        foreach ($match as $key => $value) {
+            if (!str_starts_with($key, '_')) {
+                $request = $request->withAttribute($key, $value);
+            }
+        }
+
+        return $request;
     }
 
     private function matchesCurrentContext(string $env): bool

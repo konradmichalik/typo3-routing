@@ -259,6 +259,14 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function stampsACorrelationIdOnEveryResponse(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/count'));
+
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+    }
+
+    #[Test]
     public function dispatchesBearerProtectedRouteWithAMatchingToken(): void
     {
         $_ENV['ROUTING_TEST_TOKEN'] = 'super-secret';

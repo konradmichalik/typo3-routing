@@ -13,13 +13,18 @@ declare(strict_types=1);
 
 namespace KonradMichalik\RoutingBenchmark\Middleware;
 
+use KonradMichalik\RoutingBenchmark\Domain\Model\Item;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
+use Symfony\Component\DependencyInjection\Attribute\Lazy;
 use TYPO3\CMS\Core\Http\JsonResponse;
+use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 // The "conventional middleware" side of the benchmark. It does by hand exactly what the
 // routing layer does for the BenchmarkController endpoints: match the path, pull and cast
-// the relevant input, return the same JSON.
+// the relevant input, return the same JSON. The entity endpoint uses the same
+// PersistenceManagerInterface::getObjectByIdentifier() lookup as the routing side, so that
+// scenario isolates dispatch overhead specifically, not a difference in lookup mechanism.
 //
 // Registered to run at the same stack position as the typo3-routing dispatcher (after the
 // site middleware, before the page resolver), so the only thing the benchmark compares is
@@ -31,8 +36,16 @@ use TYPO3\CMS\Core\Http\JsonResponse;
  * @author Konrad Michalik <hej@konradmichalik.dev>
  * @license GPL-2.0-or-later
  */
-final class PlainBenchmarkMiddleware implements MiddlewareInterface
+final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
 {
+    public function __construct(
+        // Lazy: this middleware runs on every frontend request at this stack position, not just
+        // /api/bench/plain/entity/*. Eagerly building PersistenceManagerInterface would pull in
+        // PageRepository's constructor-time DB query for every scenario, not only the one that
+        // actually needs it.
+        #[Lazy] private PersistenceManagerInterface $persistenceManager,
+    ) {}
+
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         $path = $request->getUri()->getPath();
@@ -49,6 +62,13 @@ final class PlainBenchmarkMiddleware implements MiddlewareInterface
             $q = $request->getQueryParams()['q'] ?? null;
             if (null !== $q && 1 === preg_match('/^\d+$/', (string) $q)) {
                 return new JsonResponse(['q' => (int) $q]);
+            }
+        }
+
+        if (1 === preg_match('#^/api/bench/plain/entity/(\d+)$#', $path, $matches)) {
+            $item = $this->persistenceManager->getObjectByIdentifier($matches[1], Item::class);
+            if ($item instanceof Item) {
+                return new JsonResponse(['id' => $item->getUid(), 'title' => $item->getTitle()]);
             }
         }
 

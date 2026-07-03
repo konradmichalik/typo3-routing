@@ -20,6 +20,7 @@ use ReflectionEnum;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionParameter;
+use TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface;
 
 use function enum_exists;
 use function in_array;
@@ -78,7 +79,11 @@ final class ArgumentSpecFactory
 
         // A variadic collects zero or more values from a single input array — it never injects the request.
         if ($parameter->isVariadic()) {
-            $spec = ['name' => $name, 'type' => $this->resolveValueType($type, $name, $where), 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null];
+            $variadicType = $this->resolveValueType($type, $name, $where);
+            if (null !== $variadicType && is_a($variadicType, DomainObjectInterface::class, true)) {
+                throw new LogicException(sprintf('Entity type "%s" on variadic parameter "$%s" of "%s" is not supported by route argument resolution.', $variadicType, $name, $where), 1750000009);
+            }
+            $spec = ['name' => $name, 'type' => $variadicType, 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null];
 
             return $this->applyParamOverride($spec, $parameter, $where);
         }
@@ -140,7 +145,11 @@ final class ArgumentSpecFactory
             return $class;
         }
 
-        throw new LogicException(sprintf('Unsupported object type "%s" on parameter "$%s" of "%s". Only scalars, backed enums and the PSR-7 request are resolvable.', $class, $name, $where), 1750000004);
+        if (is_a($class, DomainObjectInterface::class, true)) {
+            return $class;
+        }
+
+        throw new LogicException(sprintf('Unsupported object type "%s" on parameter "$%s" of "%s". Only scalars, backed enums, Extbase domain objects and the PSR-7 request are resolvable.', $class, $name, $where), 1750000004);
     }
 
     /**

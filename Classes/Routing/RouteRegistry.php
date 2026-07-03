@@ -28,12 +28,12 @@ final class RouteRegistry
     private ?RouteCollection $collection = null;
 
     /**
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}> $routes
-     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                   $cacheConfigs
-     * @param array<string, array{limit: int, interval: string, policy: string}>                                                                                                                    $rateLimits
-     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                         $arguments
-     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                            $authenticators
-     * @param array<string, string>                                                                                                                                                                 $requestTokenScopes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> $routes
+     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                               $cacheConfigs
+     * @param array<string, array{limit: int, interval: string, policy: string}>                                                                                                                                                                $rateLimits
+     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                     $arguments
+     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                        $authenticators
+     * @param array<string, string>                                                                                                                                                                                                             $requestTokenScopes
      */
     public function __construct(
         private readonly array $routes,
@@ -63,8 +63,8 @@ final class RouteRegistry
                     ],
                     $route['requirements'],
                     [],
-                    '',
-                    [],
+                    $route['host'] ?? '',
+                    $route['schemes'] ?? [],
                     $route['methods'],
                 ), $route['priority'] ?? 0);
             }
@@ -136,7 +136,7 @@ final class RouteRegistry
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}>
      */
     public function getRoutes(): array
     {

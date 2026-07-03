@@ -86,6 +86,18 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesRouteSchemesAndHost(): void
+    {
+        $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
+
+        self::assertSame(['https'], $routes['fixture_secure_only']['schemes'] ?? null);
+        self::assertSame('api.example.com', $routes['fixture_secure_only']['host'] ?? null);
+        // Routes without an explicit constraint default to any-scheme / any-host.
+        self::assertSame([], $routes['fixture_count']['schemes'] ?? null);
+        self::assertNull($routes['fixture_count']['host'] ?? null);
+    }
+
+    #[Test]
     public function appliesClassLevelRoutePrefixToPathNameEnvAndRequirements(): void
     {
         $routes = $this->discover($this->buildContainer(['prefixed' => PrefixedController::class]));
@@ -417,13 +429,13 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}>
      */
     private function discover(ContainerBuilder $container): array
     {
         (new RouteCompilerPass())->process($container);
 
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> $routes */
         $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
 
         return $routes;

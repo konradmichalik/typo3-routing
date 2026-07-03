@@ -57,6 +57,12 @@ final class FixtureController implements RouteControllerInterface
         return new JsonResponse(['preferred' => true]);
     }
 
+    #[Route(path: '/api/secure-only', name: 'fixture_secure_only', schemes: ['https'], host: 'api.example.com')]
+    public function secureOnly(ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse(['secure' => true]);
+    }
+
     // A trailing placeholder with a default becomes optional: /api/blog and /api/blog/{page} both match.
     #[Route(path: '/api/blog/{page}', name: 'fixture_blog', defaults: ['page' => 1])]
     public function blog(int $page): JsonResponse

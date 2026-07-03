@@ -39,12 +39,14 @@ final class RouteTest extends TestCase
         self::assertSame([], $route->requirements);
         self::assertSame(0, $route->priority);
         self::assertSame([], $route->defaults);
+        self::assertSame([], $route->schemes);
+        self::assertNull($route->host);
     }
 
     #[Test]
     public function storesAllProvidedValues(): void
     {
-        $route = new Route(path: '/api/bar', methods: ['POST', 'PUT'], name: 'bar', env: 'Development', requirements: ['id' => '\d+', 'q' => ''], priority: 10, defaults: ['page' => 1]);
+        $route = new Route(path: '/api/bar', methods: ['POST', 'PUT'], name: 'bar', env: 'Development', requirements: ['id' => '\d+', 'q' => ''], priority: 10, defaults: ['page' => 1], schemes: ['https'], host: 'api.example.com');
 
         self::assertSame('/api/bar', $route->path);
         self::assertSame(['POST', 'PUT'], $route->methods);
@@ -53,6 +55,8 @@ final class RouteTest extends TestCase
         self::assertSame(['id' => '\d+', 'q' => ''], $route->requirements);
         self::assertSame(10, $route->priority);
         self::assertSame(['page' => 1], $route->defaults);
+        self::assertSame(['https'], $route->schemes);
+        self::assertSame('api.example.com', $route->host);
     }
 
     #[Test]

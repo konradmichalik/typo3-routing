@@ -141,4 +141,10 @@ final class ExampleController implements RouteControllerInterface
         // Typed arguments resolved from an application/json body (POST and PUT alike).
         return new JsonResponse(['title' => $title, 'priority' => $priority]);
     }
+
+    #[Route(path: '/api/example/restricted', name: 'example_restricted', schemes: ['https'], host: 'example.com')]
+    public function restricted(): JsonResponse
+    {
+        return new JsonResponse(['restricted' => true]);
+    }
 }

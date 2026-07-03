@@ -37,6 +37,8 @@ final readonly class Route
      * @param array<string, string> $requirements Constraints by parameter name → regex. A name matching a path placeholder ({id}) is enforced by the matcher (404). Any other name is a required query/body parameter validated at dispatch (400; '' = presence only). E.g. ['id' => '\d+', 'q' => '']. Named patterns from Symfony\Component\Routing\Requirement\Requirement may be used as values, e.g. ['id' => Requirement::DIGITS]. At class level: merged under method requirements.
      * @param int                   $priority     Match priority; higher values are matched first. Use to disambiguate a static path from an overlapping placeholder path. Default 0
      * @param array<string, mixed>  $defaults     Default values for path placeholders. A trailing placeholder with a default becomes optional (`/blog/{page}` + ['page' => 1] also matches `/blog`, yielding page=1) and is omitted from generated URLs when it equals the default. Keys starting with "_" are reserved (used internally) and rejected at build time. At class level: merged under method defaults (the method wins per key).
+     * @param list<string>          $schemes      Allowed URI schemes (e.g. ['https']); empty = any scheme. A request whose scheme doesn't match yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
+     * @param string|null           $host         Restrict the route to a specific hostname (e.g. 'api.example.com'); null = any host. A request from a different host yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
      */
     public function __construct(
         public string $path,
@@ -46,5 +48,7 @@ final readonly class Route
         public array $requirements = [],
         public int $priority = 0,
         public array $defaults = [],
+        public array $schemes = [],
+        public ?string $host = null,
     ) {}
 }

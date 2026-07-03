@@ -276,6 +276,30 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function matchesRouteWhenSchemeAndHostAreSatisfied(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/restricted'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function returnsNotFoundWhenSchemeDoesNotMatch(): void
+    {
+        $response = $this->process($this->request('GET', 'http://example.com/api/example/restricted'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function returnsNotFoundWhenHostDoesNotMatch(): void
+    {
+        $response = $this->process($this->request('GET', 'https://other.example.com/api/example/restricted', 'https://other.example.com/'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
     public function dispatchesBearerProtectedRouteWithAMatchingToken(): void
     {
         $_ENV['ROUTING_TEST_TOKEN'] = 'super-secret';

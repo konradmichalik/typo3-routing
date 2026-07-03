@@ -249,6 +249,15 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function includesRateLimitHeadersOnTheContainerWiredDispatcher(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/limited'));
+
+        self::assertSame('1', $response->getHeaderLine('X-RateLimit-Limit'));
+        self::assertSame('0', $response->getHeaderLine('X-RateLimit-Remaining'));
+    }
+
+    #[Test]
     public function dispatchesBearerProtectedRouteWithAMatchingToken(): void
     {
         $_ENV['ROUTING_TEST_TOKEN'] = 'super-secret';

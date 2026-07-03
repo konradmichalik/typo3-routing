@@ -35,10 +35,10 @@ use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
  * @author Konrad Michalik <hej@konradmichalik.dev>
  * @license GPL-2.0-or-later
  */
-final class PlainBenchmarkMiddleware implements MiddlewareInterface
+final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private readonly PersistenceManagerInterface $persistenceManager,
+        private PersistenceManagerInterface $persistenceManager,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface

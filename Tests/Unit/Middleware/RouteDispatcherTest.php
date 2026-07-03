@@ -481,6 +481,33 @@ final class RouteDispatcherTest extends TestCase
         self::assertSame(404, $response->getStatusCode());
     }
 
+    #[Test]
+    public function stampsAGeneratedRequestIdOnASuccessResponse(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
+
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+    }
+
+    #[Test]
+    public function echoesTheClientsRequestId(): void
+    {
+        $request = $this->request('GET', 'https://example.com/api/count')->withHeader('X-Request-ID', 'client-supplied-id');
+
+        $response = $this->dispatch($request);
+
+        self::assertSame('client-supplied-id', $response->getHeaderLine('X-Request-ID'));
+    }
+
+    #[Test]
+    public function stampsARequestIdOnErrorResponsesToo(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/missing'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+    }
+
     private function dispatch(ServerRequestInterface $request, ?ResponseInterface $fallThrough = null, ?Context $context = null): ResponseInterface
     {
         return $this->dispatcher($context)->process($request, $this->handler($fallThrough ?? new Response('php://temp', 200)));

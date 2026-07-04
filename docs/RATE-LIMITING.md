@@ -27,3 +27,6 @@ public function submit(ServerRequestInterface $request): ResponseInterface
 
 > [!NOTE]
 > Behind a reverse proxy or CDN, configure `$GLOBALS['TYPO3_CONF_VARS']['SYS']['reverseProxyIP']` so the real client IP is used as the rate-limit key instead of the proxy address.
+
+> [!NOTE]
+> Counters are **best-effort under concurrency**: bucket updates are not cross-process locked, so parallel requests can briefly exceed the configured limit. Treat the limit as a throttle, not as an exact quota or a hard security boundary. The `typo3_routing_ratelimit` cache uses the TYPO3 default backend (database) unless overridden — for busy endpoints, point it at Redis or APCu via `$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['typo3_routing_ratelimit']` to keep the two extra storage round-trips per request off the database.

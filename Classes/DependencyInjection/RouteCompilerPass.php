@@ -22,6 +22,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
+use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
 
 use function array_intersect;
 use function array_map;
@@ -95,6 +96,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$arguments', $collected->arguments);
         $registry->setArgument('$authenticators', $collected->authenticators);
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
+        // Pre-compile the matcher tables so request-time matching never re-compiles route regexes.
+        $registry->setArgument('$compiledRoutes', (new CompiledUrlMatcherDumper(RouteRegistry::buildCollection($collected->routes)))->getCompiledRoutes());
     }
 
     /**

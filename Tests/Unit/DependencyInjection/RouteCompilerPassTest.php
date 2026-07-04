@@ -172,6 +172,20 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesCompiledMatcherRoutes(): void
+    {
+        $container = $this->buildContainer(['fixture_controller' => FixtureController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<mixed> $compiled */
+        $compiled = $container->getDefinition(RouteRegistry::class)->getArgument('$compiledRoutes');
+
+        // CompiledUrlMatcher format: [matchHost, staticRoutes, regexpList, dynamicRoutes, checkCondition].
+        self::assertCount(5, $compiled);
+        self::assertArrayHasKey('/api/count', (array) $compiled[1]);
+    }
+
+    #[Test]
     public function throwsOnDuplicateRouteName(): void
     {
         $this->expectException(LogicException::class);

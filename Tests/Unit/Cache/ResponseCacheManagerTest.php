@@ -131,6 +131,16 @@ final class ResponseCacheManagerTest extends TestCase
         self::assertNotSame($base, $otherPage);
     }
 
+    #[Test]
+    public function buildKeyVariesByHost(): void
+    {
+        // Multi-site: the same route on two domains must never share a cache entry.
+        $siteA = $this->subject->buildKey('r', new ServerRequest('https://a.example.com/api/x', 'GET'), []);
+        $siteB = $this->subject->buildKey('r', new ServerRequest('https://b.example.com/api/x', 'GET'), []);
+
+        self::assertNotSame($siteA, $siteB);
+    }
+
     /**
      * @param array<string, string> $query
      */

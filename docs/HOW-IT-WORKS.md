@@ -41,6 +41,18 @@ vendor/bin/typo3 routing:debug --method=POST --protected   # protected write end
 vendor/bin/typo3 routing:debug --cached --json             # cached routes, machine-readable
 ```
 
+## Match simulation command
+
+`routing:match` runs the same matcher the dispatcher uses and reports which route wins for a given path — or why none does. Give the path **without the site base** (exactly as written in `#[Route]`); the leading slash is optional. `--method` (default `GET`), `--scheme` (default `https`) and `--host` (default `localhost`) simulate the request so `schemes`/`host` constraints and priority overlaps can be debugged.
+
+``` bash
+vendor/bin/typo3 routing:match /api/item/new                        # which route claims this path?
+vendor/bin/typo3 routing:match /api/item/42                         # placeholder route, with resolved parameters
+vendor/bin/typo3 routing:match /api/orders --method=POST --host=api.example.com
+```
+
+A match prints the route name, controller, resolved path parameters and — for an [environment-bound route](CONFIGURATION.md) — a note that it is only reachable in that context (the matcher itself ignores `env`; the dispatcher enforces it at request time). A path that matches nothing exits non-zero with `No route matches`; a path that matches but rejects the method reports the allowed methods.
+
 The table lists every route with its path, methods, controller, environment binding, and requirements:
 
 ```

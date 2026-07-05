@@ -72,7 +72,7 @@ Authenticated routes are **never served from the shared response cache** (the ca
 
 ## `#[RequireRequestToken]` (CSRF)
 
-For **session-based, state-changing** endpoints (FE/BE user, `POST`/`PUT`/`PATCH`), add `#[RequireRequestToken]`. It verifies TYPO3's CSRF-like [request token](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Authentication/AuthenticationService/CSRFlikeRequestTokenHandling.html); a missing, unverifiable, or wrong-scope token yields `403 Forbidden`.
+For **session-based, state-changing** endpoints (FE/BE user, `POST`/`PUT`/`PATCH`/`DELETE`), add `#[RequireRequestToken]`. It verifies TYPO3's CSRF-like [request token](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Authentication/AuthenticationService/CSRFlikeRequestTokenHandling.html); a missing, unverifiable, or wrong-scope token yields `403 Forbidden`.
 
 ```php
 #[Route(path: '/api/account/update', methods: ['POST'], name: 'account_update')]
@@ -85,7 +85,7 @@ public function update(ServerRequestInterface $request): ResponseInterface { /* 
 |-----------|---------------|------------------------|------------------------------------------------------|
 | `scope`   | `string\|null`| `routing/<routeName>`  | Token scope; derived from the route name when omitted. |
 
-- Only enforced for `POST`/`PUT`/`PATCH`; safe methods are not CSRF-relevant. Putting it on a **GET-only** route is a build-time error.
+- Only enforced for `POST`/`PUT`/`PATCH`/`DELETE`; safe methods are not CSRF-relevant. Putting it on a **GET-only** route is a build-time error.
 - It is **redundant for Bearer-protected** routes (harmless, but unnecessary).
 
 ### Issuing the token

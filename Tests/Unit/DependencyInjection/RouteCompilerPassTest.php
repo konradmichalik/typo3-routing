@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -381,6 +381,19 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000012);
 
         $this->discover($this->buildContainer(['get_token' => GetOnlyRequestTokenController::class]));
+    }
+
+    #[Test]
+    public function acceptsRequestTokenOnADeleteOnlyRoute(): void
+    {
+        // DELETE is state-changing and CSRF-relevant, so opting into token verification must build.
+        $container = $this->buildContainer(['delete_token' => DeleteRequestTokenController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, string> $scopes */
+        $scopes = $container->getDefinition(RouteRegistry::class)->getArgument('$requestTokenScopes');
+
+        self::assertSame('routing/fixture_delete_token', $scopes['fixture_delete_token']);
     }
 
     #[Test]

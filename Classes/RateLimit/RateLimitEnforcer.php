@@ -28,7 +28,7 @@ final readonly class RateLimitEnforcer
     ) {}
 
     /**
-     * @param array{limit: int, interval: string, policy: string} $config
+     * @param array{limit: int, interval: string, policy: string, keyBy: string} $config
      */
     public function consume(string $routeName, array $config, string $clientId): RateLimit
     {

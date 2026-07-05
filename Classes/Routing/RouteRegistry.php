@@ -30,7 +30,7 @@ final class RouteRegistry
     /**
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> $routes
      * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                               $cacheConfigs
-     * @param array<string, array{limit: int, interval: string, policy: string}>                                                                                                                                                                $rateLimits
+     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                 $rateLimits
      * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                     $arguments
      * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                        $authenticators
      * @param array<string, string>                                                                                                                                                                                                             $requestTokenScopes
@@ -117,7 +117,7 @@ final class RouteRegistry
     }
 
     /**
-     * @return array{limit: int, interval: string, policy: string}|null
+     * @return array{limit: int, interval: string, policy: string, keyBy: string}|null
      */
     public function getRateLimit(string $routeName): ?array
     {

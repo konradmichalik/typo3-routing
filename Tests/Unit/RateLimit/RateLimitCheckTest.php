@@ -27,9 +27,9 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 final class RateLimitCheckTest extends TestCase
 {
     /**
-     * @var array{limit: int, interval: string, policy: string}
+     * @var array{limit: int, interval: string, policy: string, keyBy: string}
      */
-    private const CONFIG = ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window'];
+    private const CONFIG = ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'ip'];
 
     #[Test]
     public function anAcceptedRequestIsNotBlockedAndCarriesItsQuotaHeaders(): void

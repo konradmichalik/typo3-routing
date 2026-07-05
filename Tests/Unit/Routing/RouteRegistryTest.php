@@ -217,7 +217,7 @@ final class RouteRegistryTest extends TestCase
             [],
             new ServiceLocator([]),
             [],
-            ['limited' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window']],
+            ['limited' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'ip']],
         );
 
         $rateLimit = $registry->getRateLimit('limited');
@@ -226,6 +226,7 @@ final class RouteRegistryTest extends TestCase
         self::assertSame(60, $rateLimit['limit']);
         self::assertSame('1 minute', $rateLimit['interval']);
         self::assertSame('sliding_window', $rateLimit['policy']);
+        self::assertSame('ip', $rateLimit['keyBy']);
         self::assertNull($registry->getRateLimit('unlimited'));
     }
 

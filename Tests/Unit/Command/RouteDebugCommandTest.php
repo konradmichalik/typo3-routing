@@ -337,8 +337,8 @@ final class RouteDebugCommandTest extends TestCase
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
         $cacheConfigs = ['example_count' => ['lifetime' => 3600, 'tags' => ['pages'], 'ignoreParams' => []]];
-        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
-        $rateLimits = ['example_dev' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window']];
+        /** @var array<string, array{limit: int, interval: string, policy: string, keyBy: string}> $rateLimits */
+        $rateLimits = ['example_dev' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'ip']];
         /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
         $arguments = ['example_dev' => [['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]]];
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

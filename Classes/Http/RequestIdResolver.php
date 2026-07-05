@@ -18,6 +18,7 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use function bin2hex;
 use function chr;
 use function ord;
+use function preg_match;
 use function random_bytes;
 use function sprintf;
 use function str_split;
@@ -46,7 +47,17 @@ final class RequestIdResolver
     {
         $incoming = trim($request->getHeaderLine(self::HEADER));
 
-        return '' !== $incoming ? $incoming : self::generate();
+        return self::isAcceptable($incoming) ? $incoming : self::generate();
+    }
+
+    /**
+     * A client-supplied id is echoed into the response and correlated in logs, so accept only a
+     * bounded run of visible ASCII (no control characters, CR/LF or spaces) — otherwise generate a
+     * fresh one. This keeps an attacker from smuggling arbitrary or oversized content downstream.
+     */
+    private static function isAcceptable(string $id): bool
+    {
+        return 1 === preg_match('/^[\x21-\x7e]{1,128}$/', $id);
     }
 
     private static function generate(): string

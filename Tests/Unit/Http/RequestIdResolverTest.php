@@ -18,6 +18,8 @@ use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
 
+use function str_repeat;
+
 /**
  * RequestIdResolverTest.
  *
@@ -70,5 +72,39 @@ final class RequestIdResolverTest extends TestCase
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
         self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+    }
+
+    #[Test]
+    public function generatesAFreshIdWhenTheIncomingValueContainsControlCharacters(): void
+    {
+        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
+            ->withHeader('X-Request-ID', "abc\tinjected");
+
+        $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
+
+        // The tampered value is rejected and a fresh UUID is generated instead.
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+    }
+
+    #[Test]
+    public function generatesAFreshIdWhenTheIncomingValueIsTooLong(): void
+    {
+        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
+            ->withHeader('X-Request-ID', str_repeat('a', 129));
+
+        $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
+
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+    }
+
+    #[Test]
+    public function acceptsAValidNonUuidCorrelationId(): void
+    {
+        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
+            ->withHeader('X-Request-ID', 'req_01HXAF.42-abc');
+
+        $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
+
+        self::assertSame('req_01HXAF.42-abc', $response->getHeaderLine('X-Request-ID'));
     }
 }

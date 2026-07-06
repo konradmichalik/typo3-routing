@@ -268,7 +268,7 @@ final class OpenApiGeneratorTest extends TestCase
             $routes,
             new ServiceLocator([]),
             [],
-            ['items_create' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window']],
+            ['items_create' => ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'ip']],
             $arguments,
             ['items_create' => [['service' => BearerTokenAuthenticator::class, 'options' => []]]],
             ['items_create' => 'routing/items_create'],

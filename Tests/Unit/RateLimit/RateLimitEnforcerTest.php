@@ -27,9 +27,9 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 final class RateLimitEnforcerTest extends TestCase
 {
     /**
-     * @var array{limit: int, interval: string, policy: string}
+     * @var array{limit: int, interval: string, policy: string, keyBy: string}
      */
-    private const CONFIG = ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window'];
+    private const CONFIG = ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'ip'];
 
     #[Test]
     public function acceptsTheFirstRequestWithinTheLimit(): void
@@ -79,7 +79,7 @@ final class RateLimitEnforcerTest extends TestCase
     public function supportsTheFixedWindowPolicy(): void
     {
         $enforcer = new RateLimitEnforcer(new InMemoryStorage());
-        $config = ['limit' => 1, 'interval' => '1 minute', 'policy' => 'fixed_window'];
+        $config = ['limit' => 1, 'interval' => '1 minute', 'policy' => 'fixed_window', 'keyBy' => 'ip'];
 
         $enforcer->consume('route_a', $config, '203.0.113.1');
         $blocked = $enforcer->consume('route_a', $config, '203.0.113.1');

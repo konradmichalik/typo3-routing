@@ -27,10 +27,12 @@ final readonly class RateLimit
      * @param int    $limit    Maximum number of requests allowed within the interval
      * @param string $interval Time window as a relative date string (e.g. '1 minute', '10 seconds')
      * @param string $policy   Limiter policy: 'sliding_window' (default) or 'fixed_window'
+     * @param string $keyBy    What to throttle per: 'ip' (default) or 'user' (the logged-in frontend user, falling back to IP for anonymous requests)
      */
     public function __construct(
         public int $limit = 60,
         public string $interval = '1 minute',
         public string $policy = 'sliding_window',
+        public string $keyBy = 'ip',
     ) {}
 }

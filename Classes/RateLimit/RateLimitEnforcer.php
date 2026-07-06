@@ -33,7 +33,7 @@ final readonly class RateLimitEnforcer
      * That keeps the hot path free of cross-process locking; treat the limit as a throttle, not as
      * an exact quota or a hard security boundary.
      *
-     * @param array{limit: int, interval: string, policy: string} $config
+     * @param array{limit: int, interval: string, policy: string, keyBy: string} $config
      */
     public function consume(string $routeName, array $config, string $clientId): RateLimit
     {

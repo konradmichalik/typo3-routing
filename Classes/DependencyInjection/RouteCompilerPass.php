@@ -49,6 +49,11 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     private const SUPPORTED_RATE_LIMIT_POLICIES = ['sliding_window', 'fixed_window'];
 
     /**
+     * @var list<string>
+     */
+    private const SUPPORTED_RATE_LIMIT_KEYS = ['ip', 'user'];
+
+    /**
      * Attributes that only take effect alongside a #[Route] on the same method.
      *
      * @var array<class-string, string>
@@ -211,7 +216,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
     /**
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cache
-     * @param array{limit: int, interval: string, policy: string}|null                  $rateLimit
+     * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
     private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, CollectedRoutes $collected, ?Route $classRoute): void
@@ -368,7 +373,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     }
 
     /**
-     * @return array{limit: int, interval: string, policy: string}|null
+     * @return array{limit: int, interval: string, policy: string, keyBy: string}|null
      */
     private function resolveRateLimit(ReflectionMethod $method, string $serviceId): ?array
     {
@@ -383,7 +388,11 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             throw new LogicException(sprintf('Unsupported #[RateLimit] policy "%s" on "%s::%s()". Supported policies are "%s".', $rateLimit->policy, $serviceId, $method->getName(), implode('", "', self::SUPPORTED_RATE_LIMIT_POLICIES)), 1750000001);
         }
 
-        return ['limit' => $rateLimit->limit, 'interval' => $rateLimit->interval, 'policy' => $rateLimit->policy];
+        if (!in_array($rateLimit->keyBy, self::SUPPORTED_RATE_LIMIT_KEYS, true)) {
+            throw new LogicException(sprintf('Unsupported #[RateLimit] keyBy "%s" on "%s::%s()". Supported keys are "%s".', $rateLimit->keyBy, $serviceId, $method->getName(), implode('", "', self::SUPPORTED_RATE_LIMIT_KEYS)), 1750000024);
+        }
+
+        return ['limit' => $rateLimit->limit, 'interval' => $rateLimit->interval, 'policy' => $rateLimit->policy, 'keyBy' => $rateLimit->keyBy];
     }
 
     private function deriveRouteName(string $serviceId, string $method): string

@@ -26,22 +26,24 @@ use PHPUnit\Framework\TestCase;
 final class RateLimitTest extends TestCase
 {
     #[Test]
-    public function defaultsToSixtyPerMinuteSlidingWindow(): void
+    public function defaultsToSixtyPerMinuteSlidingWindowKeyedByIp(): void
     {
         $rateLimit = new RateLimit();
 
         self::assertSame(60, $rateLimit->limit);
         self::assertSame('1 minute', $rateLimit->interval);
         self::assertSame('sliding_window', $rateLimit->policy);
+        self::assertSame('ip', $rateLimit->keyBy);
     }
 
     #[Test]
     public function storesAllProvidedValues(): void
     {
-        $rateLimit = new RateLimit(limit: 10, interval: '10 seconds', policy: 'fixed_window');
+        $rateLimit = new RateLimit(limit: 10, interval: '10 seconds', policy: 'fixed_window', keyBy: 'user');
 
         self::assertSame(10, $rateLimit->limit);
         self::assertSame('10 seconds', $rateLimit->interval);
         self::assertSame('fixed_window', $rateLimit->policy);
+        self::assertSame('user', $rateLimit->keyBy);
     }
 }

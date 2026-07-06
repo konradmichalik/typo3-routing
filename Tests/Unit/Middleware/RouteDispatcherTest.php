@@ -18,7 +18,7 @@ use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
-use KonradMichalik\Typo3Routing\RateLimit\{RateLimitCheck, RateLimitEnforcer};
+use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, RouteRegistry};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController};
@@ -297,7 +297,7 @@ final class RouteDispatcherTest extends TestCase
 
         $registry = $this->registry();
         $context = new Context();
-        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, $context), new CorsHandler($extensionConfiguration), new CacheBypassGuard($context), $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, $context), new CorsHandler($extensionConfiguration), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -374,6 +374,21 @@ final class RouteDispatcherTest extends TestCase
         self::assertSame(429, $second->getStatusCode());
         self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Too Many Requests","status":429}', (string) $second->getBody());
         self::assertNotSame('', $second->getHeaderLine('Retry-After'));
+    }
+
+    #[Test]
+    public function throttlesAUserKeyedRoutePerFrontendUser(): void
+    {
+        $userA = $this->frontendUserContext(1);
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/userlimited'), null, $userA);
+        $second = $this->dispatch($this->request('GET', 'https://example.com/api/userlimited'), null, $userA);
+
+        self::assertSame(200, $first->getStatusCode());
+        self::assertSame(429, $second->getStatusCode());
+
+        // A different frontend user has an independent bucket.
+        $other = $this->dispatch($this->request('GET', 'https://example.com/api/userlimited'), null, $this->frontendUserContext(2));
+        self::assertSame(200, $other->getStatusCode());
     }
 
     #[Test]
@@ -684,7 +699,7 @@ final class RouteDispatcherTest extends TestCase
         $context ??= new Context();
         $accessGuard = new AccessGuard($registry, $context);
 
-        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, new CacheBypassGuard($context), $extensionConfiguration);
+        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -701,6 +716,7 @@ final class RouteDispatcherTest extends TestCase
             'guarded' => ['path' => '/api/guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'posted' => ['path' => '/api/posted', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => ['n' => '\d+']],
             'limited' => ['path' => '/api/limited', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'userlimited' => ['path' => '/api/userlimited', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'denied' => ['path' => '/api/denied', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'securecached' => ['path' => '/api/securecached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
             'optionated' => ['path' => '/api/optionated', 'methods' => ['GET', 'OPTIONS'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
@@ -715,9 +731,10 @@ final class RouteDispatcherTest extends TestCase
             'securecached' => ['lifetime' => 3600, 'tags' => ['pages'], 'ignoreParams' => []],
         ];
 
-        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
+        /** @var array<string, array{limit: int, interval: string, policy: string, keyBy: string}> $rateLimits */
         $rateLimits = [
-            'limited' => ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window'],
+            'limited' => ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'ip'],
+            'userlimited' => ['limit' => 1, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'user'],
         ];
 
         $request = ['name' => 'request', 'type' => null, 'source' => 'request', 'nullable' => false, 'hasDefault' => false, 'default' => null];
@@ -735,6 +752,7 @@ final class RouteDispatcherTest extends TestCase
             'guarded' => [],
             'posted' => [$request],
             'limited' => [],
+            'userlimited' => [],
             'denied' => [],
             'securecached' => [],
             'optionated' => [],
@@ -761,6 +779,17 @@ final class RouteDispatcherTest extends TestCase
         ]);
 
         return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator);
+    }
+
+    private function frontendUserContext(int $uid): Context
+    {
+        $user = new FakeUser();
+        $user->user = ['uid' => $uid];
+
+        $context = new Context();
+        $context->setAspect('frontend.user', new UserAspect($user));
+
+        return $context;
     }
 
     private function backendUserContext(): Context

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -253,13 +253,15 @@ final class RouteCompilerPassTest extends TestCase
         $container = $this->buildContainer(['fixture_controller' => FixtureController::class]);
         (new RouteCompilerPass())->process($container);
 
-        /** @var array<string, array{limit: int, interval: string, policy: string}> $rateLimits */
+        /** @var array<string, array{limit: int, interval: string, policy: string, keyBy: string}> $rateLimits */
         $rateLimits = $container->getDefinition(RouteRegistry::class)->getArgument('$rateLimits');
 
         self::assertArrayHasKey('fixture_limited', $rateLimits);
         self::assertSame(5, $rateLimits['fixture_limited']['limit']);
         self::assertSame('10 seconds', $rateLimits['fixture_limited']['interval']);
         self::assertSame('fixed_window', $rateLimits['fixture_limited']['policy']);
+        // Defaults to IP keying when not specified.
+        self::assertSame('ip', $rateLimits['fixture_limited']['keyBy']);
         // Methods without #[RateLimit] get no entry.
         self::assertArrayNotHasKey('fixture_count', $rateLimits);
     }
@@ -271,6 +273,15 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000001);
 
         $this->discover($this->buildContainer(['bogus' => InvalidRateLimitPolicyController::class]));
+    }
+
+    #[Test]
+    public function throwsOnUnsupportedRateLimitKey(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000024);
+
+        $this->discover($this->buildContainer(['bogus_key' => InvalidRateLimitKeyController::class]));
     }
 
     #[Test]

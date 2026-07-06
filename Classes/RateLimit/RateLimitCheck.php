@@ -34,7 +34,7 @@ final readonly class RateLimitCheck
      * Consumes a token and reports both the outcome and the quota headers to stamp on the eventual
      * response — accepted or blocked, a client can always see its remaining quota.
      *
-     * @param array{limit: int, interval: string, policy: string} $config
+     * @param array{limit: int, interval: string, policy: string, keyBy: string} $config
      *
      * @return array{blocked: ResponseInterface|null, headers: array<string, string>}
      */

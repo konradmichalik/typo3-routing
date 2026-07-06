@@ -28,7 +28,7 @@ final class CollectedRoutes
     /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> */
     public array $cacheConfigs = [];
 
-    /** @var array<string, array{limit: int, interval: string, policy: string}> */
+    /** @var array<string, array{limit: int, interval: string, policy: string, keyBy: string}> */
     public array $rateLimits = [];
 
     /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> */

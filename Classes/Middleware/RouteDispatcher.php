@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, HttpProblemException, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
-use KonradMichalik\Typo3Routing\RateLimit\RateLimitCheck;
+use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -26,7 +26,6 @@ use Symfony\Component\Routing\RequestContext;
 use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
-use TYPO3\CMS\Core\Http\NormalizedParams;
 
 use function array_filter;
 use function array_key_exists;
@@ -62,6 +61,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private AccessGuard $accessGuard,
         private CorsHandler $cors,
         private CacheBypassGuard $cacheBypass,
+        private ClientKeyResolver $clientKeyResolver,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $prefix = '/api/';
@@ -221,7 +221,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return ['blocked' => null, 'headers' => []];
         }
 
-        return $this->rateLimitCheck->evaluate($routeName, $config, $this->clientId($request));
+        return $this->rateLimitCheck->evaluate($routeName, $config, $this->clientKeyResolver->resolve($config, $request));
     }
 
     /**
@@ -234,19 +234,6 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         return $response;
-    }
-
-    private function clientId(ServerRequestInterface $request): string
-    {
-        // normalizedParams is set early in the frontend stack and resolves reverse-proxy headers.
-        $normalizedParams = $request->getAttribute('normalizedParams');
-        if ($normalizedParams instanceof NormalizedParams) {
-            return $normalizedParams->getRemoteAddress();
-        }
-
-        $remoteAddress = $request->getServerParams()['REMOTE_ADDR'] ?? '';
-
-        return is_string($remoteAddress) ? $remoteAddress : '';
     }
 
     /**

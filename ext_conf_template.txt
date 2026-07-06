@@ -10,7 +10,7 @@ cors.allowedOrigins =
 # cat=cors/enable/020; type=string; label=CORS allowed request headers:Comma-separated list of request headers the browser may send (Access-Control-Allow-Headers). Defaults to Content-Type, Authorization.
 cors.allowedHeaders = Content-Type, Authorization
 
-# cat=cors/enable/030; type=boolean; label=CORS allow credentials:Allow credentialed requests (cookies, Authorization header). When enabled, the concrete request origin is echoed instead of * (as required by the CORS spec).
+# cat=cors/enable/030; type=boolean; label=CORS allow credentials:Allow credentialed requests (cookies, Authorization header). Requires an EXPLICIT origin list: combined with the * wildcard this setting is ignored (with a logged warning), because reflecting arbitrary origins with credentials would let any website read authenticated API responses.
 cors.allowCredentials = 0
 
 # cat=cors/enable/040; type=string; label=CORS exposed response headers:Comma-separated list of response headers exposed to the browser (Access-Control-Expose-Headers). Empty by default.

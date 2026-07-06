@@ -256,6 +256,9 @@ A malformed identifier (not an integer) yields a **400**, same as an invalid `in
 > [!NOTE]
 > `getObjectByIdentifier()` respects Extbase's enable-fields (a hidden/deleted record resolves as **404**), but does not restrict by storage page or apply a workspace overlay — a record on any page/pid is resolvable by uid.
 
+> [!WARNING]
+> Entity binding resolves **any** valid identifier — it is a lookup, not an authorization check. A client can request `/api/news/{news}` for any uid, so a route exposing user- or tenant-scoped records must enforce access itself: guard it with [`#[Authenticate]`](AUTHENTICATION.md) and verify ownership in the controller. Treat the resolved object like any untrusted `id` parameter (an IDOR risk if left unchecked).
+
 ### Variadics
 
 A **variadic** parameter collects zero or more values from a single input array (`?ids[]=1&ids[]=2`), each coerced to the element type. An absent input yields no arguments.

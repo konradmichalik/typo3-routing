@@ -41,6 +41,7 @@ final class UrisViewHelper extends AbstractRouteUriViewHelper
             $map[(string) $key] = $generator->generate($request, (string) $routeName);
         }
 
-        return json_encode($map, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+        // JSON_HEX_TAG escapes <, > so the output stays safe to embed directly in an inline <script>.
+        return json_encode($map, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_HEX_TAG);
     }
 }

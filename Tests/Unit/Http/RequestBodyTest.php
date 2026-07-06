@@ -117,6 +117,24 @@ final class RequestBodyTest extends TestCase
         self::assertSame([], RequestBody::toArray($request));
     }
 
+    #[Test]
+    public function memoizesTheDecodedBodyPerStream(): void
+    {
+        $request = $this->jsonRequest('POST', '{"n":1}');
+        self::assertSame(['n' => 1], RequestBody::toArray($request));
+
+        // Overwrite the same stream in place; a re-decode would see the new content, but the memo
+        // (keyed by the stream instance) returns the first result without touching the stream again.
+        $body = $request->getBody();
+        $body->rewind();
+        $body->write('{"n":2}');
+        $body->rewind();
+        self::assertSame(['n' => 1], RequestBody::toArray($request));
+
+        // A different request carries a different stream, so it is decoded independently.
+        self::assertSame(['n' => 2], RequestBody::toArray($this->jsonRequest('POST', '{"n":2}')));
+    }
+
     private function jsonRequest(string $method, string $body, string $contentType = 'application/json'): ServerRequest
     {
         $stream = new Stream('php://temp', 'wb+');

@@ -13,7 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Http;
 
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\{ServerRequestInterface, StreamInterface};
+use WeakMap;
 
 use function is_array;
 use function json_decode;
@@ -29,6 +30,16 @@ use function strtolower;
 final class RequestBody
 {
     /**
+     * Per-request memo of the decoded body, keyed by the body stream. The stream instance is shared
+     * across the request clones that withAttribute() produces, so the two consumers in one request —
+     * the dispatcher's input-requirement check and the argument resolver — decode a payload once, not
+     * twice. Entries are released with the stream (weak references), so nothing leaks across requests.
+     *
+     * @var WeakMap<StreamInterface, array<mixed>>|null
+     */
+    private static ?WeakMap $decoded = null;
+
+    /**
      * The request body as an associative array. TYPO3 only populates the parsed body for
      * form-encoded POST requests, so a JSON payload — and any PUT/PATCH body — is decoded
      * from the raw stream here, letting it bind to typed arguments like a form field would.
@@ -42,13 +53,15 @@ final class RequestBody
             return $parsed;
         }
 
-        if (!self::isJson($request)) {
-            return [];
+        $stream = $request->getBody();
+        $memo = self::$decoded ??= new WeakMap();
+        if (isset($memo[$stream])) {
+            return $memo[$stream];
         }
 
-        $decoded = json_decode(self::readRaw($request), true);
+        $decoded = self::isJson($request) ? json_decode(self::readRaw($request), true) : null;
 
-        return is_array($decoded) ? $decoded : [];
+        return $memo[$stream] = is_array($decoded) ? $decoded : [];
     }
 
     private static function isJson(ServerRequestInterface $request): bool

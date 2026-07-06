@@ -28,6 +28,11 @@ final readonly class RateLimitEnforcer
     ) {}
 
     /**
+     * Counters are best-effort under concurrency: the factory is created without a lock factory,
+     * so parallel requests can read the same bucket state and briefly exceed the configured limit.
+     * That keeps the hot path free of cross-process locking; treat the limit as a throttle, not as
+     * an exact quota or a hard security boundary.
+     *
      * @param array{limit: int, interval: string, policy: string} $config
      */
     public function consume(string $routeName, array $config, string $clientId): RateLimit

@@ -109,6 +109,26 @@ final class AccessGuardTest extends TestCase
         self::assertNull($this->guard()->enforce(['_route' => 'token'], $this->request('GET')));
     }
 
+    #[Test]
+    public function deniesDeleteWithoutARequestToken(): void
+    {
+        // DELETE is state-changing, so it is CSRF-relevant like POST/PUT/PATCH.
+        $guard = $this->guard($this->contextWithToken(null));
+
+        $response = $guard->enforce(['_route' => 'token'], $this->request('DELETE'));
+
+        self::assertNotNull($response);
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function grantsDeleteWhenTheRequestTokenScopeMatches(): void
+    {
+        $guard = $this->guard($this->contextWithToken(RequestToken::create('routing/token')));
+
+        self::assertNull($guard->enforce(['_route' => 'token'], $this->request('DELETE')));
+    }
+
     private function guard(?Context $context = null): AccessGuard
     {
         $pass = ['service' => PassAuthenticator::class, 'options' => []];

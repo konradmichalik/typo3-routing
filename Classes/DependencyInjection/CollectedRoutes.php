@@ -13,16 +13,19 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
+use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use Symfony\Component\DependencyInjection\Reference;
 
 /**
  * CollectedRoutes.
  *
+ * @phpstan-import-type BakedRoute from RouteRegistry
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class CollectedRoutes
 {
-    /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> */
+    /** @var array<string, BakedRoute> */
     public array $routes = [];
 
     /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> */

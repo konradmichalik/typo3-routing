@@ -306,6 +306,6 @@ public function cancel(Order $order): ResponseInterface
 }
 ```
 
-The dispatcher maps it to `application/problem+json` — status `409`, title `Conflict`, and the message as `detail` (omitted when it only repeats the title). Only 4xx/5xx status codes are accepted; anything else is a build error at throw time.
+The dispatcher maps it to `application/problem+json` — status `409`, title `Conflict`, and the message as `detail` (omitted when it only repeats the title). Only 4xx/5xx status codes are accepted; anything else raises a runtime `LogicException` when the exception is constructed.
 
 Every **other** exception stays untouched and reaches TYPO3's regular error handling (and its logging) as before — `HttpProblemException` is for *expected* error outcomes, not a replacement for exception handling.

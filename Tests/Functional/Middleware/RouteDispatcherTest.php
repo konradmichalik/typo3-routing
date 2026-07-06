@@ -73,6 +73,19 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function mapsAControllerThrownProblemToAProblemDetailsResponse(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/problem'));
+
+        self::assertSame(409, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->getHeaderLine('Content-Type'));
+        self::assertJsonStringEqualsJsonString(
+            '{"type":"about:blank","title":"Conflict","status":409,"detail":"Item already processed"}',
+            (string) $response->getBody(),
+        );
+    }
+
+    #[Test]
     public function returnsNotFoundForUnknownPathUnderPrefix(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/missing'));

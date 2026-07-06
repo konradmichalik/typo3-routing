@@ -288,3 +288,24 @@ public function search(
     // …
 }
 ```
+
+## Error responses from controllers
+
+Throw `HttpProblemException` to answer with the same [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem-details format the dispatcher uses for its own errors (`404`, `405`, `400`, …):
+
+```php
+use KonradMichalik\Typo3Routing\Http\HttpProblemException;
+
+#[Route(path: '/api/orders/{id}/cancel', methods: ['POST'], name: 'order_cancel')]
+public function cancel(Order $order): ResponseInterface
+{
+    if ($order->isShipped()) {
+        throw new HttpProblemException(409, 'Order has already been shipped');
+    }
+    // …
+}
+```
+
+The dispatcher maps it to `application/problem+json` — status `409`, title `Conflict`, and the message as `detail` (omitted when it only repeats the title). Only 4xx/5xx status codes are accepted; anything else raises a runtime `LogicException` when the exception is constructed.
+
+Every **other** exception stays untouched and reaches TYPO3's regular error handling (and its logging) as before — `HttpProblemException` is for *expected* error outcomes, not a replacement for exception handling.

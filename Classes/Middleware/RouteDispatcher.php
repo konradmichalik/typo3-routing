@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, HttpProblemException, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\RateLimitCheck;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, RouteRegistry};
 use Override;
@@ -306,7 +306,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return ConditionalGet::notModified($request, $cached) ?? $cached;
         }
 
-        $response = $this->invokeController($match, $request);
+        $response = $this->invokeController($match, $routeName, $request);
         $response = $this->writeCache($cacheConfig, $routeName, $request, $response);
         $response = $this->cache->withCacheStatus($response, $cacheConfig, $request, 'MISS');
 
@@ -351,7 +351,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     /**
      * @param array<string, mixed> $match
      */
-    private function invokeController(array $match, ServerRequestInterface $request): ResponseInterface
+    private function invokeController(array $match, string $routeName, ServerRequestInterface $request): ResponseInterface
     {
         [$serviceId, $method] = explode('::', (string) $match['_controller'], 2);
         $controller = $this->registry->getControllerLocator()->get($serviceId);
@@ -359,19 +359,22 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         $request = $this->withPathAttributes($match, $request);
 
-        $routeName = (string) ($match['_route'] ?? '');
         try {
             $arguments = $this->argumentResolver->resolve($this->registry->getArguments($routeName), $match, $request);
+
+            /** @var callable(mixed...): ResponseInterface $target */
+            $target = [$controller, $method];
+
+            return $target(...$arguments);
         } catch (ArgumentResolutionException $exception) {
             return JsonErrorResponse::create(400, $exception->getMessage());
         } catch (EntityNotFoundException) {
             return JsonErrorResponse::create(404, 'Not Found');
+        } catch (HttpProblemException $exception) {
+            // A controller-thrown problem maps onto the dispatcher's regular error format; every
+            // other exception stays untouched and reaches TYPO3's error handling (and logging).
+            return JsonErrorResponse::create($exception->status, $exception->getMessage());
         }
-
-        /** @var callable(mixed...): ResponseInterface $target */
-        $target = [$controller, $method];
-
-        return $target(...$arguments);
     }
 
     /**

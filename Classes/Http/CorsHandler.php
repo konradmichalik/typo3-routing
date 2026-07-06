@@ -26,7 +26,10 @@ use function implode;
 use function in_array;
 use function is_array;
 use function is_scalar;
+use function trigger_error;
 use function trim;
+
+use const E_USER_WARNING;
 
 /**
  * CorsHandler.
@@ -62,7 +65,7 @@ final readonly class CorsHandler
 
         $this->allowedOrigins = $this->toList($this->string($cors, 'allowedOrigins', ''));
         $this->allowedHeaders = $this->normalizeCsv($this->string($cors, 'allowedHeaders', 'Content-Type, Authorization'));
-        $this->allowCredentials = '1' === $this->string($cors, 'allowCredentials', '0');
+        $this->allowCredentials = $this->resolveAllowCredentials('1' === $this->string($cors, 'allowCredentials', '0'));
         $this->exposeHeaders = $this->normalizeCsv($this->string($cors, 'exposeHeaders', ''));
         $this->maxAge = (int) $this->string($cors, 'maxAge', '3600');
     }
@@ -124,6 +127,23 @@ final readonly class CorsHandler
             ->withHeader('Access-Control-Max-Age', (string) $this->maxAge);
     }
 
+    /**
+     * Credentials require an explicit origin allow-list. Reflecting arbitrary origins with
+     * `Access-Control-Allow-Credentials: true` would let ANY website read authenticated API
+     * responses — exactly what the spec's wildcard/credentials prohibition exists to prevent —
+     * so the wildcard downgrades credentialed CORS to plain wildcard CORS.
+     */
+    private function resolveAllowCredentials(bool $requested): bool
+    {
+        if (!$requested || !in_array('*', $this->allowedOrigins, true)) {
+            return $requested;
+        }
+
+        trigger_error('typo3_routing: cors.allowCredentials is ignored because cors.allowedOrigins contains "*". List explicit origins to allow credentialed requests.', E_USER_WARNING);
+
+        return false;
+    }
+
     private function applyOriginHeaders(ResponseInterface $response, string $origin): ResponseInterface
     {
         $response = $response->withHeader('Access-Control-Allow-Origin', $origin);
@@ -147,8 +167,8 @@ final readonly class CorsHandler
         $origin = '' === $origin ? null : $origin;
 
         if (in_array('*', $this->allowedOrigins, true)) {
-            // The spec forbids the wildcard together with credentials, so echo the concrete origin then.
-            return $this->allowCredentials ? $origin : '*';
+            // Credentials are force-disabled for the wildcard (see resolveAllowCredentials), so '*' is always safe here.
+            return '*';
         }
 
         if (null !== $origin && in_array($origin, $this->allowedOrigins, true)) {

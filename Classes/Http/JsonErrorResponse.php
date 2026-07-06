@@ -36,7 +36,13 @@ final class JsonErrorResponse
         403 => 'Forbidden',
         404 => 'Not Found',
         405 => 'Method Not Allowed',
+        409 => 'Conflict',
+        410 => 'Gone',
+        415 => 'Unsupported Media Type',
+        422 => 'Unprocessable Content',
         429 => 'Too Many Requests',
+        500 => 'Internal Server Error',
+        503 => 'Service Unavailable',
     ];
 
     /**

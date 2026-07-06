@@ -23,10 +23,13 @@ public function list(ServerRequestInterface $request): ResponseInterface
 | `tags`         | `list<string>` | `[]`    | Cache tags. A tag matching a table name is flushed automatically when a record of that table changes (via DataHandler). |
 | `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key (e.g. an individual `search` term).  |
 
-- Only **successful (`200`) GET responses** are cached. The cache key is built from route name, path, query string (minus `ignoreParams`) and language, so query/language variants are cached separately.
+- Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, path, query string (minus `ignoreParams`) and language, so host/query/language variants are cached separately — in a multi-site install two sites never share a cache entry.
 - Invalidation rides on the TYPO3 caching framework: changing a record of a tagged table flushes the matching entries immediately; `lifetime` is the fallback. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).
 
 - Routes carrying an [`#[Authenticate]`](AUTHENTICATION.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.
+
+> [!WARNING]
+> This safeguard only triggers on `#[Authenticate]`. A **public** `#[Cache]` route whose controller inspects the frontend-user context itself (e.g. via the `frontend.user` aspect) shares one cache entry across all visitors — the first user's personalized response would be served to everyone. Don't combine `#[Cache]` with identity-dependent output; protect such routes with `#[Authenticate]` (which disables the cache) instead.
 - The cache is bypassed entirely — neither read nor written — for a **logged-in backend user** (so editors always see live content while previewing) and for a request sending `Cache-Control: no-store`. A plain `Cache-Control: no-cache` only skips **reading** the stored entry; the fresh response still refreshes the cache for later requests.
 
 ## ETag / conditional GET

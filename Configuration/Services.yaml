@@ -49,6 +49,12 @@ services:
               command: 'routing:debug'
               description: 'List all registered attribute routes'
 
+    KonradMichalik\Typo3Routing\Command\RouteMatchCommand:
+        tags:
+            - name: console.command
+              command: 'routing:match'
+              description: 'Simulate matching a request path against the registered attribute routes'
+
     KonradMichalik\Typo3Routing\Command\OpenApiCommand:
         tags:
             - name: console.command

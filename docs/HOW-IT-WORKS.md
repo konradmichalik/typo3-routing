@@ -1,8 +1,8 @@
 # How It Works
 
-1. **Compile time** — [`RouteCompilerPass`](../Classes/DependencyInjection/RouteCompilerPass.php) scans every service definition, picks those implementing `RouteControllerInterface`, reflects their `#[Route]` attributes **and method parameter signatures** into plain arrays, and injects those plus a `ServiceLocator` of the controllers into [`RouteRegistry`](../Classes/Routing/RouteRegistry.php). Duplicate route names, unsupported parameter shapes, and modifier attributes (`#[Cache]`, `#[RateLimit]`, `#[Authenticate]`, `#[RequireRequestToken]`) sitting on a method without a `#[Route]` all raise a build-time exception. There is no extra cache: invalidation rides on the DI container cache, which TYPO3 already clears correctly.
+1. **Compile time** — [`RouteCompilerPass`](../Classes/DependencyInjection/RouteCompilerPass.php) scans every service definition, picks those implementing `RouteControllerInterface`, reflects their `#[Route]` attributes **and method parameter signatures** into plain arrays, and injects those plus a `ServiceLocator` of the controllers into [`RouteRegistry`](../Classes/Routing/RouteRegistry.php). The route collection is also dumped into Symfony's `CompiledUrlMatcher` format at build time, so request-time matching runs on pre-compiled tables instead of re-compiling every route's regex per request. Duplicate route names, unsupported parameter shapes, and modifier attributes (`#[Cache]`, `#[RateLimit]`, `#[Authenticate]`, `#[RequireRequestToken]`) sitting on a method without a `#[Route]` all raise a build-time exception. There is no extra cache: invalidation rides on the DI container cache, which TYPO3 already clears correctly.
 
-2. **Runtime** — [`RouteDispatcher`](../Classes/Middleware/RouteDispatcher.php) applies the prefix gate, matches via `symfony/routing`, filters by environment, then resolves the controller method's typed arguments via [`ControllerArgumentResolver`](../Classes/Routing/ControllerArgumentResolver.php) and invokes it. `404`, `405` (with an `Allow` header), and `400` (unresolvable/invalid argument) responses are emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details — `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}` (`detail` is omitted when it would only repeat the title); the success response format is entirely the controller's choice. Every response — success or error — also carries an `X-Request-ID` header: echoed back when the client sent one, otherwise generated, so a single id correlates a request across logs and proxies.
+2. **Runtime** — [`RouteDispatcher`](../Classes/Middleware/RouteDispatcher.php) applies the prefix gate, matches via `symfony/routing`, filters by environment, then resolves the controller method's typed arguments via [`ControllerArgumentResolver`](../Classes/Routing/ControllerArgumentResolver.php) and invokes it. `404`, `405` (with an `Allow` header), `400` (unresolvable/invalid argument), and controller-thrown `HttpProblemException` responses are emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details — `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}` (`detail` is omitted when it would only repeat the title); the success response format is entirely the controller's choice. Every response — success or error — also carries an `X-Request-ID` header: echoed back when the client sent one, otherwise generated, so a single id correlates a request across logs and proxies.
 
 ## Debug command
 
@@ -40,6 +40,18 @@ Filters narrow the table (and `--json`) and combine with AND. The active filters
 vendor/bin/typo3 routing:debug --method=POST --protected   # protected write endpoints
 vendor/bin/typo3 routing:debug --cached --json             # cached routes, machine-readable
 ```
+
+## Match simulation command
+
+`routing:match` runs the same matcher the dispatcher uses and reports which route wins for a given path — or why none does. Give the path **without the site base** (exactly as written in `#[Route]`); the leading slash is optional. `--method` (default `GET`), `--scheme` (default `https`) and `--host` (default `localhost`) simulate the request so `schemes`/`host` constraints and priority overlaps can be debugged.
+
+``` bash
+vendor/bin/typo3 routing:match /api/item/new                        # which route claims this path?
+vendor/bin/typo3 routing:match /api/item/42                         # placeholder route, with resolved parameters
+vendor/bin/typo3 routing:match /api/orders --method=POST --host=api.example.com
+```
+
+A match prints the route name, controller, resolved path parameters and — for an [environment-bound route](CONFIGURATION.md) — a note that it is only reachable in that context (the matcher itself ignores `env`; the dispatcher enforces it at request time). A path that matches nothing exits non-zero with `No route matches`; a path that matches but rejects the method reports the allowed methods.
 
 The table lists every route with its path, methods, controller, environment binding, and requirements:
 

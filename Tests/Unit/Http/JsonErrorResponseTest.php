@@ -53,6 +53,17 @@ final class JsonErrorResponseTest extends TestCase
     }
 
     #[Test]
+    public function mapsCommonControllerErrorStatusesToTheirTitles(): void
+    {
+        self::assertStringContainsString('"title":"Conflict"', (string) JsonErrorResponse::create(409, '')->getBody());
+        self::assertStringContainsString('"title":"Gone"', (string) JsonErrorResponse::create(410, '')->getBody());
+        self::assertStringContainsString('"title":"Unsupported Media Type"', (string) JsonErrorResponse::create(415, '')->getBody());
+        self::assertStringContainsString('"title":"Unprocessable Content"', (string) JsonErrorResponse::create(422, '')->getBody());
+        self::assertStringContainsString('"title":"Internal Server Error"', (string) JsonErrorResponse::create(500, '')->getBody());
+        self::assertStringContainsString('"title":"Service Unavailable"', (string) JsonErrorResponse::create(503, '')->getBody());
+    }
+
+    #[Test]
     public function mergesAdditionalHeaders(): void
     {
         $response = JsonErrorResponse::create(405, 'Method Not Allowed', ['Allow' => 'POST']);

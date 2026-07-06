@@ -189,6 +189,19 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function mapsAControllerThrownProblemToAProblemDetailsResponse(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/problem'));
+
+        self::assertSame(409, $response->getStatusCode());
+        self::assertSame('application/problem+json', $response->getHeaderLine('Content-Type'));
+        self::assertJsonStringEqualsJsonString(
+            '{"type":"about:blank","title":"Conflict","status":409,"detail":"Item already processed"}',
+            (string) $response->getBody(),
+        );
+    }
+
+    #[Test]
     public function usesNormalizedParamsRemoteAddressForRateLimiting(): void
     {
         $normalizedParams = $this->createMock(NormalizedParams::class);
@@ -708,6 +721,7 @@ final class RouteDispatcherTest extends TestCase
             'securecached' => ['path' => '/api/securecached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
             'optionated' => ['path' => '/api/optionated', 'methods' => ['GET', 'OPTIONS'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'entity' => ['path' => '/api/entity/{item}', 'methods' => ['GET'], 'controller' => 'entityCtrl::show', 'env' => null, 'requirements' => []],
+            'problem' => ['path' => '/api/problem', 'methods' => ['GET'], 'controller' => 'ctrl::problem', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -743,6 +757,7 @@ final class RouteDispatcherTest extends TestCase
             'securecached' => [],
             'optionated' => [],
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
+            'problem' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

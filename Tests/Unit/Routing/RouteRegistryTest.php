@@ -19,6 +19,8 @@ use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
+use Symfony\Component\Routing\Matcher\CompiledUrlMatcher;
+use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
 use Symfony\Component\Routing\RequestContext;
 
 /**
@@ -191,6 +193,29 @@ final class RouteRegistryTest extends TestCase
         // The shorter path matches and yields the default; the explicit segment wins over it.
         self::assertSame(1, $registry->getMatcher($context)->match('/api/blog')['page']);
         self::assertSame('5', $registry->getMatcher($context)->match('/api/blog/5')['page']);
+    }
+
+    #[Test]
+    public function usesCompiledMatcherWhenCompiledRoutesAreBaked(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}> $routes */
+        $routes = [
+            'item_show' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => ['id' => '\d+'], 'priority' => 0],
+            'item_new' => ['path' => '/api/item/new', 'methods' => ['GET'], 'controller' => 'ctrl::new', 'env' => null, 'requirements' => [], 'priority' => 10],
+        ];
+        $compiled = (new CompiledUrlMatcherDumper(RouteRegistry::buildCollection($routes)))->getCompiledRoutes();
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), compiledRoutes: $compiled);
+
+        $context = new RequestContext();
+        $context->setMethod('GET');
+        $matcher = $registry->getMatcher($context);
+
+        self::assertInstanceOf(CompiledUrlMatcher::class, $matcher);
+        // The compiled matcher behaves exactly like the plain one: priority, placeholders, requirements.
+        self::assertSame('item_new', $matcher->match('/api/item/new')['_route']);
+        self::assertSame('42', $matcher->match('/api/item/42')['id']);
+        $this->expectException(ResourceNotFoundException::class);
+        $matcher->match('/api/item/abc');
     }
 
     #[Test]

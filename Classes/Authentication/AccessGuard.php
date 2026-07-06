@@ -77,7 +77,7 @@ final readonly class AccessGuard
         $scope = $this->registry->getRequestTokenScope($routeName);
 
         // Not opted in, or a non-state-changing method that is not CSRF-relevant → nothing to verify.
-        if (null === $scope || !in_array($request->getMethod(), ['POST', 'PUT', 'PATCH'], true)) {
+        if (null === $scope || !in_array($request->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             return true;
         }
 

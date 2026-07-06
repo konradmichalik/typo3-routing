@@ -17,6 +17,7 @@ use KonradMichalik\RoutingTest\Domain\Model\Item;
 use KonradMichalik\RoutingTest\Enum\Status;
 use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Param, RateLimit, RequireRequestToken, Route};
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
+use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
@@ -146,5 +147,12 @@ final class ExampleController implements RouteControllerInterface
     public function restricted(): JsonResponse
     {
         return new JsonResponse(['restricted' => true]);
+    }
+
+    #[Route(path: '/api/example/problem', name: 'example_problem')]
+    public function problem(): never
+    {
+        // A controller-thrown problem: mapped to a 409 application/problem+json response.
+        throw new HttpProblemException(409, 'Item already processed');
     }
 }

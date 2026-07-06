@@ -20,6 +20,11 @@ use RuntimeException;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
 
+use function restore_error_handler;
+use function set_error_handler;
+
+use const E_USER_WARNING;
+
 /**
  * CorsHandlerTest.
  *
@@ -77,13 +82,39 @@ final class CorsHandlerTest extends TestCase
     }
 
     #[Test]
-    public function decorateEchoesConcreteOriginWhenWildcardCombinedWithCredentials(): void
+    public function wildcardIgnoresCredentialsAndWarns(): void
     {
-        $handler = $this->handler(['allowedOrigins' => '*', 'allowCredentials' => '1']);
+        // Reflecting arbitrary origins with credentials would let any website read authenticated
+        // responses, so the wildcard must downgrade to plain (non-credentialed) wildcard CORS.
+        $warnings = [];
+        set_error_handler(static function (int $errno, string $errstr) use (&$warnings): bool {
+            $warnings[] = $errstr;
+
+            return true;
+        }, E_USER_WARNING);
+
+        try {
+            $handler = $this->handler(['allowedOrigins' => '*', 'allowCredentials' => '1']);
+        } finally {
+            restore_error_handler();
+        }
 
         $response = $handler->decorate(new Response('php://temp', 200), $this->request('https://anywhere.example'));
 
-        self::assertSame('https://anywhere.example', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Credentials'));
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('cors.allowCredentials is ignored', $warnings[0]);
+    }
+
+    #[Test]
+    public function explicitOriginsStillAllowCredentials(): void
+    {
+        $handler = $this->handler(['allowedOrigins' => 'https://app.example.com', 'allowCredentials' => '1']);
+
+        $response = $handler->decorate(new Response('php://temp', 200), $this->request('https://app.example.com'));
+
+        self::assertSame('https://app.example.com', $response->getHeaderLine('Access-Control-Allow-Origin'));
         self::assertSame('true', $response->getHeaderLine('Access-Control-Allow-Credentials'));
     }
 

@@ -22,6 +22,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
+use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
 
 use function array_intersect;
 use function array_map;
@@ -100,6 +101,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$arguments', $collected->arguments);
         $registry->setArgument('$authenticators', $collected->authenticators);
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
+        // Pre-compile the matcher tables so request-time matching never re-compiles route regexes.
+        $registry->setArgument('$compiledRoutes', (new CompiledUrlMatcherDumper(RouteRegistry::buildCollection($collected->routes)))->getCompiledRoutes());
     }
 
     /**
@@ -311,8 +314,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             return;
         }
 
-        if ([] === array_intersect(['POST', 'PUT', 'PATCH'], $methods)) {
-            throw new LogicException(sprintf('#[RequireRequestToken] on "%s::%s()" (route "%s") is pointless: the route only allows "%s". Request tokens are verified for POST/PUT/PATCH only.', $serviceId, $method->getName(), $name, implode('", "', $methods)), 1750000012);
+        if ([] === array_intersect(['POST', 'PUT', 'PATCH', 'DELETE'], $methods)) {
+            throw new LogicException(sprintf('#[RequireRequestToken] on "%s::%s()" (route "%s") is pointless: the route only allows "%s". Request tokens are verified for POST/PUT/PATCH/DELETE only.', $serviceId, $method->getName(), $name, implode('", "', $methods)), 1750000012);
         }
 
         $collected->requestTokenScopes[$name] = $requestToken->scope ?? 'routing/'.$name;

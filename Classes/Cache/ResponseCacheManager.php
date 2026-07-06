@@ -117,6 +117,9 @@ final class ResponseCacheManager
     }
 
     /**
+     * The host is part of the key: in a multi-site install the same route can serve several sites
+     * whose controller output differs per site, and those must never share a cache entry.
+     *
      * @param list<string> $ignoreParams
      */
     public function buildKey(string $routeName, ServerRequestInterface $request, array $ignoreParams): string
@@ -133,6 +136,7 @@ final class ResponseCacheManager
         return 'route_'.hash('sha256', implode('|', [
             $routeName,
             $request->getMethod(),
+            $request->getUri()->getHost(),
             $request->getUri()->getPath(),
             http_build_query($query),
             (string) $languageId,

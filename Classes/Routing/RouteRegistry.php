@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Routing;
 
 use LogicException;
 use Psr\Container\ContainerInterface;
-use Symfony\Component\Routing\Matcher\UrlMatcher;
+use Symfony\Component\Routing\Matcher\{CompiledUrlMatcher, UrlMatcher, UrlMatcherInterface};
 use Symfony\Component\Routing\{RequestContext, Route as SymfonyRoute, RouteCollection};
 
 /**
@@ -34,6 +34,7 @@ final class RouteRegistry
      * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                     $arguments
      * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                        $authenticators
      * @param array<string, string>                                                                                                                                                                                                             $requestTokenScopes
+     * @param array<mixed>                                                                                                                                                                                                                      $compiledRoutes
      */
     public function __construct(
         private readonly array $routes,
@@ -44,38 +45,57 @@ final class RouteRegistry
         private readonly array $authenticators = [],
         private readonly array $requestTokenScopes = [],
         private readonly ?ContainerInterface $authenticatorLocator = null,
+        private readonly array $compiledRoutes = [],
     ) {}
+
+    /**
+     * Builds the Symfony route collection from baked route arrays. Shared by the lazy runtime
+     * collection (URL generation, matcher fallback) and the compiler pass, which dumps the same
+     * collection into the compiled matcher format at container build time.
+     *
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> $routes
+     */
+    public static function buildCollection(array $routes): RouteCollection
+    {
+        $collection = new RouteCollection();
+        foreach ($routes as $name => $route) {
+            $collection->add($name, new SymfonyRoute(
+                $route['path'],
+                [
+                    // User-supplied defaults first; the internal keys are placed last so they can
+                    // never be overwritten (the compiler pass already rejects reserved "_" keys).
+                    ...($route['defaults'] ?? []),
+                    '_controller' => $route['controller'],
+                    '_env' => $route['env'],
+                    '_requirements' => $route['requirements'],
+                ],
+                $route['requirements'],
+                [],
+                $route['host'] ?? '',
+                $route['schemes'] ?? [],
+                $route['methods'],
+            ), $route['priority'] ?? 0);
+        }
+
+        return $collection;
+    }
 
     public function getRouteCollection(): RouteCollection
     {
-        if (!$this->collection instanceof RouteCollection) {
-            $collection = new RouteCollection();
-            foreach ($this->routes as $name => $route) {
-                $collection->add($name, new SymfonyRoute(
-                    $route['path'],
-                    [
-                        // User-supplied defaults first; the internal keys are placed last so they can
-                        // never be overwritten (the compiler pass already rejects reserved "_" keys).
-                        ...($route['defaults'] ?? []),
-                        '_controller' => $route['controller'],
-                        '_env' => $route['env'],
-                        '_requirements' => $route['requirements'],
-                    ],
-                    $route['requirements'],
-                    [],
-                    $route['host'] ?? '',
-                    $route['schemes'] ?? [],
-                    $route['methods'],
-                ), $route['priority'] ?? 0);
-            }
-            $this->collection = $collection;
-        }
-
-        return $this->collection;
+        return $this->collection ??= self::buildCollection($this->routes);
     }
 
-    public function getMatcher(RequestContext $context): UrlMatcher
+    /**
+     * Matching prefers the routes pre-compiled at container build time: the plain UrlMatcher would
+     * re-compile every route's regex on each request. The fallback covers registries constructed
+     * without compiled routes (tests, manual wiring).
+     */
+    public function getMatcher(RequestContext $context): UrlMatcherInterface
     {
+        if ([] !== $this->compiledRoutes) {
+            return new CompiledUrlMatcher($this->compiledRoutes, $context);
+        }
+
         return new UrlMatcher($this->getRouteCollection(), $context);
     }
 

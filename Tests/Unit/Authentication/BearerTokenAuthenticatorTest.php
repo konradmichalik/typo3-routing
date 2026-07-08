@@ -83,6 +83,38 @@ final class BearerTokenAuthenticatorTest extends TestCase
     }
 
     #[Test]
+    public function acceptsATokenFromTheRedirectHttpAuthorizationServerParamWhenTheHeaderIsMissing(): void
+    {
+        $_ENV[self::ENV_NAME] = 's3cret-token';
+
+        $request = new ServerRequest(
+            'https://example.com/api',
+            'GET',
+            'php://input',
+            [],
+            ['REDIRECT_HTTP_AUTHORIZATION' => 'Bearer s3cret-token'],
+        );
+
+        self::assertTrue($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
+    }
+
+    #[Test]
+    public function rejectsWhenNeitherTheHeaderNorTheRedirectServerParamIsPresent(): void
+    {
+        $_ENV[self::ENV_NAME] = 's3cret-token';
+
+        $request = new ServerRequest(
+            'https://example.com/api',
+            'GET',
+            'php://input',
+            [],
+            ['SOME_OTHER_PARAM' => 'irrelevant'],
+        );
+
+        self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
+    }
+
+    #[Test]
     public function fallsBackToTheConfiguredEnvNameWhenNoOptionGiven(): void
     {
         $_ENV[self::ENV_NAME] = 'configured-token';

@@ -36,6 +36,11 @@ final readonly class BearerTokenAuthenticator implements RouteAuthenticatorInter
         private ExtensionConfiguration $extensionConfiguration,
     ) {}
 
+    /**
+     * Reads the token from the "Authorization" header, falling back to the
+     * REDIRECT_HTTP_AUTHORIZATION server param when Apache/mod_proxy_fcgi has stripped
+     * the header (see docs/AUTHENTICATION.md).
+     */
     public function authenticate(ServerRequestInterface $request, array $options = []): bool
     {
         $expected = $this->readEnv($this->resolveEnvName($options));
@@ -44,10 +49,22 @@ final readonly class BearerTokenAuthenticator implements RouteAuthenticatorInter
             return false;
         }
 
-        $header = $request->getHeaderLine('Authorization');
+        $header = $this->resolveAuthorizationHeader($request);
         $provided = str_starts_with($header, 'Bearer ') ? substr($header, 7) : '';
 
         return '' !== $provided && hash_equals($expected, $provided);
+    }
+
+    private function resolveAuthorizationHeader(ServerRequestInterface $request): string
+    {
+        $header = $request->getHeaderLine('Authorization');
+        if ('' !== $header) {
+            return $header;
+        }
+
+        $fallback = $request->getServerParams()['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+
+        return is_string($fallback) ? $fallback : '';
     }
 
     /**

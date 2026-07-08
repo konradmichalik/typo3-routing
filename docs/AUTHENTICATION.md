@@ -40,6 +40,12 @@ Compares `Authorization: Bearer <token>` against a secret read from a **process 
 - `options['envName']` overrides the variable name; otherwise the `bearerTokenEnvName` extension setting is used, defaulting to `ROUTING_BEARER_TOKEN`.
 - **Fails closed**: an unset/empty expected token rejects every request. The comparison is constant-time (`hash_equals`). The token is never logged or echoed.
 - Bearer tokens are **CSRF-immune** (a foreign origin cannot set the `Authorization` header), so they need no request token.
+- If the `Authorization` header itself never reaches PHP (see the Apache warning below), the authenticator also accepts the token from the `REDIRECT_HTTP_AUTHORIZATION` server param, which some `mod_rewrite` setups populate even without `CGIPassAuth`. This is defense-in-depth, not a substitute for fixing the web server config.
+
+> [!WARNING]
+> **Apache + PHP-FPM (`mod_proxy_fcgi`) strips the `Authorization` header by default.** The symptom is a `401 Unauthorized` even though the sent token exactly matches the expected environment variable — the header simply never arrives at PHP, so `getHeaderLine('Authorization')` is always empty.
+>
+> Fix: add `CGIPassAuth On` to the `.htaccess` or vhost configuration. Note that a vhost configuration can silently override a `.htaccess` directive — if the header is still missing after adding `CGIPassAuth On`, verify with `apachectl -M` (is `mod_proxy_fcgi` even the module in play?) or a debug dump of the incoming request headers before assuming the fix didn't work.
 
 ### `FrontendUserAuthenticator`
 

@@ -123,6 +123,15 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function hidesTheSwaggerUiRoutesOutsideDevelopmentByDefault(): void
+    {
+        // Inert by default: the functional suite runs in "Testing" (not "Development"), and the
+        // swaggerUi flag is unset — both gates independently keep these routes a 404.
+        self::assertSame(404, $this->process($this->request('GET', 'https://example.com/api/_routing/openapi.json'))->getStatusCode());
+        self::assertSame(404, $this->process($this->request('GET', 'https://example.com/api/_routing/docs'))->getStatusCode());
+    }
+
+    #[Test]
     public function passesPathPlaceholderAsTypedControllerArgument(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/item/42'));

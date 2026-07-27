@@ -18,6 +18,8 @@ use Attribute;
 /**
  * Cors.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_CLASS)]

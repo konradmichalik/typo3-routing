@@ -24,6 +24,7 @@ public function __construct(
 | `getRequestTokenScope(string $routeName): ?string` | The expected CSRF scope, or `null` |
 | `getCacheConfig(string $routeName): ?array{lifetime, tags, ignoreParams}` | Response-cache config, or `null` |
 | `getRateLimit(string $routeName): ?array{limit, interval, policy, keyBy}` | Rate-limit config, or `null` |
+| `getCorsConfig(string $routeName): ?array{allowedOrigins, allowedHeaders, allowCredentials, exposeHeaders, maxAge}` | The route's own `#[Cors]` override, or `null` when it falls back to the global CORS configuration |
 
 The per-route array shapes (the `array{...}` types above) are part of the `@api` contract: adding a key is a minor-version change, removing or renaming one is a breaking change from `1.0.0` on.
 
@@ -33,9 +34,10 @@ The per-route array shapes (the `array{...}` types above) are part of the `@api`
 
 ## What's deliberately not exposed
 
-- **Compile-time internals** (`RouteCompilerPass`, `CollectedRoutes`, `ArgumentSpecFactory`) exist only to build the arrays `RouteRegistry` holds. They run once per container build and are never available at runtime — there is nothing to consume there even if you wanted to.
-- **Dispatch internals** (`RouteDispatcher`, `ControllerArgumentResolver`, `AccessGuard`, the `Cache`/`RateLimit`/`Http` namespaces) implement request handling. Their behavior is documented (see [How It Works](HOW-IT-WORKS.md), [Configuration](CONFIGURATION.md)) but their classes are not a PHP API — nothing about them is meant to be called, extended, or type-hinted against from outside.
-- **Commands** (`routing:debug`, `routing:match`, `routing:openapi`) are a documented, stable *CLI* interface (arguments, options, `--json` output shape), but the PHP command classes themselves are `@internal` — consume the CLI, not the class.
+- **Compile-time internals** (`RouteCompilerPass`, `CollectedRoutes`, `ArgumentSpecFactory`, `CorsResolver`) exist only to build the arrays `RouteRegistry` holds. They run once per container build and are never available at runtime — there is nothing to consume there even if you wanted to.
+- **Dispatch internals** (`RouteDispatcher`, `ControllerArgumentResolver`, `AccessGuard`, `CorsPreflightResolver`, the `Cache`/`RateLimit`/`Http` namespaces) implement request handling. Their behavior is documented (see [How It Works](HOW-IT-WORKS.md), [Configuration](CONFIGURATION.md)) but their classes are not a PHP API — nothing about them is meant to be called, extended, or type-hinted against from outside.
+- **Commands** (`routing:debug`, `routing:match`, `routing:openapi`) are a documented, stable *CLI* interface (arguments, options, `--json` output shape), but the PHP command classes themselves — including the `RouteTableFormatter` helper behind `routing:debug` — are `@internal`; consume the CLI, not the classes.
+- **The Swagger UI route** (`SwaggerUiController`, see [Configuration](CONFIGURATION.md#swagger-ui-development-only)) is a development-only HTTP endpoint, not a PHP extension point — consume it over HTTP like any other route, not by referencing the controller class.
 
 ## BC promise
 

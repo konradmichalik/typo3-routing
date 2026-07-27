@@ -23,6 +23,8 @@ use function array_values;
 /**
  * CorsPreflightResolver.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class CorsPreflightResolver

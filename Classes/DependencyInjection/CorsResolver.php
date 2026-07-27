@@ -24,6 +24,8 @@ use function sprintf;
 /**
  * CorsResolver.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class CorsResolver

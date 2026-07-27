@@ -21,6 +21,8 @@ use function sprintf;
 /**
  * RouteTableFormatter.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class RouteTableFormatter

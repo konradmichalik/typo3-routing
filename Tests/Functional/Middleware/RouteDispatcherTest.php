@@ -123,6 +123,19 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function routeOwnCorsAttributeAppliesWithoutAnyGlobalCorsConfiguration(): void
+    {
+        // This test instance has no cors.* extension configuration at all — the global policy is off.
+        $response = $this->process(
+            $this->request('GET', 'https://example.com/api/example/cors-override')
+                ->withHeader('Origin', 'https://partner.example.org'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
     public function passesPathPlaceholderAsTypedControllerArgument(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/item/42'));

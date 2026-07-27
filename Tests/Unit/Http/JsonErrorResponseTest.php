@@ -71,4 +71,15 @@ final class JsonErrorResponseTest extends TestCase
         self::assertSame(405, $response->getStatusCode());
         self::assertSame('POST', $response->getHeaderLine('Allow'));
     }
+
+    #[Test]
+    public function mergesAdditionalProblemBodyMembers(): void
+    {
+        $response = JsonErrorResponse::create(429, 'Too Many Requests', ['Retry-After' => '30'], ['retryAfter' => 30]);
+
+        self::assertJsonStringEqualsJsonString(
+            '{"type":"about:blank","title":"Too Many Requests","status":429,"retryAfter":30}',
+            (string) $response->getBody(),
+        );
+    }
 }

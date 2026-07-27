@@ -55,6 +55,19 @@ A route with `env: 'Development'` only exists while the top-level application co
 public function dump(ServerRequestInterface $request): ResponseInterface { /* … */ }
 ```
 
+## Swagger UI (development only)
+
+The extension can serve a Swagger UI page over its own OpenAPI export — no extra setup beyond enabling a flag. Both routes are double-gated: they only exist in the `Development` [application context](#environment-bound-routes) **and** only when explicitly enabled (via **Settings → Extension Configuration → typo3_routing**); outside either condition they behave as if they don't exist (`404`), same as any other environment-bound route.
+
+| Setting     | Description                                                                                   | Default |
+|-------------|-------------------------------------------------------------------------------------------------|---------|
+| `swaggerUi` | Serve the Swagger UI (`/api/_routing/docs`) and its OpenAPI JSON document (`/api/_routing/openapi.json`). | `0` (off) |
+
+The routes sit under the configured [path prefix](#path-prefix-gate) (`/api/` by default) so they are reachable without further changes; if you've customized `prefix` away from `/api/`, make sure it still covers `/api/_routing/` (or add it explicitly to the comma-separated list), or the request never reaches the dispatcher at all.
+
+> [!WARNING]
+> Never enable `swaggerUi` in a production context — the `Development` gate alone already prevents this in a correctly configured instance, but the flag exists as a second, independent safeguard.
+
 ## Middleware placement
 
 The dispatcher middleware runs in the **frontend** stack, **after** `typo3/cms-frontend/site` (it needs the resolved site/language context) and after both auth middlewares — `typo3/cms-frontend/backend-user-authentication` and `typo3/cms-frontend/authentication` — and **before** `typo3/cms-frontend/page-resolver`.

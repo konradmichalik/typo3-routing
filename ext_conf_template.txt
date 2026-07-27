@@ -18,3 +18,6 @@ cors.exposeHeaders =
 
 # cat=cors/enable/050; type=int+; label=CORS preflight max age:How long (seconds) the browser may cache the preflight result (Access-Control-Max-Age). Defaults to 3600.
 cors.maxAge = 3600
+
+# cat=basic/enable/020; type=boolean; label=Swagger UI (development only):Serve a Swagger UI page and the underlying OpenAPI JSON document at /api/_routing/docs and /api/_routing/openapi.json. Only ever reachable in the "Development" application context AND when this flag is enabled (both required) — never available in Production, regardless of this setting.
+swaggerUi = 0

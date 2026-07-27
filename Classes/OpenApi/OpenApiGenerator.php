@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, BearerTokenAuthenticator, FrontendUserAuthenticator};
+use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
@@ -26,6 +27,8 @@ use function is_a;
 use function lcfirst;
 use function sprintf;
 use function str_contains;
+use function str_starts_with;
+use function strpos;
 use function strrpos;
 use function strtolower;
 use function strtoupper;
@@ -67,6 +70,11 @@ final readonly class OpenApiGenerator
         $usedSchemes = [];
 
         foreach ($this->registry->getRoutes() as $name => $route) {
+            if (str_starts_with($route['controller'], SwaggerUiController::class.'::')) {
+                // The Swagger UI's own routes describe tooling, not the API surface — never in the document.
+                continue;
+            }
+
             $methods = [] === $route['methods'] ? ['GET'] : $route['methods'];
             foreach ($methods as $method) {
                 $operation = $this->operation($name, $route, $method, $usedSchemes);
@@ -93,8 +101,8 @@ final readonly class OpenApiGenerator
     }
 
     /**
-     * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>} $route
-     * @param array<string, array<string, string>>                                                                                  $usedSchemes
+     * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, description?: string|null} $route
+     * @param array<string, array<string, string>>                                                                                                             $usedSchemes
      *
      * @return array<string, mixed>
      */
@@ -120,11 +128,21 @@ final readonly class OpenApiGenerator
             };
         }
 
+        $routeDescription = $route['description'] ?? null;
+
         $operation = [
             'operationId' => $name,
             'tags' => [$serviceId],
-            'description' => $this->description($name, $route),
         ];
+
+        if (null !== $routeDescription) {
+            $summary = $this->summary($routeDescription);
+            if (null !== $summary) {
+                $operation['summary'] = $summary;
+            }
+        }
+
+        $operation['description'] = $routeDescription ?? $this->description($name, $route);
 
         if ([] !== $parameters) {
             $operation['parameters'] = $parameters;
@@ -288,6 +306,18 @@ final readonly class OpenApiGenerator
         $shortName = str_contains($service, '\\') ? substr($service, (int) strrpos($service, '\\') + 1) : $service;
 
         return ['name' => lcfirst($shortName), 'definition' => ['type' => 'http', 'scheme' => 'bearer']];
+    }
+
+    /**
+     * Splits off the first sentence of a user-authored description to use as the OpenAPI `summary`,
+     * mirroring how PHPDoc summaries relate to their full description. Not "trivially splittable"
+     * (no ". " found) means the whole text is a single sentence, so no separate summary is emitted.
+     */
+    private function summary(string $description): ?string
+    {
+        $pos = strpos($description, '. ');
+
+        return false === $pos ? null : substr($description, 0, $pos + 1);
     }
 
     /**

@@ -16,7 +16,7 @@ vendor/bin/typo3 routing:debug --json   # machine-readable (tooling / LLM)
 
 ### Filtering and inspecting
 
-Pass a route name as an argument: an **exact** name prints a full detail view (including cache, rate limit, and the resolved controller arguments — which the overview table omits); any other value is treated as a **name substring** filter.
+Pass a route name as an argument: an **exact** name prints a full detail view (including cache, rate limit, and the resolved controller arguments — which the overview table omits); any other value is treated as a **name substring** filter. A route's `description` (see [Description](USAGE.md#description)) is truncated in the table but shown in full in the detail view and `--json`.
 
 ``` bash
 vendor/bin/typo3 routing:debug course_show     # detail view for one route
@@ -113,3 +113,13 @@ What is derived automatically from the attributes:
 - **Parameters & request bodies** — from the typed method signature: path/query parameters for `GET`-style routes, a JSON request body for `POST`/`PUT`/`PATCH`. Scalar types map to JSON Schema, backed enums become `enum` schemas, and a `requirements` regex becomes a `pattern`.
 - **Security** — `#[Authenticate]` routes reference a matching security scheme (`BearerTokenAuthenticator` → HTTP bearer; FE/BE user → cookie API key). OR-combined authenticators emit multiple requirements.
 - **Responses** — a generic `200` plus the error responses each route can actually produce (`400`/`401`/`403`/`404`/`405`/`429`), all served as `application/problem+json` sharing the RFC 9457 `{type, title, status, detail}` `Error` schema.
+- **Description & summary** — a route's `#[Route(description: …)]` becomes the operation `description`; if it splits into more than one sentence, the first sentence is also emitted as `summary`. Routes without a `description` fall back to a synthesized one-liner naming the controller, CSRF requirement, and application context.
+
+### Swagger UI (development only)
+
+A live Swagger UI is a thin, opt-in HTTP layer on top of the same export — no separate spec generation logic. Enable it via the [`swaggerUi` configuration flag](CONFIGURATION.md#swagger-ui-development-only); it's inert everywhere else:
+
+- `GET /api/_routing/openapi.json` — the OpenAPI document, generated the same way as `routing:openapi`
+- `GET /api/_routing/docs` — a minimal HTML page loading Swagger UI from a CDN, pointed at the JSON route above
+
+Both routes are excluded from the OpenAPI document itself (they describe tooling, not the API surface) and only ever exist in the `Development` application context, on top of the config flag — see [Environment-bound routes](CONFIGURATION.md#environment-bound-routes) for how that gate works.

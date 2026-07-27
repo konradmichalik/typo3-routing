@@ -261,6 +261,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'defaults' => $defaults,
             'schemes' => $route->schemes,
             'host' => $route->host,
+            'description' => $route->description ?? $classRoute?->description,
         ];
         $collected->arguments[$name] = $this->argumentSpecs->build($method, $path, $serviceId);
 

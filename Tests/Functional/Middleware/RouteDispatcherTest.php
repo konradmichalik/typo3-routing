@@ -26,6 +26,8 @@ use TYPO3\CMS\Core\Security\RequestToken;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
+use function json_decode;
+
 /**
  * RouteDispatcherTest.
  *
@@ -133,6 +135,15 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function hidesTheSwaggerUiRoutesOutsideDevelopmentByDefault(): void
+    {
+        // Inert by default: the functional suite runs in "Testing" (not "Development"), and the
+        // swaggerUi flag is unset — both gates independently keep these routes a 404.
+        self::assertSame(404, $this->process($this->request('GET', 'https://example.com/api/_routing/openapi.json'))->getStatusCode());
+        self::assertSame(404, $this->process($this->request('GET', 'https://example.com/api/_routing/docs'))->getStatusCode());
     }
 
     #[Test]
@@ -270,8 +281,13 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
         self::assertSame(200, $first->getStatusCode());
         self::assertSame(429, $second->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Too Many Requests","status":429}', (string) $second->getBody());
         self::assertNotSame('', $second->getHeaderLine('Retry-After'));
+
+        $body = json_decode((string) $second->getBody(), true);
+        self::assertSame('about:blank', $body['type']);
+        self::assertSame('Too Many Requests', $body['title']);
+        self::assertSame(429, $body['status']);
+        self::assertSame((int) $second->getHeaderLine('Retry-After'), $body['retryAfter']);
     }
 
     #[Test]

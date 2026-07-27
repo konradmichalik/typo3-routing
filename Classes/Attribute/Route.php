@@ -39,6 +39,7 @@ final readonly class Route
      * @param array<string, mixed>  $defaults     Default values for path placeholders. A trailing placeholder with a default becomes optional (`/blog/{page}` + ['page' => 1] also matches `/blog`, yielding page=1) and is omitted from generated URLs when it equals the default. Keys starting with "_" are reserved (used internally) and rejected at build time. At class level: merged under method defaults (the method wins per key).
      * @param list<string>          $schemes      Allowed URI schemes (e.g. ['https']); empty = any scheme. A request whose scheme doesn't match yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
      * @param string|null           $host         Restrict the route to a specific hostname (e.g. 'api.example.com'); null = any host. A request from a different host yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
+     * @param string|null           $description  Human-readable summary of what the endpoint does, surfaced in `routing:debug` and the OpenAPI export. At class level: fallback used by methods that do not set their own.
      */
     public function __construct(
         public string $path,
@@ -50,5 +51,6 @@ final readonly class Route
         public array $defaults = [],
         public array $schemes = [],
         public ?string $host = null,
+        public ?string $description = null,
     ) {}
 }

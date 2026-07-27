@@ -85,7 +85,7 @@ final class SwaggerUiControllerTest extends TestCase
                     return '1';
                 }
 
-                throw new RuntimeException('prefix not configured');
+                throw new RuntimeException('prefix not configured', 7857001195);
             },
         );
         $controller = new SwaggerUiController(new OpenApiGenerator($this->registry()), $this->urlGenerator(), $extensionConfiguration);

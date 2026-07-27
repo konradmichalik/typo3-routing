@@ -15,7 +15,8 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -172,6 +173,14 @@ final class RouteCompilerPassTest extends TestCase
         $routes = $this->discover($this->buildContainer(['plain' => PlainService::class]));
 
         self::assertSame([], $routes);
+    }
+
+    #[Test]
+    public function ignoresServiceDefinitionsWhoseClassFailsToAutoload(): void
+    {
+        // BrokenParentService extends a missing class: an unrelated, broken third-party service must
+        // not abort compilation of the whole container.
+        self::assertSame([], $this->discover($this->buildContainer(['broken' => BrokenParentService::class])));
     }
 
     #[Test]
@@ -442,6 +451,17 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000010);
 
         $this->discover($this->buildContainer(['broken' => InvalidAuthenticatorController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenAnAuthenticatorClassFailsToAutoload(): void
+    {
+        // BrokenAuthenticator extends a missing class; this must surface as the same LogicException
+        // as any other invalid authenticator reference, not as an uncaught \Error.
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000010);
+
+        $this->discover($this->buildContainer(['broken_authenticator' => BrokenAuthenticatorController::class]));
     }
 
     #[Test]

@@ -161,6 +161,72 @@ final class CorsHandlerTest extends TestCase
         self::assertSame('GET, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
     }
 
+    #[Test]
+    public function routeOverrideEnablesCorsEvenWhenTheGlobalConfigurationIsOff(): void
+    {
+        $handler = $this->handler([]);
+        $override = $this->override(['https://partner.example.org']);
+
+        self::assertFalse($handler->isEnabled());
+        self::assertTrue($handler->isEnabled($override));
+
+        $response = $handler->decorate(new Response('php://temp', 200), $this->request('https://partner.example.org'), $override);
+        self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function routeOverrideReplacesTheGlobalConfigurationEntirely(): void
+    {
+        // Global allows admin.example.com; the route override allows only partner.example.org.
+        $handler = $this->handler(['allowedOrigins' => 'https://admin.example.com']);
+        $override = $this->override(['https://partner.example.org']);
+
+        $response = $handler->decorate(new Response('php://temp', 200), $this->request('https://admin.example.com'), $override);
+
+        // The globally-allowed origin is not part of the route's own policy, so it's left untouched.
+        self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function routeOverrideCarriesItsOwnCredentialsAndExposedHeaders(): void
+    {
+        $handler = $this->handler([]);
+        $override = $this->override(['https://partner.example.org'], allowCredentials: true, exposeHeaders: 'X-Total-Count');
+
+        $response = $handler->decorate(new Response('php://temp', 200), $this->request('https://partner.example.org'), $override);
+
+        self::assertSame('true', $response->getHeaderLine('Access-Control-Allow-Credentials'));
+        self::assertSame('X-Total-Count', $response->getHeaderLine('Access-Control-Expose-Headers'));
+    }
+
+    #[Test]
+    public function preflightResponseHonoursTheRouteOverride(): void
+    {
+        $handler = $this->handler([]);
+        $override = $this->override(['https://partner.example.org'], maxAge: 120);
+
+        $response = $handler->preflightResponse(['GET'], $this->request('https://partner.example.org'), $override);
+
+        self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('120', $response->getHeaderLine('Access-Control-Max-Age'));
+    }
+
+    /**
+     * @param list<string> $allowedOrigins
+     *
+     * @return array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}
+     */
+    private function override(array $allowedOrigins, bool $allowCredentials = false, string $exposeHeaders = '', int $maxAge = 3600): array
+    {
+        return [
+            'allowedOrigins' => $allowedOrigins,
+            'allowedHeaders' => 'Content-Type, Authorization',
+            'allowCredentials' => $allowCredentials,
+            'exposeHeaders' => $exposeHeaders,
+            'maxAge' => $maxAge,
+        ];
+    }
+
     /**
      * @param array<string, mixed> $cors
      */

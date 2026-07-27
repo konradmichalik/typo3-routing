@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Middleware;
 use KonradMichalik\RoutingTest\Controller\ExampleController;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{CorsHandler, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, RouteRegistry};
@@ -297,7 +297,8 @@ final class RouteDispatcherTest extends TestCase
 
         $registry = $this->registry();
         $context = new Context();
-        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, $context), new CorsHandler($extensionConfiguration), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
+        $cors = new CorsHandler($extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -551,6 +552,61 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function routeOwnCorsOverrideAppliesEvenWhenGlobalCorsIsDisabled(): void
+    {
+        $dispatcher = $this->dispatcher();
+        $request = $this->request('GET', 'https://example.com/api/cors-override')->withHeader('Origin', 'https://partner.example.org');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function routeOwnCorsOverrideIgnoresAGloballyAllowedOriginNotInItsOwnList(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://admin.example.com']);
+        $request = $this->request('GET', 'https://example.com/api/cors-override')->withHeader('Origin', 'https://admin.example.com');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
+    public function preflightResolvesTheIntendedRouteAndItsOwnCorsOverride(): void
+    {
+        $dispatcher = $this->dispatcher();
+        $request = $this->request('OPTIONS', 'https://example.com/api/cors-override')
+            ->withHeader('Origin', 'https://partner.example.org')
+            ->withHeader('Access-Control-Request-Method', 'POST');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        // "corsOverride" declares both GET and POST on the same route.
+        self::assertSame('GET, POST, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+        self::assertSame('120', $response->getHeaderLine('Access-Control-Max-Age'));
+    }
+
+    #[Test]
+    public function preflightFallsBackToTheGlobalPolicyWhenTheIntendedMethodMatchesNoRoute(): void
+    {
+        // "submit" only accepts POST; a preflight for GET can't resolve a specific route or override.
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('OPTIONS', 'https://example.com/api/submit')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'GET');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('https://app.example.com', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('POST, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+    }
+
+    #[Test]
     public function marksACacheMissThenHitViaTheStatusHeader(): void
     {
         $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
@@ -699,7 +755,7 @@ final class RouteDispatcherTest extends TestCase
         $context ??= new Context();
         $accessGuard = new AccessGuard($registry, $context);
 
-        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
+        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $accessGuard, $cors, new CorsPreflightResolver($registry, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -722,6 +778,7 @@ final class RouteDispatcherTest extends TestCase
             'optionated' => ['path' => '/api/optionated', 'methods' => ['GET', 'OPTIONS'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'entity' => ['path' => '/api/entity/{item}', 'methods' => ['GET'], 'controller' => 'entityCtrl::show', 'env' => null, 'requirements' => []],
             'problem' => ['path' => '/api/problem', 'methods' => ['GET'], 'controller' => 'ctrl::problem', 'env' => null, 'requirements' => []],
+            'corsOverride' => ['path' => '/api/cors-override', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -758,6 +815,7 @@ final class RouteDispatcherTest extends TestCase
             'optionated' => [],
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
             'problem' => [],
+            'corsOverride' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
@@ -769,6 +827,11 @@ final class RouteDispatcherTest extends TestCase
         /** @var array<string, string> $requestTokenScopes */
         $requestTokenScopes = [];
 
+        /** @var array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}> $corsConfigs */
+        $corsConfigs = [
+            'corsOverride' => ['allowedOrigins' => ['https://partner.example.org'], 'allowedHeaders' => 'Content-Type, Authorization', 'allowCredentials' => false, 'exposeHeaders' => '', 'maxAge' => 120],
+        ];
+
         $locator = new ServiceLocator([
             'ctrl' => static fn (): ExampleController => new ExampleController(),
             'entityCtrl' => static fn (): EntityController => new EntityController(),
@@ -778,7 +841,7 @@ final class RouteDispatcherTest extends TestCase
             DenyAuthenticator::class => static fn (): DenyAuthenticator => new DenyAuthenticator(),
         ]);
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator);
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, corsConfigs: $corsConfigs);
     }
 
     private function frontendUserContext(int $uid): Context

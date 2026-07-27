@@ -26,6 +26,8 @@ use function substr;
 /**
  * BearerTokenAuthenticator.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class BearerTokenAuthenticator implements RouteAuthenticatorInterface

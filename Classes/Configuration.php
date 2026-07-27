@@ -20,6 +20,8 @@ use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
 /**
  * Configuration.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class Configuration

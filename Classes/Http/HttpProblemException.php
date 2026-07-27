@@ -21,6 +21,8 @@ use function sprintf;
 /**
  * HttpProblemException.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class HttpProblemException extends RuntimeException

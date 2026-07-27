@@ -18,6 +18,8 @@ use Symfony\Component\DependencyInjection\Reference;
 /**
  * CollectedRoutes.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class CollectedRoutes

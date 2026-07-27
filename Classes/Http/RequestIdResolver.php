@@ -27,6 +27,8 @@ use function trim;
 /**
  * RequestIdResolver.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class RequestIdResolver

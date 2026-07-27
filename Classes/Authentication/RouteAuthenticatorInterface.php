@@ -18,6 +18,8 @@ use Psr\Http\Message\ServerRequestInterface;
 /**
  * RouteAuthenticatorInterface.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 interface RouteAuthenticatorInterface

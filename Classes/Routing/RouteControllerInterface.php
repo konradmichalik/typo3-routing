@@ -16,6 +16,8 @@ namespace KonradMichalik\Typo3Routing\Routing;
 /**
  * RouteControllerInterface.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 interface RouteControllerInterface {}

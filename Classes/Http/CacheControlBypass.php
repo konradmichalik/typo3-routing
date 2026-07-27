@@ -21,6 +21,8 @@ use function strtolower;
 /**
  * CacheControlBypass.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class CacheControlBypass

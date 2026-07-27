@@ -18,6 +18,8 @@ use Attribute;
 /**
  * RequireRequestToken.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[Attribute(Attribute::TARGET_METHOD)]

@@ -18,6 +18,8 @@ use RuntimeException;
 /**
  * ArgumentResolutionException.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class ArgumentResolutionException extends RuntimeException {}

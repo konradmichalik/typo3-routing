@@ -22,6 +22,8 @@ use function is_string;
 /**
  * ClientKeyResolver.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class ClientKeyResolver

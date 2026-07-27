@@ -25,6 +25,8 @@ use function in_array;
 /**
  * AccessGuard.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class AccessGuard

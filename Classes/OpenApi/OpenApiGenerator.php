@@ -34,6 +34,8 @@ use function substr;
 /**
  * OpenApiGenerator.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class OpenApiGenerator

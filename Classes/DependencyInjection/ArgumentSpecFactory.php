@@ -31,6 +31,8 @@ use function sprintf;
 /**
  * ArgumentSpecFactory.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class ArgumentSpecFactory

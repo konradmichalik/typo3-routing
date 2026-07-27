@@ -19,6 +19,8 @@ use RuntimeException;
 /**
  * UrisViewHelper.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class UrisViewHelper extends AbstractRouteUriViewHelper

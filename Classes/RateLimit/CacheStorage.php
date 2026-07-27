@@ -20,6 +20,8 @@ use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 /**
  * CacheStorage.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class CacheStorage implements StorageInterface

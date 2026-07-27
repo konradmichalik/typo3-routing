@@ -21,6 +21,8 @@ use function json_encode;
 /**
  * JsonErrorResponse.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class JsonErrorResponse

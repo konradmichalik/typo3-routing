@@ -47,8 +47,9 @@ final class JsonErrorResponse
 
     /**
      * @param array<string, string> $headers
+     * @param array<string, mixed>  $extra   additional RFC 9457 extension members merged into the problem body
      */
-    public static function create(int $status, string $message, array $headers = []): Response
+    public static function create(int $status, string $message, array $headers = [], array $extra = []): Response
     {
         $title = self::TITLES[$status] ?? 'Error';
 
@@ -58,6 +59,7 @@ final class JsonErrorResponse
         if ('' !== $message && $message !== $title) {
             $problem['detail'] = $message;
         }
+        $problem = array_merge($problem, $extra);
 
         $response = new Response('php://temp', $status, array_merge(['Content-Type' => 'application/problem+json'], $headers));
         $response->getBody()->write(json_encode($problem, \JSON_THROW_ON_ERROR));

@@ -18,6 +18,8 @@ use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
+use function json_decode;
+
 /**
  * RateLimitCheckTest.
  *
@@ -57,5 +59,9 @@ final class RateLimitCheckTest extends TestCase
         self::assertNotSame('', $result['blocked']->getHeaderLine('Retry-After'));
         self::assertSame('1', $result['headers']['X-RateLimit-Limit']);
         self::assertSame('0', $result['headers']['X-RateLimit-Remaining']);
+
+        $body = json_decode((string) $result['blocked']->getBody(), true);
+        self::assertArrayHasKey('retryAfter', $body);
+        self::assertSame((int) $result['blocked']->getHeaderLine('Retry-After'), $body['retryAfter']);
     }
 }

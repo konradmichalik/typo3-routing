@@ -168,7 +168,25 @@ final class OpenApiGeneratorTest extends TestCase
     #[Test]
     public function excludesTheSwaggerUiControllersOwnRoutesFromTheDocument(): void
     {
-        self::assertArrayNotHasKey('/_routing/openapi.json', $this->features()['paths']);
+        self::assertArrayNotHasKey('/api/_routing/openapi.json', $this->features()['paths']);
+    }
+
+    #[Test]
+    public function usesRouteDescriptionAndSplitsOffTheFirstSentenceAsSummary(): void
+    {
+        $operation = $this->features()['paths']['/api/described']['get'];
+
+        self::assertSame('Fetch a single course by its numeric ID.', $operation['summary']);
+        self::assertSame('Fetch a single course by its numeric ID. Includes schedule and availability.', $operation['description']);
+    }
+
+    #[Test]
+    public function omitsSummaryWhenTheRouteDescriptionIsASingleSentence(): void
+    {
+        $operation = $this->features()['paths']['/api/single-sentence']['get'];
+
+        self::assertArrayNotHasKey('summary', $operation);
+        self::assertSame('A lone sentence with no split point', $operation['description']);
     }
 
     /**
@@ -204,13 +222,15 @@ final class OpenApiGeneratorTest extends TestCase
 
     private function featureRegistry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, description?: string|null}> $routes */
         $routes = [
             'types' => ['path' => '/api/types', 'methods' => ['GET'], 'controller' => 'ctrl::types', 'env' => null, 'requirements' => ['raw' => '[a-z]+']],
             'note' => ['path' => '/api/note', 'methods' => ['POST'], 'controller' => 'ctrl::note', 'env' => null, 'requirements' => []],
             'custom' => ['path' => '/api/custom', 'methods' => ['GET'], 'controller' => 'ctrl::custom', 'env' => null, 'requirements' => []],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
-            'routing_swagger_openapi_json' => ['path' => '/_routing/openapi.json', 'methods' => ['GET'], 'controller' => SwaggerUiController::class.'::openApiJson', 'env' => 'Development', 'requirements' => []],
+            'routing_swagger_openapi_json' => ['path' => '/api/_routing/openapi.json', 'methods' => ['GET'], 'controller' => SwaggerUiController::class.'::openApiJson', 'env' => 'Development', 'requirements' => []],
+            'described' => ['path' => '/api/described', 'methods' => ['GET'], 'controller' => 'ctrl::described', 'env' => null, 'requirements' => [], 'description' => 'Fetch a single course by its numeric ID. Includes schedule and availability.'],
+            'singleSentence' => ['path' => '/api/single-sentence', 'methods' => ['GET'], 'controller' => 'ctrl::singleSentence', 'env' => null, 'requirements' => [], 'description' => 'A lone sentence with no split point'],
         ];
 
         $arguments = [
@@ -230,6 +250,8 @@ final class OpenApiGeneratorTest extends TestCase
             'custom' => [],
             'dev' => [],
             'routing_swagger_openapi_json' => [],
+            'described' => [],
+            'singleSentence' => [],
         ];
 
         return new RouteRegistry(

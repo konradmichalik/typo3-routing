@@ -38,6 +38,7 @@ The attribute is repeatable. Its parameters:
 | `defaults`     | `array<string, mixed>`  | `[]`      | Default values for path placeholders; a trailing placeholder with a default becomes optional. See below. |
 | `schemes`      | `list<string>`          | `[]`      | Allowed URI schemes (e.g. `['https']`); empty = any scheme. See below.  |
 | `host`         | `?string`               | `null`    | Restrict the route to a specific hostname (e.g. `'api.example.com'`); null = any host. See below. |
+| `description`  | `?string`               | `null`    | Human-readable summary of what the endpoint does; surfaced in `routing:debug` and the OpenAPI export. See below. |
 
 ## Priority
 
@@ -111,6 +112,17 @@ public function status(): ResponseInterface { /* … */ }
 
 Not inherited from a class-level `#[Route]` — same rule as `methods`.
 
+## Description
+
+A human-readable summary of what the endpoint does — not derived from PHPDoc, deliberately: an explicit attribute parameter is the honest contract, whereas parsing docblocks at compile time would tie route metadata to comment formatting.
+
+```php
+#[Route(path: '/api/courses/{id}', name: 'course_show', description: 'Fetch a single course by its numeric ID, including schedule and availability.')]
+public function show(int $id): ResponseInterface { /* … */ }
+```
+
+It shows up in `routing:debug` (truncated in the table, full in `--json` and the detail view) and in the OpenAPI export (see [OpenAPI](HOW-IT-WORKS.md#openapi-export)): a description with more than one sentence has its first sentence split off as the operation `summary`, the full text stays the `description`.
+
 ## Class-level prefix (route groups)
 
 Placing `#[Route]` on the **controller class** turns it into a prefix shared by every method route — handy for grouping related endpoints or versioning an API (`/api/v1`, `/api/v2`). At most one class-level `#[Route]` is allowed.
@@ -142,6 +154,7 @@ How the class-level values combine with each method:
 | `requirements` | **Merged** with method requirements; the method wins per key.                                 |
 | `defaults`     | **Merged** with method defaults; the method wins per key.                                     |
 | `methods`      | **Ignored** at class level — the method default (`['GET']`) is indistinguishable from "unset". |
+| `description`  | Used as the **default** for methods that do not set their own `description`; a method `description` wins. |
 
 ## Requirements
 

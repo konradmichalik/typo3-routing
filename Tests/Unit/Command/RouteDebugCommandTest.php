@@ -174,6 +174,26 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function truncatesLongDescriptionsInTableOutputButNotInJsonOrDetail(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute([]);
+        $table = $tester->getDisplay();
+        self::assertStringNotContainsString('Charges a payment for the current basket, only reachable over HTTPS.', $table);
+        self::assertStringContainsString('…', $table);
+
+        $tester->execute(['--json' => true]);
+        /** @var list<array{name: string, description: string|null}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertSame('Charges a payment for the current basket, only reachable over HTTPS.', $data[2]['description']);
+        self::assertNull($data[0]['description']);
+
+        $tester->execute(['name' => 'example_secure']);
+        self::assertStringContainsString('Charges a payment for the current basket, only reachable over HTTPS.', $tester->getDisplay());
+    }
+
+    #[Test]
     public function filtersByNameSubstring(): void
     {
         $tester = $this->tester($this->registry());
@@ -327,11 +347,11 @@ final class RouteDebugCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
-            'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'host' => 'api.example.com'],
+            'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'host' => 'api.example.com', 'description' => 'Charges a payment for the current basket, only reachable over HTTPS.'],
             'example_any' => ['path' => '/api/example/any', 'methods' => [], 'controller' => 'ctrl::any', 'env' => null, 'requirements' => []],
         ];
 

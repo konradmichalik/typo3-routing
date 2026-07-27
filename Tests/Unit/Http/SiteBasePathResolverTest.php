@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\SiteBasePathResolver;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -37,8 +38,9 @@ final class SiteBasePathResolverTest extends TestCase
     #[Test]
     public function stripsLanguageBasePrefixFromPath(): void
     {
-        $request = (new ServerRequest('https://example.com/sub/api/count'))
-            ->withAttribute('language', $this->makeLanguage('https://example.com/sub/'));
+        $request = Requests::get('https://example.com/sub/api/count')
+            ->withAttribute('language', $this->makeLanguage('https://example.com/sub/'))
+            ->withoutNormalizedParams()->build();
 
         self::assertSame('/api/count', $this->subject->stripSiteBase($request));
     }
@@ -62,7 +64,7 @@ final class SiteBasePathResolverTest extends TestCase
     #[Test]
     public function returnsNormalizedPathWhenNoSiteContextAvailable(): void
     {
-        $request = new ServerRequest('https://example.com/api/count');
+        $request = Requests::get('https://example.com/api/count')->withoutNormalizedParams()->build();
 
         self::assertSame('/api/count', $this->subject->stripSiteBase($request));
     }
@@ -104,6 +106,6 @@ final class SiteBasePathResolverTest extends TestCase
     {
         $site = new Site('main', 1, ['base' => $base]);
 
-        return (new ServerRequest($url))->withAttribute('site', $site);
+        return Requests::get($url)->withAttribute('site', $site)->withoutNormalizedParams()->build();
     }
 }

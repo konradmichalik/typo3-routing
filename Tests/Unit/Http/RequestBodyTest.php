@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Http\RequestBody;
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
@@ -30,7 +31,7 @@ final class RequestBodyTest extends TestCase
     #[Test]
     public function returnsParsedBodyWhenPresent(): void
     {
-        $request = (new ServerRequest('https://example.com/', 'POST'))->withParsedBody(['n' => '9']);
+        $request = (new RequestBuilder('POST', 'https://example.com/'))->withParsedBody(['n' => '9'])->withoutNormalizedParams()->build();
 
         self::assertSame(['n' => '9'], RequestBody::toArray($request));
     }
@@ -164,7 +165,8 @@ final class RequestBodyTest extends TestCase
         $stream->write($body);
         $stream->rewind();
 
-        return (new ServerRequest('https://example.com/', $method))
+        return (new RequestBuilder($method, 'https://example.com/'))
+            ->withoutNormalizedParams()->build()
             ->withBody($stream)
             ->withHeader('Content-Type', $contentType);
     }

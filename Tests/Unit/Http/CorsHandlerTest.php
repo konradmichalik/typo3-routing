@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\CorsHandler;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -240,6 +241,6 @@ final class CorsHandlerTest extends TestCase
 
     private function request(string $origin): ServerRequest
     {
-        return (new ServerRequest('https://example.com/api/count', 'GET'))->withHeader('Origin', $origin);
+        return Requests::get('https://example.com/api/count')->withHeader('Origin', $origin)->withoutNormalizedParams()->build();
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Functional\Middleware;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -89,9 +90,10 @@ final class EntityResolutionTest extends FunctionalTestCase
             ],
         ]);
 
-        return (new ServerRequest($url, 'GET'))
+        return Requests::get($url)
             ->withAttribute('site', $site)
-            ->withAttribute('language', $site->getDefaultLanguage());
+            ->withAttribute('language', $site->getDefaultLanguage())
+            ->build();
     }
 
     private function handler(): RequestHandlerInterface

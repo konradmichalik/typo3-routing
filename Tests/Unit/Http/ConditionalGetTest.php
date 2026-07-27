@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\ConditionalGet;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -37,7 +38,7 @@ final class ConditionalGetTest extends TestCase
     #[Test]
     public function returnsNullWhenThereIsNoIfNoneMatchHeader(): void
     {
-        $request = new ServerRequest('https://example.com/api/x', 'GET');
+        $request = Requests::get('https://example.com/api/x')->withoutNormalizedParams()->build();
         $response = (new Response('php://temp', 200))->withHeader('ETag', '"abc"');
 
         self::assertNull(ConditionalGet::notModified($request, $response));
@@ -83,6 +84,6 @@ final class ConditionalGetTest extends TestCase
 
     private function request(string $ifNoneMatch): ServerRequest
     {
-        return (new ServerRequest('https://example.com/api/x', 'GET'))->withHeader('If-None-Match', $ifNoneMatch);
+        return Requests::get('https://example.com/api/x')->withHeader('If-None-Match', $ifNoneMatch)->withoutNormalizedParams()->build();
     }
 }

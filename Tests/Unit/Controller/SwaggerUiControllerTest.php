@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Controller;
 
+use KonradMichalik\Ttt\Assertion\JsonAssertions;
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Http\{HttpProblemException, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
@@ -33,6 +35,8 @@ use TYPO3\CMS\Core\Site\Entity\Site;
 #[CoversClass(SwaggerUiController::class)]
 final class SwaggerUiControllerTest extends TestCase
 {
+    use JsonAssertions;
+
     #[Test]
     public function openApiJsonThrowsA404ProblemWhenTheFlagIsDisabled(): void
     {
@@ -69,24 +73,26 @@ final class SwaggerUiControllerTest extends TestCase
         $response = $controller->openApiJson($this->request());
 
         self::assertSame(200, $response->getStatusCode());
-        $document = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame('3.1.0', $document['openapi']);
-        self::assertArrayNotHasKey('servers', $document);
-        self::assertArrayHasKey('/api/example', $document['paths']);
+        $body = (string) $response->getBody();
+        self::assertJsonPath($body, 'openapi', '3.1.0');
+        self::assertJsonHasPath($body, 'paths./api/example');
+        self::assertArrayNotHasKey('servers', json_decode($body, true, 512, \JSON_THROW_ON_ERROR));
     }
 
     #[Test]
     public function openApiJsonUsesTheSiteBaseAsServerForASubPathMountedSite(): void
     {
         $controller = $this->controller('1');
-        $request = (new ServerRequest('https://example.com/sub/'))->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']));
+        $request = Requests::get('https://example.com/sub/')
+            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']))
+            ->withoutNormalizedParams()->build();
 
         $response = $controller->openApiJson($request);
 
-        $document = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame([['url' => '/sub']], $document['servers']);
+        $body = (string) $response->getBody();
+        self::assertJsonPath($body, 'servers', [['url' => '/sub']]);
         // The route's own path is unaffected — it stays relative to the site base, as everywhere else.
-        self::assertArrayHasKey('/api/example', $document['paths']);
+        self::assertJsonHasPath($body, 'paths./api/example');
     }
 
     #[Test]
@@ -135,7 +141,9 @@ final class SwaggerUiControllerTest extends TestCase
 
     private function request(): ServerRequest
     {
-        return (new ServerRequest('https://example.com/'))->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/']));
+        return Requests::get('https://example.com/')
+            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/']))
+            ->withoutNormalizedParams()->build();
     }
 
     private function registry(): RouteRegistry

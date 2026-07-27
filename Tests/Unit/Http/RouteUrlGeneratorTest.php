@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\{RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -145,6 +146,6 @@ final class RouteUrlGeneratorTest extends TestCase
 
     private function request(string $url, string $base): ServerRequest
     {
-        return (new ServerRequest($url))->withAttribute('site', new Site('main', 1, ['base' => $base]));
+        return Requests::get($url)->withAttribute('site', new Site('main', 1, ['base' => $base]))->withoutNormalizedParams()->build();
     }
 }

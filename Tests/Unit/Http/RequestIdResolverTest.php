@@ -13,10 +13,11 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\RequestIdResolver;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
-use TYPO3\CMS\Core\Http\{Response, ServerRequest};
+use TYPO3\CMS\Core\Http\Response;
 
 use function str_repeat;
 
@@ -31,8 +32,9 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function echoesTheIncomingRequestId(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', 'client-supplied-id');
+        $request = Requests::get('https://example.com/api/count')
+            ->withHeader('X-Request-ID', 'client-supplied-id')
+            ->withoutNormalizedParams()->build();
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -42,7 +44,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesAUuidWhenNoRequestIdWasSent(): void
     {
-        $request = new ServerRequest('https://example.com/api/count', 'GET');
+        $request = Requests::get('https://example.com/api/count')->withoutNormalizedParams()->build();
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -55,7 +57,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesADifferentIdOnEachCall(): void
     {
-        $request = new ServerRequest('https://example.com/api/count', 'GET');
+        $request = Requests::get('https://example.com/api/count')->withoutNormalizedParams()->build();
 
         $first = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
         $second = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
@@ -66,8 +68,9 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function treatsAWhitespaceOnlyHeaderAsAbsent(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', '   ');
+        $request = Requests::get('https://example.com/api/count')
+            ->withHeader('X-Request-ID', '   ')
+            ->withoutNormalizedParams()->build();
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -77,8 +80,9 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesAFreshIdWhenTheIncomingValueContainsControlCharacters(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', "abc\tinjected");
+        $request = Requests::get('https://example.com/api/count')
+            ->withHeader('X-Request-ID', "abc\tinjected")
+            ->withoutNormalizedParams()->build();
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -89,8 +93,9 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesAFreshIdWhenTheIncomingValueIsTooLong(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', str_repeat('a', 129));
+        $request = Requests::get('https://example.com/api/count')
+            ->withHeader('X-Request-ID', str_repeat('a', 129))
+            ->withoutNormalizedParams()->build();
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -100,8 +105,9 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function acceptsAValidNonUuidCorrelationId(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', 'req_01HXAF.42-abc');
+        $request = Requests::get('https://example.com/api/count')
+            ->withHeader('X-Request-ID', 'req_01HXAF.42-abc')
+            ->withoutNormalizedParams()->build();
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 

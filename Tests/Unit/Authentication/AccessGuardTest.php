@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Authentication;
 
+use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
@@ -163,6 +164,6 @@ final class AccessGuardTest extends TestCase
 
     private function request(string $method): ServerRequest
     {
-        return new ServerRequest('https://example.com/api/x', $method);
+        return (new RequestBuilder($method, 'https://example.com/api/x'))->withoutNormalizedParams()->build();
     }
 }

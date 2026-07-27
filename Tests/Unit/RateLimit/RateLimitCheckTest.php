@@ -13,12 +13,11 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\RateLimit;
 
+use KonradMichalik\Ttt\Assertion\JsonAssertions;
 use KonradMichalik\Typo3Routing\RateLimit\{RateLimitCheck, RateLimitEnforcer};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
-
-use function json_decode;
 
 /**
  * RateLimitCheckTest.
@@ -28,6 +27,8 @@ use function json_decode;
 #[CoversClass(RateLimitCheck::class)]
 final class RateLimitCheckTest extends TestCase
 {
+    use JsonAssertions;
+
     /**
      * @var array{limit: int, interval: string, policy: string, keyBy: string}
      */
@@ -60,8 +61,8 @@ final class RateLimitCheckTest extends TestCase
         self::assertSame('1', $result['headers']['X-RateLimit-Limit']);
         self::assertSame('0', $result['headers']['X-RateLimit-Remaining']);
 
-        $body = json_decode((string) $result['blocked']->getBody(), true);
-        self::assertArrayHasKey('retryAfter', $body);
-        self::assertSame((int) $result['blocked']->getHeaderLine('Retry-After'), $body['retryAfter']);
+        $body = (string) $result['blocked']->getBody();
+        self::assertJsonHasPath($body, 'retryAfter');
+        self::assertJsonPath($body, 'retryAfter', (int) $result['blocked']->getHeaderLine('Retry-After'));
     }
 }

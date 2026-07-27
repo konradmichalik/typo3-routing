@@ -13,12 +13,13 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Authentication;
 
+use KonradMichalik\Ttt\Attribute\WithEnvVar;
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
-use TYPO3\CMS\Core\Http\ServerRequest;
 
 /**
  * BearerTokenAuthenticatorTest.
@@ -30,27 +31,20 @@ final class BearerTokenAuthenticatorTest extends TestCase
 {
     private const ENV_NAME = 'ROUTING_TEST_BEARER';
 
-    protected function tearDown(): void
-    {
-        unset($_ENV[self::ENV_NAME]);
-    }
-
     #[Test]
+    #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function acceptsAMatchingToken(): void
     {
-        $_ENV[self::ENV_NAME] = 's3cret-token';
-
-        $request = (new ServerRequest('https://example.com/api'))->withHeader('Authorization', 'Bearer s3cret-token');
+        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer s3cret-token')->withoutNormalizedParams()->build();
 
         self::assertTrue($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
+    #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function rejectsAWrongToken(): void
     {
-        $_ENV[self::ENV_NAME] = 's3cret-token';
-
-        $request = (new ServerRequest('https://example.com/api'))->withHeader('Authorization', 'Bearer wrong');
+        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer wrong')->withoutNormalizedParams()->build();
 
         self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
@@ -59,86 +53,68 @@ final class BearerTokenAuthenticatorTest extends TestCase
     public function failsClosedWhenTheExpectedTokenIsNotSet(): void
     {
         // Variable deliberately unset — the authenticator must reject everything.
-        $request = (new ServerRequest('https://example.com/api'))->withHeader('Authorization', 'Bearer anything');
+        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer anything')->withoutNormalizedParams()->build();
 
         self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
+    #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function rejectsWhenNoAuthorizationHeaderIsPresent(): void
     {
-        $_ENV[self::ENV_NAME] = 's3cret-token';
-
-        self::assertFalse($this->authenticator()->authenticate(new ServerRequest('https://example.com/api'), ['envName' => self::ENV_NAME]));
+        self::assertFalse($this->authenticator()->authenticate(Requests::get('https://example.com/api')->withoutNormalizedParams()->build(), ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
+    #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function rejectsANonBearerAuthorizationScheme(): void
     {
-        $_ENV[self::ENV_NAME] = 's3cret-token';
-
-        $request = (new ServerRequest('https://example.com/api'))->withHeader('Authorization', 'Basic s3cret-token');
+        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Basic s3cret-token')->withoutNormalizedParams()->build();
 
         self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
+    #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function acceptsATokenFromTheRedirectHttpAuthorizationServerParamWhenTheHeaderIsMissing(): void
     {
-        $_ENV[self::ENV_NAME] = 's3cret-token';
-
-        $request = new ServerRequest(
-            'https://example.com/api',
-            'GET',
-            'php://input',
-            [],
-            ['REDIRECT_HTTP_AUTHORIZATION' => 'Bearer s3cret-token'],
-        );
+        $request = Requests::get('https://example.com/api')
+            ->withServerParam('REDIRECT_HTTP_AUTHORIZATION', 'Bearer s3cret-token')
+            ->withoutNormalizedParams()->build();
 
         self::assertTrue($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
+    #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function rejectsWhenNeitherTheHeaderNorTheRedirectServerParamIsPresent(): void
     {
-        $_ENV[self::ENV_NAME] = 's3cret-token';
-
-        $request = new ServerRequest(
-            'https://example.com/api',
-            'GET',
-            'php://input',
-            [],
-            ['SOME_OTHER_PARAM' => 'irrelevant'],
-        );
+        $request = Requests::get('https://example.com/api')
+            ->withServerParam('SOME_OTHER_PARAM', 'irrelevant')
+            ->withoutNormalizedParams()->build();
 
         self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
+    #[WithEnvVar(self::ENV_NAME, 'configured-token')]
     public function fallsBackToTheConfiguredEnvNameWhenNoOptionGiven(): void
     {
-        $_ENV[self::ENV_NAME] = 'configured-token';
-
-        $request = (new ServerRequest('https://example.com/api'))->withHeader('Authorization', 'Bearer configured-token');
+        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer configured-token')->withoutNormalizedParams()->build();
 
         self::assertTrue($this->authenticator(self::ENV_NAME)->authenticate($request));
     }
 
     #[Test]
+    #[WithEnvVar('ROUTING_BEARER_TOKEN', 'default-token')]
     public function fallsBackToTheDefaultEnvNameWhenConfigurationThrows(): void
     {
-        $_ENV['ROUTING_BEARER_TOKEN'] = 'default-token';
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
 
-        try {
-            $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
-            $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
+        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer default-token')->withoutNormalizedParams()->build();
 
-            $request = (new ServerRequest('https://example.com/api'))->withHeader('Authorization', 'Bearer default-token');
-
-            self::assertTrue((new BearerTokenAuthenticator($extensionConfiguration))->authenticate($request));
-        } finally {
-            unset($_ENV['ROUTING_BEARER_TOKEN']);
-        }
+        self::assertTrue((new BearerTokenAuthenticator($extensionConfiguration))->authenticate($request));
     }
 
     private function authenticator(string $configuredEnvName = ''): BearerTokenAuthenticator

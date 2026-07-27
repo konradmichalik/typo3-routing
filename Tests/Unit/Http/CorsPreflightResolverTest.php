@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -126,8 +127,12 @@ final class CorsPreflightResolverTest extends TestCase
 
     private function request(string $method, ?string $intendedMethod = null): ServerRequest
     {
-        $request = new ServerRequest('https://example.com/api/public', $method);
+        $builder = new RequestBuilder($method, 'https://example.com/api/public');
 
-        return null === $intendedMethod ? $request : $request->withHeader('Access-Control-Request-Method', $intendedMethod);
+        if (null !== $intendedMethod) {
+            $builder->withHeader('Access-Control-Request-Method', $intendedMethod);
+        }
+
+        return $builder->withoutNormalizedParams()->build();
     }
 }

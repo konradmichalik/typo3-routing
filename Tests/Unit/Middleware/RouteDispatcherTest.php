@@ -14,6 +14,9 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Middleware;
 
 use KonradMichalik\RoutingTest\Controller\ExampleController;
+use KonradMichalik\Ttt\Assertion\JsonAssertions;
+use KonradMichalik\Ttt\Attribute\WithEnvironment;
+use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, SiteBasePathResolver};
@@ -32,13 +35,9 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Context\{Context, UserAspect};
-use TYPO3\CMS\Core\Core\{ApplicationContext, Environment};
 use TYPO3\CMS\Core\Http\{NormalizedParams, Response, ServerRequest};
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
-
-use function dirname;
-use function json_decode;
 
 /**
  * RouteDispatcherTest.
@@ -49,6 +48,7 @@ use function json_decode;
 final class RouteDispatcherTest extends TestCase
 {
     use CreatesResponseCacheManager;
+    use JsonAssertions;
 
     private ResponseCacheManager $responseCache;
 
@@ -270,21 +270,9 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    #[WithEnvironment(context: 'Production')]
     public function hidesEnvBoundRouteOutsideItsContext(): void
     {
-        $root = dirname(__DIR__, 3);
-        Environment::initialize(
-            new ApplicationContext('Production'),
-            true,
-            false,
-            $root,
-            $root,
-            $root.'/var',
-            $root.'/config',
-            __FILE__,
-            'UNIX',
-        );
-
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/dev'));
 
         self::assertSame(404, $response->getStatusCode());
@@ -376,11 +364,11 @@ final class RouteDispatcherTest extends TestCase
         self::assertSame(429, $second->getStatusCode());
         self::assertNotSame('', $second->getHeaderLine('Retry-After'));
 
-        $body = json_decode((string) $second->getBody(), true);
-        self::assertSame('about:blank', $body['type']);
-        self::assertSame('Too Many Requests', $body['title']);
-        self::assertSame(429, $body['status']);
-        self::assertSame((int) $second->getHeaderLine('Retry-After'), $body['retryAfter']);
+        $body = (string) $second->getBody();
+        self::assertJsonPath($body, 'type', 'about:blank');
+        self::assertJsonPath($body, 'title', 'Too Many Requests');
+        self::assertJsonPath($body, 'status', 429);
+        self::assertJsonPath($body, 'retryAfter', (int) $second->getHeaderLine('Retry-After'));
     }
 
     #[Test]
@@ -882,11 +870,13 @@ final class RouteDispatcherTest extends TestCase
         ]);
 
         parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
+        /* @var array<string, array<mixed>|string> $query */
 
-        return (new ServerRequest($url, $method))
+        return (new RequestBuilder($method, $url))
             ->withAttribute('site', $site)
             ->withAttribute('language', $site->getDefaultLanguage())
-            ->withQueryParams($query);
+            ->withQueryParams($query)
+            ->withoutNormalizedParams()->build();
     }
 
     private function handler(ResponseInterface $response): RequestHandlerInterface

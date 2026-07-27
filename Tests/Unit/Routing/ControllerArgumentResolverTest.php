@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
+use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
@@ -372,7 +373,7 @@ final class ControllerArgumentResolverTest extends TestCase
 
     private function request(string $method = 'GET'): ServerRequest
     {
-        return new ServerRequest('https://example.com/', $method);
+        return (new RequestBuilder($method, 'https://example.com/'))->withoutNormalizedParams()->build();
     }
 
     private function jsonRequest(string $method, string $body): ServerRequest
@@ -381,7 +382,8 @@ final class ControllerArgumentResolverTest extends TestCase
         $stream->write($body);
         $stream->rewind();
 
-        return (new ServerRequest('https://example.com/', $method))
+        return (new RequestBuilder($method, 'https://example.com/'))
+            ->withoutNormalizedParams()->build()
             ->withBody($stream)
             ->withHeader('Content-Type', 'application/json');
     }

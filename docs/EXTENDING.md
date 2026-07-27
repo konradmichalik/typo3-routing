@@ -18,7 +18,7 @@ public function __construct(
 
 | Method | Returns |
 |---|---|
-| `getRoutes(): array<string, array{path, methods, controller, env, requirements, priority?, defaults?, schemes?, host?}>` | Every compiled route, keyed by name |
+| `getRoutes(): array<string, array{path, methods, controller, env, requirements, priority?, defaults?, schemes?, host?, description?}>` | Every compiled route, keyed by name |
 | `getArguments(string $routeName): list<array{name, type, source, nullable, hasDefault, default}>` | The controller method's parameters, in declaration order |
 | `getAuthenticators(string $routeName): list<array{service, options}>` | OR-combined authenticators; empty means public |
 | `getRequestTokenScope(string $routeName): ?string` | The expected CSRF scope, or `null` |

@@ -4,12 +4,15 @@
          displayDetailsOnTestsThatTriggerWarnings="true"
          displayDetailsOnTestsThatTriggerNotices="true"
          displayDetailsOnSkippedTests="true"
-         bootstrap="vendor/autoload.php"
+         bootstrap="Tests/Unit/UnitTestsBootstrap.php"
          colors="true"
 >
     <php>
         <env name="COLUMNS" value="300" />
     </php>
+    <extensions>
+        <bootstrap class="KonradMichalik\Ttt\TttExtension"/>
+    </extensions>
     <testsuites>
         <testsuite name="Unit">
             <directory>Tests/Unit</directory>

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit;
 
+use KonradMichalik\Ttt\Attribute\WithTypo3ConfVars;
 use KonradMichalik\Typo3Routing\Cache\{CacheTagFlusher, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Configuration;
 use KonradMichalik\Typo3Routing\RateLimit\CacheStorage;
@@ -26,19 +27,9 @@ use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[CoversClass(Configuration::class)]
+#[WithTypo3ConfVars([])]
 final class ConfigurationTest extends TestCase
 {
-    protected function tearDown(): void
-    {
-        unset(
-            $GLOBALS['TYPO3_CONF_VARS']['SYS']['fluid']['namespaces']['routing'],
-            $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER],
-            $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][CacheStorage::CACHE_IDENTIFIER],
-            $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'][ResponseCacheManager::CACHE_IDENTIFIER],
-            $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processCmdmapClass'][ResponseCacheManager::CACHE_IDENTIFIER],
-        );
-    }
-
     #[Test]
     public function registersTheRoutingFluidNamespace(): void
     {
@@ -52,8 +43,6 @@ final class ConfigurationTest extends TestCase
     #[Test]
     public function registersTheResponseCache(): void
     {
-        unset($GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER]);
-
         Configuration::registerResponseCache();
 
         /** @var array{frontend: string, groups: list<string>} $config */
@@ -65,8 +54,6 @@ final class ConfigurationTest extends TestCase
     #[Test]
     public function registersTheRateLimitCacheOutsideTheAllGroup(): void
     {
-        unset($GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][CacheStorage::CACHE_IDENTIFIER]);
-
         Configuration::registerRateLimitCache();
 
         /** @var array{frontend: string} $config */

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\RequestIdResolver;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -31,8 +32,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function echoesTheIncomingRequestId(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', 'client-supplied-id');
+        $request = $this->request('client-supplied-id');
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -42,7 +42,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesAUuidWhenNoRequestIdWasSent(): void
     {
-        $request = new ServerRequest('https://example.com/api/count', 'GET');
+        $request = $this->request();
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -55,7 +55,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesADifferentIdOnEachCall(): void
     {
-        $request = new ServerRequest('https://example.com/api/count', 'GET');
+        $request = $this->request();
 
         $first = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
         $second = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
@@ -66,8 +66,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function treatsAWhitespaceOnlyHeaderAsAbsent(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', '   ');
+        $request = $this->request('   ');
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -77,8 +76,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesAFreshIdWhenTheIncomingValueContainsControlCharacters(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', "abc\tinjected");
+        $request = $this->request("abc\tinjected");
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -89,8 +87,7 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function generatesAFreshIdWhenTheIncomingValueIsTooLong(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', str_repeat('a', 129));
+        $request = $this->request(str_repeat('a', 129));
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
@@ -100,11 +97,21 @@ final class RequestIdResolverTest extends TestCase
     #[Test]
     public function acceptsAValidNonUuidCorrelationId(): void
     {
-        $request = (new ServerRequest('https://example.com/api/count', 'GET'))
-            ->withHeader('X-Request-ID', 'req_01HXAF.42-abc');
+        $request = $this->request('req_01HXAF.42-abc');
 
         $response = RequestIdResolver::decorate(new Response('php://temp', 200), $request);
 
         self::assertSame('req_01HXAF.42-abc', $response->getHeaderLine('X-Request-ID'));
+    }
+
+    private function request(?string $requestId = null): ServerRequest
+    {
+        $builder = Requests::get('https://example.com/api/count');
+
+        if (null !== $requestId) {
+            $builder->withHeader('X-Request-ID', $requestId);
+        }
+
+        return $builder->build();
     }
 }

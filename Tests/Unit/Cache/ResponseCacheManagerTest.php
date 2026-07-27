@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -98,7 +99,7 @@ final class ResponseCacheManagerTest extends TestCase
     public function withCacheStatusAddsTheHeaderForACacheableGetRoute(): void
     {
         $cacheConfig = ['lifetime' => 3600, 'tags' => [], 'ignoreParams' => []];
-        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), $cacheConfig, new ServerRequest('https://example.com/api/x', 'GET'), 'HIT');
+        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), $cacheConfig, Requests::get('https://example.com/api/x')->build(), 'HIT');
 
         self::assertSame('HIT', $response->getHeaderLine('X-TYPO3-API-Cache'));
     }
@@ -106,7 +107,7 @@ final class ResponseCacheManagerTest extends TestCase
     #[Test]
     public function withCacheStatusOmitsTheHeaderWhenCachingIsNotConfigured(): void
     {
-        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), null, new ServerRequest('https://example.com/api/x', 'GET'), 'MISS');
+        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), null, Requests::get('https://example.com/api/x')->build(), 'MISS');
 
         self::assertSame('', $response->getHeaderLine('X-TYPO3-API-Cache'));
     }
@@ -115,7 +116,7 @@ final class ResponseCacheManagerTest extends TestCase
     public function withCacheStatusOmitsTheHeaderForNonGetRequests(): void
     {
         $cacheConfig = ['lifetime' => 3600, 'tags' => [], 'ignoreParams' => []];
-        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), $cacheConfig, new ServerRequest('https://example.com/api/x', 'POST'), 'MISS');
+        $response = $this->subject->withCacheStatus(new Response('php://temp', 200), $cacheConfig, Requests::post('https://example.com/api/x')->build(), 'MISS');
 
         self::assertSame('', $response->getHeaderLine('X-TYPO3-API-Cache'));
     }
@@ -135,8 +136,8 @@ final class ResponseCacheManagerTest extends TestCase
     public function buildKeyVariesByHost(): void
     {
         // Multi-site: the same route on two domains must never share a cache entry.
-        $siteA = $this->subject->buildKey('r', new ServerRequest('https://a.example.com/api/x', 'GET'), []);
-        $siteB = $this->subject->buildKey('r', new ServerRequest('https://b.example.com/api/x', 'GET'), []);
+        $siteA = $this->subject->buildKey('r', Requests::get('https://a.example.com/api/x')->build(), []);
+        $siteB = $this->subject->buildKey('r', Requests::get('https://b.example.com/api/x')->build(), []);
 
         self::assertNotSame($siteA, $siteB);
     }
@@ -146,6 +147,6 @@ final class ResponseCacheManagerTest extends TestCase
      */
     private function requestWithQuery(array $query): ServerRequest
     {
-        return (new ServerRequest('https://example.com/api/x', 'GET'))->withQueryParams($query);
+        return Requests::get('https://example.com/api/x')->withQueryParams($query)->build();
     }
 }

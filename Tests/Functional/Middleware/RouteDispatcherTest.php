@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Functional\Middleware;
 
+use KonradMichalik\Ttt\Assertion\JsonAssertions;
+use KonradMichalik\Ttt\Http\RequestBuilder;
+use KonradMichalik\Ttt\Traits\EnvVarSandbox;
 use KonradMichalik\Typo3Routing\Http\RouteUrlGenerator;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use PHPUnit\Framework\Attributes\Test;
@@ -26,8 +29,6 @@ use TYPO3\CMS\Core\Security\RequestToken;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
-use function json_decode;
-
 /**
  * RouteDispatcherTest.
  *
@@ -36,6 +37,9 @@ use function json_decode;
  */
 final class RouteDispatcherTest extends FunctionalTestCase
 {
+    use EnvVarSandbox;
+    use JsonAssertions;
+
     protected bool $initializeDatabase = false;
 
     protected array $testExtensionsToLoad = [
@@ -64,6 +68,12 @@ final class RouteDispatcherTest extends FunctionalTestCase
             ],
         ],
     ];
+
+    protected function tearDown(): void
+    {
+        $this->restoreEnvVars();
+        parent::tearDown();
+    }
 
     #[Test]
     public function dispatchesMatchingRouteToController(): void
@@ -283,11 +293,11 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertSame(429, $second->getStatusCode());
         self::assertNotSame('', $second->getHeaderLine('Retry-After'));
 
-        $body = json_decode((string) $second->getBody(), true);
-        self::assertSame('about:blank', $body['type']);
-        self::assertSame('Too Many Requests', $body['title']);
-        self::assertSame(429, $body['status']);
-        self::assertSame((int) $second->getHeaderLine('Retry-After'), $body['retryAfter']);
+        $body = (string) $second->getBody();
+        self::assertJsonPath($body, 'type', 'about:blank');
+        self::assertJsonPath($body, 'title', 'Too Many Requests');
+        self::assertJsonPath($body, 'status', 429);
+        self::assertJsonPath($body, 'retryAfter', (int) $second->getHeaderLine('Retry-After'));
     }
 
     #[Test]
@@ -344,37 +354,29 @@ final class RouteDispatcherTest extends FunctionalTestCase
     #[Test]
     public function dispatchesBearerProtectedRouteWithAMatchingToken(): void
     {
-        $_ENV['ROUTING_TEST_TOKEN'] = 'super-secret';
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
 
-        try {
-            $request = $this->request('GET', 'https://example.com/api/example/secure')
-                ->withHeader('Authorization', 'Bearer super-secret');
+        $request = $this->request('GET', 'https://example.com/api/example/secure')
+            ->withHeader('Authorization', 'Bearer super-secret');
 
-            $response = $this->process($request);
+        $response = $this->process($request);
 
-            self::assertSame(200, $response->getStatusCode());
-            self::assertJsonStringEqualsJsonString('{"secure":true}', (string) $response->getBody());
-        } finally {
-            unset($_ENV['ROUTING_TEST_TOKEN']);
-        }
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"secure":true}', (string) $response->getBody());
     }
 
     #[Test]
     public function rejectsBearerProtectedRouteWithAWrongToken(): void
     {
-        $_ENV['ROUTING_TEST_TOKEN'] = 'super-secret';
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
 
-        try {
-            $request = $this->request('GET', 'https://example.com/api/example/secure')
-                ->withHeader('Authorization', 'Bearer nope');
+        $request = $this->request('GET', 'https://example.com/api/example/secure')
+            ->withHeader('Authorization', 'Bearer nope');
 
-            $response = $this->process($request);
+        $response = $this->process($request);
 
-            self::assertSame(401, $response->getStatusCode());
-            self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Unauthorized","status":401}', (string) $response->getBody());
-        } finally {
-            unset($_ENV['ROUTING_TEST_TOKEN']);
-        }
+        self::assertSame(401, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Unauthorized","status":401}', (string) $response->getBody());
     }
 
     #[Test]
@@ -522,10 +524,11 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
         parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
 
-        return (new ServerRequest($url, $method))
+        return (new RequestBuilder($method, $url))
             ->withAttribute('site', $site)
             ->withAttribute('language', $site->getDefaultLanguage())
-            ->withQueryParams($query);
+            ->withQueryParams($query) // @phpstan-ignore argument.type
+            ->build();
     }
 
     private function jsonRequest(string $method, string $url, string $body): ServerRequest

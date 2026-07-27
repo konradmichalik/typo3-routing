@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Authentication;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Authentication\FrontendUserAuthenticator;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\FakeUser;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -32,7 +33,7 @@ final class FrontendUserAuthenticatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->request = new ServerRequest('https://example.com/api');
+        $this->request = Requests::get('https://example.com/api')->build();
     }
 
     #[Test]

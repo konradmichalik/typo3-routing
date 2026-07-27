@@ -13,12 +13,12 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\RateLimit;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\FakeUser;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Context\{Context, UserAspect};
-use TYPO3\CMS\Core\Http\{NormalizedParams, ServerRequest};
 
 /**
  * ClientKeyResolverTest.
@@ -41,9 +41,7 @@ final class ClientKeyResolverTest extends TestCase
     #[Test]
     public function keysByIpFromNormalizedParams(): void
     {
-        $normalizedParams = $this->createMock(NormalizedParams::class);
-        $normalizedParams->method('getRemoteAddress')->willReturn('203.0.113.5');
-        $request = (new ServerRequest('https://example.com/api/x', 'GET'))->withAttribute('normalizedParams', $normalizedParams);
+        $request = Requests::get('https://example.com/api/x')->withRemoteAddress('203.0.113.5')->build();
 
         self::assertSame('ip:203.0.113.5', $this->resolver()->resolve(self::IP_CONFIG, $request));
     }
@@ -51,7 +49,10 @@ final class ClientKeyResolverTest extends TestCase
     #[Test]
     public function keysByIpFallsBackToRemoteAddrServerParam(): void
     {
-        $request = new ServerRequest('https://example.com/api/x', 'GET', 'php://input', [], ['REMOTE_ADDR' => '198.51.100.9']);
+        $request = Requests::get('https://example.com/api/x')
+            ->withoutNormalizedParams()
+            ->withServerParam('REMOTE_ADDR', '198.51.100.9')
+            ->build();
 
         self::assertSame('ip:198.51.100.9', $this->resolver()->resolve(self::IP_CONFIG, $request));
     }
@@ -59,7 +60,7 @@ final class ClientKeyResolverTest extends TestCase
     #[Test]
     public function keysByIpYieldsAnEmptyAddressWhenNoneIsAvailable(): void
     {
-        $request = new ServerRequest('https://example.com/api/x', 'GET');
+        $request = Requests::get('https://example.com/api/x')->withoutNormalizedParams()->build();
 
         self::assertSame('ip:', $this->resolver()->resolve(self::IP_CONFIG, $request));
     }
@@ -67,7 +68,7 @@ final class ClientKeyResolverTest extends TestCase
     #[Test]
     public function keysByUserWhenAFrontendUserIsLoggedIn(): void
     {
-        $request = new ServerRequest('https://example.com/api/x', 'GET');
+        $request = Requests::get('https://example.com/api/x')->build();
 
         self::assertSame('user:7', $this->resolver($this->userContext(7))->resolve(self::USER_CONFIG, $request));
     }
@@ -75,9 +76,7 @@ final class ClientKeyResolverTest extends TestCase
     #[Test]
     public function keysByUserFallsBackToIpForAnonymousRequests(): void
     {
-        $normalizedParams = $this->createMock(NormalizedParams::class);
-        $normalizedParams->method('getRemoteAddress')->willReturn('203.0.113.5');
-        $request = (new ServerRequest('https://example.com/api/x', 'GET'))->withAttribute('normalizedParams', $normalizedParams);
+        $request = Requests::get('https://example.com/api/x')->withRemoteAddress('203.0.113.5')->build();
 
         // A user-keyed route still throttles anonymous callers — by IP — since rate limiting runs before auth.
         self::assertSame('ip:203.0.113.5', $this->resolver()->resolve(self::USER_CONFIG, $request));

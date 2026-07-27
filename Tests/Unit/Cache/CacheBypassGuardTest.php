@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Cache\CacheBypassGuard;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\FakeUser;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -32,7 +33,7 @@ final class CacheBypassGuardTest extends TestCase
     public function anAnonymousRequestWithoutCacheControlSkipsNeitherReadNorWrite(): void
     {
         $guard = new CacheBypassGuard(new Context());
-        $request = new ServerRequest('https://example.com/api/cached', 'GET');
+        $request = $this->request();
 
         self::assertFalse($guard->skipsRead($request));
         self::assertFalse($guard->skipsWrite($request));
@@ -42,7 +43,7 @@ final class CacheBypassGuardTest extends TestCase
     public function anAnonymousRequestWithNoStoreSkipsBothReadAndWrite(): void
     {
         $guard = new CacheBypassGuard(new Context());
-        $request = (new ServerRequest('https://example.com/api/cached', 'GET'))->withHeader('Cache-Control', 'no-store');
+        $request = $this->request('no-store');
 
         self::assertTrue($guard->skipsRead($request));
         self::assertTrue($guard->skipsWrite($request));
@@ -52,7 +53,7 @@ final class CacheBypassGuardTest extends TestCase
     public function aLoggedInBackendUserSkipsBothReadAndWriteRegardlessOfCacheControl(): void
     {
         $guard = new CacheBypassGuard($this->backendUserContext(true));
-        $request = new ServerRequest('https://example.com/api/cached', 'GET');
+        $request = $this->request();
 
         self::assertTrue($guard->skipsRead($request));
         self::assertTrue($guard->skipsWrite($request));
@@ -62,10 +63,21 @@ final class CacheBypassGuardTest extends TestCase
     public function aLoggedOutBackendUserDoesNotSkipEitherOnItsOwn(): void
     {
         $guard = new CacheBypassGuard($this->backendUserContext(false));
-        $request = new ServerRequest('https://example.com/api/cached', 'GET');
+        $request = $this->request();
 
         self::assertFalse($guard->skipsRead($request));
         self::assertFalse($guard->skipsWrite($request));
+    }
+
+    private function request(?string $cacheControl = null): ServerRequest
+    {
+        $builder = Requests::get('https://example.com/api/cached');
+
+        if (null !== $cacheControl) {
+            $builder->withHeader('Cache-Control', $cacheControl);
+        }
+
+        return $builder->build();
     }
 
     private function backendUserContext(bool $loggedIn): Context

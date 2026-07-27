@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0c125e16757a400370082395637b7a1d",
+    "content-hash": "c54ee9a47f4047e45c3c41bf70feaca6",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -6130,6 +6130,71 @@
                 "source": "https://github.com/eliashaeussler/version-bumper/tree/4.0.3"
             },
             "time": "2026-06-04T05:37:13+00:00"
+        },
+        {
+            "name": "konradmichalik/ttt",
+            "version": "0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/konradmichalik/ttt.git",
+                "reference": "7924d932009d8a20b9b4e12e67bf4baf28dd0057"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/konradmichalik/ttt/zipball/7924d932009d8a20b9b4e12e67bf4baf28dd0057",
+                "reference": "7924d932009d8a20b9b4e12e67bf4baf28dd0057",
+                "shasum": ""
+            },
+            "require": {
+                "php": "~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
+                "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0 || ^13.0"
+            },
+            "require-dev": {
+                "armin/editorconfig-cli": "^2.0",
+                "ergebnis/composer-normalize": "^2.44",
+                "konradmichalik/php-cs-fixer-preset": "^0.2.0",
+                "konradmichalik/php-doc-block-header-fixer": "^0.3.4",
+                "phpstan/phpstan": "^2.0",
+                "phpstan/phpstan-phpunit": "^2.0",
+                "rector/rector": "^2.2",
+                "typo3/cms-core": "^13.4 || ^14.0"
+            },
+            "suggest": {
+                "typo3/cms-core": "Required for TYPO3-specific attributes like InApplicationContext and WithEnvironment (^13.4 || ^14.0)"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "KonradMichalik\\Ttt\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-3.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Konrad Michalik",
+                    "email": "hej@konradmichalik.dev",
+                    "role": "Maintainer"
+                }
+            ],
+            "description": "ttt - TYPO3 Testing Terrarium. Declarative test sandboxing via PHP attributes: TYPO3_CONF_VARS, application context, environment and more - applied before the test, guaranteed to be restored afterwards.",
+            "keywords": [
+                "Toolbox",
+                "attributes",
+                "php",
+                "phpunit",
+                "sandbox",
+                "testing",
+                "ttt",
+                "typo3"
+            ],
+            "support": {
+                "issues": "https://github.com/konradmichalik/ttt/issues",
+                "source": "https://github.com/konradmichalik/ttt/tree/0.2.0"
+            },
+            "time": "2026-07-27T11:34:34+00:00"
         },
         {
             "name": "myclabs/deep-copy",

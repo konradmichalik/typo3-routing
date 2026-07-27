@@ -19,6 +19,7 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\FakeUser;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Context\{Context, UserAspect};
+use TYPO3\CMS\Core\Http\ServerRequest;
 
 /**
  * CacheBypassGuardTest.
@@ -32,7 +33,7 @@ final class CacheBypassGuardTest extends TestCase
     public function anAnonymousRequestWithoutCacheControlSkipsNeitherReadNorWrite(): void
     {
         $guard = new CacheBypassGuard(new Context());
-        $request = Requests::get('https://example.com/api/cached')->withoutNormalizedParams()->build();
+        $request = $this->request();
 
         self::assertFalse($guard->skipsRead($request));
         self::assertFalse($guard->skipsWrite($request));
@@ -42,7 +43,7 @@ final class CacheBypassGuardTest extends TestCase
     public function anAnonymousRequestWithNoStoreSkipsBothReadAndWrite(): void
     {
         $guard = new CacheBypassGuard(new Context());
-        $request = Requests::get('https://example.com/api/cached')->withHeader('Cache-Control', 'no-store')->withoutNormalizedParams()->build();
+        $request = $this->request('no-store');
 
         self::assertTrue($guard->skipsRead($request));
         self::assertTrue($guard->skipsWrite($request));
@@ -52,7 +53,7 @@ final class CacheBypassGuardTest extends TestCase
     public function aLoggedInBackendUserSkipsBothReadAndWriteRegardlessOfCacheControl(): void
     {
         $guard = new CacheBypassGuard($this->backendUserContext(true));
-        $request = Requests::get('https://example.com/api/cached')->withoutNormalizedParams()->build();
+        $request = $this->request();
 
         self::assertTrue($guard->skipsRead($request));
         self::assertTrue($guard->skipsWrite($request));
@@ -62,10 +63,21 @@ final class CacheBypassGuardTest extends TestCase
     public function aLoggedOutBackendUserDoesNotSkipEitherOnItsOwn(): void
     {
         $guard = new CacheBypassGuard($this->backendUserContext(false));
-        $request = Requests::get('https://example.com/api/cached')->withoutNormalizedParams()->build();
+        $request = $this->request();
 
         self::assertFalse($guard->skipsRead($request));
         self::assertFalse($guard->skipsWrite($request));
+    }
+
+    private function request(?string $cacheControl = null): ServerRequest
+    {
+        $builder = Requests::get('https://example.com/api/cached')->withoutNormalizedParams();
+
+        if (null !== $cacheControl) {
+            $builder->withHeader('Cache-Control', $cacheControl);
+        }
+
+        return $builder->build();
     }
 
     private function backendUserContext(bool $loggedIn): Context

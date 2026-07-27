@@ -523,12 +523,11 @@ final class RouteDispatcherTest extends FunctionalTestCase
         ]);
 
         parse_str((string) parse_url($url, \PHP_URL_QUERY), $query);
-        /* @var array<string, array<mixed>|string> $query */
 
         return (new RequestBuilder($method, $url))
             ->withAttribute('site', $site)
             ->withAttribute('language', $site->getDefaultLanguage())
-            ->withQueryParams($query)
+            ->withQueryParams($query) // @phpstan-ignore argument.type
             ->build();
     }
 

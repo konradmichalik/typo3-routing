@@ -20,6 +20,7 @@ use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Http\ServerRequest;
 
 /**
  * BearerTokenAuthenticatorTest.
@@ -35,43 +36,35 @@ final class BearerTokenAuthenticatorTest extends TestCase
     #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function acceptsAMatchingToken(): void
     {
-        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer s3cret-token')->withoutNormalizedParams()->build();
-
-        self::assertTrue($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
+        self::assertTrue($this->authenticator()->authenticate($this->request('Bearer s3cret-token'), ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
     #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function rejectsAWrongToken(): void
     {
-        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer wrong')->withoutNormalizedParams()->build();
-
-        self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
+        self::assertFalse($this->authenticator()->authenticate($this->request('Bearer wrong'), ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
     public function failsClosedWhenTheExpectedTokenIsNotSet(): void
     {
         // Variable deliberately unset — the authenticator must reject everything.
-        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer anything')->withoutNormalizedParams()->build();
-
-        self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
+        self::assertFalse($this->authenticator()->authenticate($this->request('Bearer anything'), ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
     #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function rejectsWhenNoAuthorizationHeaderIsPresent(): void
     {
-        self::assertFalse($this->authenticator()->authenticate(Requests::get('https://example.com/api')->withoutNormalizedParams()->build(), ['envName' => self::ENV_NAME]));
+        self::assertFalse($this->authenticator()->authenticate($this->request(), ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
     #[WithEnvVar(self::ENV_NAME, 's3cret-token')]
     public function rejectsANonBearerAuthorizationScheme(): void
     {
-        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Basic s3cret-token')->withoutNormalizedParams()->build();
-
-        self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
+        self::assertFalse($this->authenticator()->authenticate($this->request('Basic s3cret-token'), ['envName' => self::ENV_NAME]));
     }
 
     #[Test]
@@ -100,9 +93,7 @@ final class BearerTokenAuthenticatorTest extends TestCase
     #[WithEnvVar(self::ENV_NAME, 'configured-token')]
     public function fallsBackToTheConfiguredEnvNameWhenNoOptionGiven(): void
     {
-        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer configured-token')->withoutNormalizedParams()->build();
-
-        self::assertTrue($this->authenticator(self::ENV_NAME)->authenticate($request));
+        self::assertTrue($this->authenticator(self::ENV_NAME)->authenticate($this->request('Bearer configured-token')));
     }
 
     #[Test]
@@ -112,9 +103,7 @@ final class BearerTokenAuthenticatorTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
 
-        $request = Requests::get('https://example.com/api')->withHeader('Authorization', 'Bearer default-token')->withoutNormalizedParams()->build();
-
-        self::assertTrue((new BearerTokenAuthenticator($extensionConfiguration))->authenticate($request));
+        self::assertTrue((new BearerTokenAuthenticator($extensionConfiguration))->authenticate($this->request('Bearer default-token')));
     }
 
     private function authenticator(string $configuredEnvName = ''): BearerTokenAuthenticator
@@ -123,5 +112,16 @@ final class BearerTokenAuthenticatorTest extends TestCase
         $extensionConfiguration->method('get')->willReturn($configuredEnvName);
 
         return new BearerTokenAuthenticator($extensionConfiguration);
+    }
+
+    private function request(?string $authorization = null): ServerRequest
+    {
+        $builder = Requests::get('https://example.com/api')->withoutNormalizedParams();
+
+        if (null !== $authorization) {
+            $builder->withHeader('Authorization', $authorization);
+        }
+
+        return $builder->build();
     }
 }

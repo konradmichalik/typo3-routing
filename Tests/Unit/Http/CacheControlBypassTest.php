@@ -17,6 +17,7 @@ use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\CacheControlBypass;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use TYPO3\CMS\Core\Http\ServerRequest;
 
 /**
  * CacheControlBypassTest.
@@ -29,7 +30,7 @@ final class CacheControlBypassTest extends TestCase
     #[Test]
     public function neitherReadNorWriteIsSkippedWithoutACacheControlHeader(): void
     {
-        $request = Requests::get('https://example.com/api/cached')->withoutNormalizedParams()->build();
+        $request = $this->request();
 
         self::assertFalse(CacheControlBypass::skipsRead($request));
         self::assertFalse(CacheControlBypass::skipsWrite($request));
@@ -38,7 +39,7 @@ final class CacheControlBypassTest extends TestCase
     #[Test]
     public function noCacheSkipsReadButNotWrite(): void
     {
-        $request = Requests::get('https://example.com/api/cached')->withHeader('Cache-Control', 'no-cache')->withoutNormalizedParams()->build();
+        $request = $this->request('no-cache');
 
         self::assertTrue(CacheControlBypass::skipsRead($request));
         self::assertFalse(CacheControlBypass::skipsWrite($request));
@@ -47,7 +48,7 @@ final class CacheControlBypassTest extends TestCase
     #[Test]
     public function noStoreSkipsBothReadAndWrite(): void
     {
-        $request = Requests::get('https://example.com/api/cached')->withHeader('Cache-Control', 'no-store')->withoutNormalizedParams()->build();
+        $request = $this->request('no-store');
 
         self::assertTrue(CacheControlBypass::skipsRead($request));
         self::assertTrue(CacheControlBypass::skipsWrite($request));
@@ -56,9 +57,20 @@ final class CacheControlBypassTest extends TestCase
     #[Test]
     public function matchingIsCaseInsensitive(): void
     {
-        $request = Requests::get('https://example.com/api/cached')->withHeader('Cache-Control', 'NO-STORE')->withoutNormalizedParams()->build();
+        $request = $this->request('NO-STORE');
 
         self::assertTrue(CacheControlBypass::skipsRead($request));
         self::assertTrue(CacheControlBypass::skipsWrite($request));
+    }
+
+    private function request(?string $cacheControl = null): ServerRequest
+    {
+        $builder = Requests::get('https://example.com/api/cached')->withoutNormalizedParams();
+
+        if (null !== $cacheControl) {
+            $builder->withHeader('Cache-Control', $cacheControl);
+        }
+
+        return $builder->build();
     }
 }

@@ -39,6 +39,8 @@ use const E_USER_WARNING;
 /**
  * RouteCompilerPass.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class RouteCompilerPass implements CompilerPassInterface

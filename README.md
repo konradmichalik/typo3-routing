@@ -121,6 +121,10 @@ See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments
 | [Authentication & CSRF](docs/AUTHENTICATION.md) | Protecting routes with `#[Authenticate]`, request tokens, and deployment notes |
 | [How It Works](docs/HOW-IT-WORKS.md) | Compile-time discovery, runtime dispatch, and the `routing:debug` command |
 | [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
+| [Extending](docs/EXTENDING.md) | Building tooling on top of the route metadata (`RouteRegistry`), the `@api`/`@internal` surface, and the BC promise |
+
+> [!NOTE]
+> **BC promise**: every class carries `@api` or `@internal`. From `1.0.0`, `@api` classes and methods follow semver; `@internal` ones may change in any release, including a patch. See [Extending](docs/EXTENDING.md) for the full public surface.
 
 ## 🧑‍💻 Contributing
 

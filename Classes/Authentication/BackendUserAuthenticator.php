@@ -19,6 +19,8 @@ use TYPO3\CMS\Core\Context\Context;
 /**
  * BackendUserAuthenticator.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class BackendUserAuthenticator implements RouteAuthenticatorInterface

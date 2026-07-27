@@ -21,6 +21,8 @@ use function strlen;
 /**
  * SiteBasePathResolver.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class SiteBasePathResolver

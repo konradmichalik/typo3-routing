@@ -20,6 +20,8 @@ use TYPO3\CMS\Core\Context\Context;
 /**
  * CacheBypassGuard.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class CacheBypassGuard

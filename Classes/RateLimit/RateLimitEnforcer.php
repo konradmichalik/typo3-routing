@@ -19,6 +19,8 @@ use Symfony\Component\RateLimiter\Storage\StorageInterface;
 /**
  * RateLimitEnforcer.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class RateLimitEnforcer

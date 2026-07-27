@@ -28,6 +28,8 @@ use function rtrim;
 /**
  * SwaggerUiController.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class SwaggerUiController implements RouteControllerInterface

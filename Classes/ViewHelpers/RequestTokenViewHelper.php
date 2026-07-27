@@ -21,6 +21,8 @@ use TYPO3Fluid\Fluid\Core\ViewHelper\AbstractViewHelper;
 /**
  * RequestTokenViewHelper.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class RequestTokenViewHelper extends AbstractViewHelper

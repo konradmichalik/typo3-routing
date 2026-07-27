@@ -23,6 +23,8 @@ use function is_array;
 /**
  * FrontendUserAuthenticator.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class FrontendUserAuthenticator implements RouteAuthenticatorInterface

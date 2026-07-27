@@ -18,6 +18,8 @@ use TYPO3\CMS\Core\DataHandling\DataHandler;
 /**
  * CacheTagFlusher.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class CacheTagFlusher

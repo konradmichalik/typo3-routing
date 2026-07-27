@@ -24,6 +24,8 @@ use function trim;
 /**
  * ConditionalGet.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class ConditionalGet

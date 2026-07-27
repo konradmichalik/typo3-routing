@@ -23,6 +23,8 @@ use function str_starts_with;
 /**
  * RouteUrlGenerator.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class RouteUrlGenerator

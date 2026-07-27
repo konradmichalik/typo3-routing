@@ -21,6 +21,8 @@ use Symfony\Component\Routing\{RequestContext, Route as SymfonyRoute, RouteColle
 /**
  * RouteRegistry.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class RouteRegistry
@@ -55,6 +57,8 @@ final class RouteRegistry
      * collection (URL generation, matcher fallback) and the compiler pass, which dumps the same
      * collection into the compiled matcher format at container build time.
      *
+     * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     *
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes
      */
     public static function buildCollection(array $routes): RouteCollection
@@ -82,6 +86,9 @@ final class RouteRegistry
         return $collection;
     }
 
+    /**
+     * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     */
     public function getRouteCollection(): RouteCollection
     {
         return $this->collection ??= self::buildCollection($this->routes);
@@ -91,6 +98,8 @@ final class RouteRegistry
      * Matching prefers the routes pre-compiled at container build time: the plain UrlMatcher would
      * re-compile every route's regex on each request. The fallback covers registries constructed
      * without compiled routes (tests, manual wiring).
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
      */
     public function getMatcher(RequestContext $context): UrlMatcherInterface
     {
@@ -101,11 +110,17 @@ final class RouteRegistry
         return new UrlMatcher($this->getRouteCollection(), $context);
     }
 
+    /**
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     */
     public function getControllerLocator(): ContainerInterface
     {
         return $this->controllerLocator;
     }
 
+    /**
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     */
     public function getAuthenticatorLocator(): ContainerInterface
     {
         // Always populated by the compiler pass; only ever reached for routes that declare authenticators.

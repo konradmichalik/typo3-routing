@@ -33,6 +33,8 @@ use function strtoupper;
 /**
  * RouteMatchCommand.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[AsCommand(name: 'routing:match', description: 'Simulate matching a request path against the registered attribute routes')]

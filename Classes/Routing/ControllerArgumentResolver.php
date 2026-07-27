@@ -41,6 +41,8 @@ use function strtolower;
 /**
  * ControllerArgumentResolver.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  * @license GPL-2.0-or-later
  */

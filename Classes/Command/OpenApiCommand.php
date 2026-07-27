@@ -28,6 +28,8 @@ use function json_encode;
 /**
  * OpenApiCommand.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[AsCommand(name: 'routing:openapi', description: 'Export all registered attribute routes as an OpenAPI 3.1 document')]

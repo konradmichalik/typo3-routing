@@ -18,6 +18,8 @@ use Attribute;
 /**
  * Param.
  *
+ * @api
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[Attribute(Attribute::TARGET_PARAMETER)]

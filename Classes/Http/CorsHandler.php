@@ -34,6 +34,8 @@ use const E_USER_WARNING;
 /**
  * CorsHandler.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class CorsHandler

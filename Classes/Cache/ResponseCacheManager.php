@@ -24,6 +24,8 @@ use function is_array;
 /**
  * ResponseCacheManager.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final class ResponseCacheManager

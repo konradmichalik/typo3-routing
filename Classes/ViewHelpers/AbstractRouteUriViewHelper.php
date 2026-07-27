@@ -21,6 +21,8 @@ use TYPO3Fluid\Fluid\Core\ViewHelper\AbstractViewHelper;
 /**
  * AbstractRouteUriViewHelper.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 abstract class AbstractRouteUriViewHelper extends AbstractViewHelper

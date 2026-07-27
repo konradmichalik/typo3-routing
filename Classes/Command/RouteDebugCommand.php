@@ -28,6 +28,8 @@ use function sprintf;
 /**
  * RouteDebugCommand.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[AsCommand(name: 'routing:debug', description: 'List all registered attribute routes')]

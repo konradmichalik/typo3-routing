@@ -22,6 +22,8 @@ use function time;
 /**
  * RateLimitCheck.
  *
+ * @internal
+ *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 final readonly class RateLimitCheck

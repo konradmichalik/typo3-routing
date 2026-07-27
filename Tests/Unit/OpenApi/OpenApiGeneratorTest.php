@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
+use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
@@ -164,6 +165,12 @@ final class OpenApiGeneratorTest extends TestCase
         self::assertStringContainsString('Development', $operation['description']);
     }
 
+    #[Test]
+    public function excludesTheSwaggerUiControllersOwnRoutesFromTheDocument(): void
+    {
+        self::assertArrayNotHasKey('/_routing/openapi.json', $this->features()['paths']);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -203,6 +210,7 @@ final class OpenApiGeneratorTest extends TestCase
             'note' => ['path' => '/api/note', 'methods' => ['POST'], 'controller' => 'ctrl::note', 'env' => null, 'requirements' => []],
             'custom' => ['path' => '/api/custom', 'methods' => ['GET'], 'controller' => 'ctrl::custom', 'env' => null, 'requirements' => []],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
+            'routing_swagger_openapi_json' => ['path' => '/_routing/openapi.json', 'methods' => ['GET'], 'controller' => SwaggerUiController::class.'::openApiJson', 'env' => 'Development', 'requirements' => []],
         ];
 
         $arguments = [
@@ -221,6 +229,7 @@ final class OpenApiGeneratorTest extends TestCase
             ],
             'custom' => [],
             'dev' => [],
+            'routing_swagger_openapi_json' => [],
         ];
 
         return new RouteRegistry(

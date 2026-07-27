@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, BearerTokenAuthenticator, FrontendUserAuthenticator};
+use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
@@ -26,6 +27,7 @@ use function is_a;
 use function lcfirst;
 use function sprintf;
 use function str_contains;
+use function str_starts_with;
 use function strrpos;
 use function strtolower;
 use function strtoupper;
@@ -67,6 +69,11 @@ final readonly class OpenApiGenerator
         $usedSchemes = [];
 
         foreach ($this->registry->getRoutes() as $name => $route) {
+            if (str_starts_with($route['controller'], SwaggerUiController::class.'::')) {
+                // The Swagger UI's own routes describe tooling, not the API surface — never in the document.
+                continue;
+            }
+
             $methods = [] === $route['methods'] ? ['GET'] : $route['methods'];
             foreach ($methods as $method) {
                 $operation = $this->operation($name, $route, $method, $usedSchemes);

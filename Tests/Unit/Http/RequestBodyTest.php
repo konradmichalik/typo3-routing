@@ -60,6 +60,18 @@ final class RequestBodyTest extends TestCase
     }
 
     #[Test]
+    public function ignoresCoreParseStrGarbageForPatchJsonBody(): void
+    {
+        // TYPO3's ServerRequestFactory::fromGlobals() runs PUT/PATCH/DELETE bodies through
+        // parse_str() and calls withParsedBody() whenever the result is non-empty. A JSON body
+        // has no `=`/`&`, so it becomes a single garbage key with an empty value.
+        $request = $this->jsonRequest('PATCH', '{"quantity":3}')
+            ->withParsedBody(['{"quantity":3}' => '']);
+
+        self::assertSame(['quantity' => 3], RequestBody::toArray($request));
+    }
+
+    #[Test]
     public function decodesJsonSuffixContentType(): void
     {
         $request = $this->jsonRequest('POST', '{"ok":true}', 'application/vnd.api+json');

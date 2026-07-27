@@ -23,17 +23,18 @@ use TYPO3\CMS\Core\Http\JsonResponse;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-#[Route(path: '/api/v1', name: 'v1_', env: 'Development', requirements: ['id' => '\d+'], defaults: ['format' => 'html', 'page' => 1])]
+#[Route(path: '/api/v1', name: 'v1_', env: 'Development', requirements: ['id' => '\d+'], defaults: ['format' => 'html', 'page' => 1], description: 'Course catalogue endpoints.')]
 final class PrefixedController implements RouteControllerInterface
 {
+    // No own description: falls back to the class-level description.
     #[Route(path: '/items/{id}', name: 'items_show')]
     public function show(ServerRequestInterface $request): JsonResponse
     {
         return new JsonResponse(['item' => true]);
     }
 
-    // Method env overrides the class default; method requirement and default override the class base per key.
-    #[Route(path: '/ping', env: 'Production', requirements: ['id' => '[a-z]+'], defaults: ['format' => 'json'])]
+    // Method env overrides the class default; method requirement, default, and description override the class base per key.
+    #[Route(path: '/ping', env: 'Production', requirements: ['id' => '[a-z]+'], defaults: ['format' => 'json'], description: 'Health check endpoint.')]
     public function ping(ServerRequestInterface $request): JsonResponse
     {
         return new JsonResponse(['ping' => true]);

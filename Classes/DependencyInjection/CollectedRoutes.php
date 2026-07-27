@@ -42,4 +42,7 @@ final class CollectedRoutes
 
     /** @var array<string, Reference> */
     public array $authenticatorReferences = [];
+
+    /** @var array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}> */
+    public array $corsConfigs = [];
 }

@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, RateLimit, RequireRequestToken, Route};
 use KonradMichalik\Typo3Routing\Authentication\RouteAuthenticatorInterface;
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
@@ -63,10 +63,12 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         RateLimit::class => '#[RateLimit]',
         Authenticate::class => '#[Authenticate]',
         RequireRequestToken::class => '#[RequireRequestToken]',
+        Cors::class => '#[Cors]',
     ];
 
     public function __construct(
         private ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
+        private CorsResolver $corsResolver = new CorsResolver(),
     ) {}
 
     #[Override]
@@ -101,6 +103,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$arguments', $collected->arguments);
         $registry->setArgument('$authenticators', $collected->authenticators);
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
+        $registry->setArgument('$corsConfigs', $collected->corsConfigs);
         // Pre-compile the matcher tables so request-time matching never re-compiles route regexes.
         $registry->setArgument('$compiledRoutes', (new CompiledUrlMatcherDumper(RouteRegistry::buildCollection($collected->routes)))->getCompiledRoutes());
     }
@@ -141,6 +144,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     private function collectController(ReflectionClass $reflection, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
     {
         $classRoute = $this->resolveClassRoute($reflection, $serviceId);
+        $classCors = $this->corsResolver->resolveClass($reflection);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -148,7 +152,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute) || $found;
+            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors) || $found;
         }
 
         return $found;
@@ -173,7 +177,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         return $attributes[0]->newInstance();
     }
 
-    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute): bool
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors): bool
     {
         $routeAttributes = $method->getAttributes(Route::class);
         if ([] === $routeAttributes) {
@@ -186,9 +190,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $rateLimit = $this->resolveRateLimit($method, $serviceId);
         $auth = $this->resolveAuthenticators($method, $serviceId, $container, $collected);
         $requestToken = $this->resolveRequestToken($method);
+        $cors = $this->corsResolver->resolveMethod($method, $classCors);
 
         foreach ($routeAttributes as $attribute) {
-            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $collected, $classRoute);
+            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $collected, $classRoute);
         }
 
         return true;
@@ -219,7 +224,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
-    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, CollectedRoutes $collected, ?Route $classRoute): void
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute): void
     {
         // Class-level #[Route] prefixes the path/name, defaults the env and provides base requirements.
         $namePrefix = '';
@@ -268,6 +273,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
         $this->applyCache($cache, $auth, $name, $serviceId, $method, $collected);
         $this->applyRequestToken($requestToken, $methods, $name, $serviceId, $method, $collected);
+        $this->corsResolver->apply($cors, $name, $serviceId, $method->getName(), $collected);
     }
 
     /**

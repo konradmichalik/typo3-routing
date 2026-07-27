@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, CachedAuthenticatedController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -264,6 +264,65 @@ final class RouteCompilerPassTest extends TestCase
         self::assertSame('ip', $rateLimits['fixture_limited']['keyBy']);
         // Methods without #[RateLimit] get no entry.
         self::assertArrayNotHasKey('fixture_count', $rateLimits);
+    }
+
+    #[Test]
+    public function capturesCorsConfigForTheMethodsOwnAttribute(): void
+    {
+        $container = $this->buildContainer(['cors_controller' => CorsController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}> $corsConfigs */
+        $corsConfigs = $container->getDefinition(RouteRegistry::class)->getArgument('$corsConfigs');
+
+        self::assertSame(['https://method.example.com'], $corsConfigs['cors_method_level']['allowedOrigins']);
+        self::assertTrue($corsConfigs['cors_method_level']['allowCredentials']);
+        self::assertSame(600, $corsConfigs['cors_method_level']['maxAge']);
+    }
+
+    #[Test]
+    public function fallsBackToTheClassLevelCorsForMethodsWithoutTheirOwn(): void
+    {
+        $container = $this->buildContainer(['cors_controller' => CorsController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}> $corsConfigs */
+        $corsConfigs = $container->getDefinition(RouteRegistry::class)->getArgument('$corsConfigs');
+
+        self::assertSame(['https://class.example.com'], $corsConfigs['cors_class_level']['allowedOrigins']);
+        self::assertFalse($corsConfigs['cors_class_level']['allowCredentials']);
+    }
+
+    #[Test]
+    public function omitsCorsConfigForRoutesWithoutTheAttribute(): void
+    {
+        $container = $this->buildContainer(['fixture_controller' => FixtureController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, mixed> $corsConfigs */
+        $corsConfigs = $container->getDefinition(RouteRegistry::class)->getArgument('$corsConfigs');
+
+        self::assertArrayNotHasKey('fixture_count', $corsConfigs);
+    }
+
+    #[Test]
+    public function throwsOnWildcardOriginCombinedWithCredentials(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000025);
+        $this->expectExceptionMessageMatches('/allowCredentials.*wildcard/');
+
+        $this->discover($this->buildContainer(['invalid' => InvalidCorsCredentialsController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenCorsIsUsedWithoutARoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000013);
+        $this->expectExceptionMessageMatches('/#\[Cors\].*without a #\[Route\]/');
+
+        $this->discover($this->buildContainer(['orphaned' => OrphanedCorsController::class]));
     }
 
     #[Test]

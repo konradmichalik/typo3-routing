@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
 use KonradMichalik\Typo3Routing\Http\RequestBody;
-use PHPUnit\Framework\Attributes\{CoversClass, Test};
+use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Http\{ServerRequest, Stream};
 
@@ -60,15 +60,26 @@ final class RequestBodyTest extends TestCase
     }
 
     #[Test]
-    public function ignoresCoreParseStrGarbageForPatchJsonBody(): void
+    #[DataProvider('coreFormDecodedMethods')]
+    public function ignoresCoreParseStrGarbageForJsonBody(string $method): void
     {
         // TYPO3's ServerRequestFactory::fromGlobals() runs PUT/PATCH/DELETE bodies through
         // parse_str() and calls withParsedBody() whenever the result is non-empty. A JSON body
         // has no `=`/`&`, so it becomes a single garbage key with an empty value.
-        $request = $this->jsonRequest('PATCH', '{"quantity":3}')
+        $request = $this->jsonRequest($method, '{"quantity":3}')
             ->withParsedBody(['{"quantity":3}' => '']);
 
         self::assertSame(['quantity' => 3], RequestBody::toArray($request));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function coreFormDecodedMethods(): iterable
+    {
+        yield 'PUT' => ['PUT'];
+        yield 'PATCH' => ['PATCH'];
+        yield 'DELETE' => ['DELETE'];
     }
 
     #[Test]

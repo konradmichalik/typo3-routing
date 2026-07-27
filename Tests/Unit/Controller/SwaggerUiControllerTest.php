@@ -76,7 +76,7 @@ final class SwaggerUiControllerTest extends TestCase
         $body = (string) $response->getBody();
         self::assertJsonPath($body, 'openapi', '3.1.0');
         self::assertJsonHasPath($body, 'paths./api/example');
-        self::assertArrayNotHasKey('servers', json_decode($body, true, 512, \JSON_THROW_ON_ERROR));
+        self::assertJsonMissingPath($body, 'servers');
     }
 
     #[Test]

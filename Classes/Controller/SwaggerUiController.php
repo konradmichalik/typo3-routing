@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Controller;
 
 use KonradMichalik\Typo3Routing\Attribute\Route;
-use KonradMichalik\Typo3Routing\Http\{HttpProblemException, RouteUrlGenerator};
+use KonradMichalik\Typo3Routing\Http\{HttpProblemException, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -22,8 +22,8 @@ use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Http\{HtmlResponse, JsonResponse};
 
-use function is_string;
 use function json_encode;
+use function rtrim;
 
 /**
  * SwaggerUiController.
@@ -36,6 +36,7 @@ final readonly class SwaggerUiController implements RouteControllerInterface
         private OpenApiGenerator $generator,
         private RouteUrlGenerator $urlGenerator,
         private ExtensionConfiguration $extensionConfiguration,
+        private SiteBasePathResolver $basePathResolver,
     ) {}
 
     #[Route(path: '/api/_routing/openapi.json', name: 'routing_swagger_openapi_json', env: 'Development')]
@@ -43,7 +44,7 @@ final readonly class SwaggerUiController implements RouteControllerInterface
     {
         $this->assertEnabled();
 
-        return new JsonResponse($this->generator->generate('TYPO3 Routing API', '1.0.0', $this->serverPrefix()));
+        return new JsonResponse($this->generator->generate('TYPO3 Routing API', '1.0.0', $this->siteServer($request)));
     }
 
     #[Route(path: '/api/_routing/docs', name: 'routing_swagger_docs', env: 'Development')]
@@ -74,15 +75,16 @@ final readonly class SwaggerUiController implements RouteControllerInterface
         return '1' === (string) $value;
     }
 
-    private function serverPrefix(): string
+    /**
+     * Route paths are already stored in full (including the configured `prefix` gate) and are
+     * resolved relative to the site base, not the domain root — so the OpenAPI `servers` entry must
+     * be the site's own base path, never the `prefix` config: reusing that would double it into every
+     * path (e.g. `/api/` + `/api/example` = `/api/api/example`). An empty result (root-mounted site)
+     * omits `servers` entirely, which per the OpenAPI spec defaults to "/" — exactly correct here.
+     */
+    private function siteServer(ServerRequestInterface $request): string
     {
-        try {
-            $prefix = $this->extensionConfiguration->get('typo3_routing', 'prefix');
-
-            return is_string($prefix) ? $prefix : '/api/';
-        } catch (Throwable) {
-            return '/api/';
-        }
+        return rtrim($this->basePathResolver->prependSiteBase($request, ''), '/');
     }
 
     private function renderHtml(string $specUrl): string
@@ -95,11 +97,11 @@ final readonly class SwaggerUiController implements RouteControllerInterface
             <head>
             <meta charset="utf-8">
             <title>TYPO3 Routing API &mdash; Swagger UI</title>
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.11/swagger-ui.css" integrity="sha384-9Q2fpS+xeS4ffJy6CagnwoUl+4ldAYhOs9pgZuEKxypVModhmZFzeMlvVsAjf7uT" crossorigin="anonymous">
             </head>
             <body>
             <div id="swagger-ui"></div>
-            <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.11/swagger-ui-bundle.js" integrity="sha384-vfl/klfTFrIz5urj0HnhcXLAbzPdRHezizfy+XgFB6GqcKkhlk0lS3bIbyB39NLA" crossorigin="anonymous"></script>
             <script>
             window.onload = function () {
                 window.ui = SwaggerUIBundle({

@@ -54,7 +54,7 @@ final class SwaggerUiControllerTest extends TestCase
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
-        $controller = new SwaggerUiController(new OpenApiGenerator($this->registry()), $this->urlGenerator(), $extensionConfiguration);
+        $controller = new SwaggerUiController(new OpenApiGenerator($this->registry()), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
 
         $this->expectException(HttpProblemException::class);
 
@@ -62,7 +62,7 @@ final class SwaggerUiControllerTest extends TestCase
     }
 
     #[Test]
-    public function openApiJsonReturnsTheGeneratedDocumentWhenEnabled(): void
+    public function openApiJsonOmitsServersForARootMountedSite(): void
     {
         $controller = $this->controller('1');
 
@@ -71,29 +71,22 @@ final class SwaggerUiControllerTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         $document = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
         self::assertSame('3.1.0', $document['openapi']);
-        self::assertSame([['url' => '/api/']], $document['servers']);
+        self::assertArrayNotHasKey('servers', $document);
         self::assertArrayHasKey('/api/example', $document['paths']);
     }
 
     #[Test]
-    public function openApiJsonFallsBackToTheDefaultServerPrefixWhenThatConfigKeyThrows(): void
+    public function openApiJsonUsesTheSiteBaseAsServerForASubPathMountedSite(): void
     {
-        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
-        $extensionConfiguration->method('get')->willReturnCallback(
-            static function (string $extension, string $key): string {
-                if ('swaggerUi' === $key) {
-                    return '1';
-                }
+        $controller = $this->controller('1');
+        $request = (new ServerRequest('https://example.com/sub/'))->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']));
 
-                throw new RuntimeException('prefix not configured', 7857001195);
-            },
-        );
-        $controller = new SwaggerUiController(new OpenApiGenerator($this->registry()), $this->urlGenerator(), $extensionConfiguration);
-
-        $response = $controller->openApiJson($this->request());
+        $response = $controller->openApiJson($request);
 
         $document = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
-        self::assertSame([['url' => '/api/']], $document['servers']);
+        self::assertSame([['url' => '/sub']], $document['servers']);
+        // The route's own path is unaffected — it stays relative to the site base, as everywhere else.
+        self::assertArrayHasKey('/api/example', $document['paths']);
     }
 
     #[Test]
@@ -119,6 +112,10 @@ final class SwaggerUiControllerTest extends TestCase
         $html = (string) $response->getBody();
         self::assertStringContainsString('swagger-ui-dist', $html);
         self::assertStringContainsString('"/api/example/openapi.json"', $html);
+        // Pinned to an exact version with a matching SRI hash, not a floating major-version selector.
+        self::assertMatchesRegularExpression('#swagger-ui-dist@\d+\.\d+\.\d+/swagger-ui\.css" integrity="sha384-#', $html);
+        self::assertMatchesRegularExpression('#swagger-ui-dist@\d+\.\d+\.\d+/swagger-ui-bundle\.js" integrity="sha384-#', $html);
+        self::assertStringContainsString('crossorigin="anonymous"', $html);
     }
 
     private function controller(string $swaggerUiFlag): SwaggerUiController
@@ -128,7 +125,7 @@ final class SwaggerUiControllerTest extends TestCase
             static fn (string $extension, string $key): string => 'swaggerUi' === $key ? $swaggerUiFlag : '/api/',
         );
 
-        return new SwaggerUiController(new OpenApiGenerator($this->registry()), $this->urlGenerator(), $extensionConfiguration);
+        return new SwaggerUiController(new OpenApiGenerator($this->registry()), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
     }
 
     private function urlGenerator(): RouteUrlGenerator

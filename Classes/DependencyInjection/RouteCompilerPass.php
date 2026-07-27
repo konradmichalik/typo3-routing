@@ -26,7 +26,6 @@ use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
 
 use function array_intersect;
 use function array_map;
-use function class_exists;
 use function count;
 use function in_array;
 use function is_a;
@@ -71,6 +70,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     public function __construct(
         private ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
         private CorsResolver $corsResolver = new CorsResolver(),
+        private ClassExistenceChecker $classExistenceChecker = new ClassExistenceChecker(),
     ) {}
 
     #[Override]
@@ -125,7 +125,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         }
 
         $resolvedClass = $container->getParameterBag()->resolveValue($class);
-        if (!is_string($resolvedClass) || !class_exists($resolvedClass)) {
+        if (!is_string($resolvedClass) || !$this->classExistenceChecker->exists($resolvedClass)) {
             return null;
         }
 
@@ -344,7 +344,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             $authenticate = $attribute->newInstance();
             $class = $authenticate->authenticator;
 
-            if (!class_exists($class) || !is_a($class, RouteAuthenticatorInterface::class, true)) {
+            if (!$this->classExistenceChecker->exists($class) || !is_a($class, RouteAuthenticatorInterface::class, true)) {
                 throw new LogicException(sprintf('#[Authenticate] on "%s::%s()" references "%s", which does not implement %s.', $serviceId, $method->getName(), $class, RouteAuthenticatorInterface::class), 1750000010);
             }
 

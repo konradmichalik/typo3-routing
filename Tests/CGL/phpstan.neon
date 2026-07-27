@@ -7,6 +7,7 @@ parameters:
 
 	scanDirectories:
 		- ../../vendor
+		- ../../Tests/Support
 	paths:
 		- ../../Classes
 		- ../../Configuration

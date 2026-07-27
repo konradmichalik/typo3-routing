@@ -15,7 +15,7 @@ namespace KonradMichalik\RoutingTest\Controller;
 
 use KonradMichalik\RoutingTest\Domain\Model\Item;
 use KonradMichalik\RoutingTest\Enum\Status;
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Param, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, Param, RateLimit, RequireRequestToken, Route};
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
@@ -154,5 +154,13 @@ final class ExampleController implements RouteControllerInterface
     {
         // A controller-thrown problem: mapped to a 409 application/problem+json response.
         throw new HttpProblemException(409, 'Item already processed');
+    }
+
+    #[Route(path: '/api/example/cors-override', name: 'example_cors_override')]
+    #[Cors(allowedOrigins: ['https://partner.example.org'])]
+    public function corsOverride(): JsonResponse
+    {
+        // #[Cors] applies even when no global CORS configuration is set for this test instance.
+        return new JsonResponse(['ok' => true]);
     }
 }

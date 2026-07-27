@@ -35,6 +35,7 @@ final class RouteRegistry
      * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                   $authenticators
      * @param array<string, string>                                                                                                                                                                                                                                        $requestTokenScopes
      * @param array<mixed>                                                                                                                                                                                                                                                 $compiledRoutes
+     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                       $corsConfigs
      */
     public function __construct(
         private readonly array $routes,
@@ -46,6 +47,7 @@ final class RouteRegistry
         private readonly array $requestTokenScopes = [],
         private readonly ?ContainerInterface $authenticatorLocator = null,
         private readonly array $compiledRoutes = [],
+        private readonly array $corsConfigs = [],
     ) {}
 
     /**
@@ -142,6 +144,16 @@ final class RouteRegistry
     public function getRateLimit(string $routeName): ?array
     {
         return $this->rateLimits[$routeName] ?? null;
+    }
+
+    /**
+     * The route's own #[Cors] override, or null when it falls back to the global CORS configuration.
+     *
+     * @return array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null
+     */
+    public function getCorsConfig(string $routeName): ?array
+    {
+        return $this->corsConfigs[$routeName] ?? null;
     }
 
     /**

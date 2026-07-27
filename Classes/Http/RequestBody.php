@@ -16,6 +16,7 @@ namespace KonradMichalik\Typo3Routing\Http;
 use Psr\Http\Message\{ServerRequestInterface, StreamInterface};
 use WeakMap;
 
+use function in_array;
 use function is_array;
 use function json_decode;
 use function str_contains;
@@ -31,6 +32,16 @@ use function strtolower;
  */
 final class RequestBody
 {
+    /**
+     * Methods for which TYPO3's ServerRequestFactory::fromGlobals() runs the raw body through
+     * parse_str() and calls withParsedBody() whenever the result is non-empty. A JSON payload
+     * has no `=`/`&`, so parse_str() turns it into a single garbage key (e.g. `{"n":1}` => ''),
+     * which is non-empty and would otherwise be trusted as the real parsed body.
+     *
+     * @var list<string>
+     */
+    private const CORE_FORM_DECODED_METHODS = ['PUT', 'PATCH', 'DELETE'];
+
     /**
      * Per-request memo of the decoded body, keyed by the body stream. The stream instance is shared
      * across the request clones that withAttribute() produces, so the two consumers in one request —
@@ -51,7 +62,9 @@ final class RequestBody
     public static function toArray(ServerRequestInterface $request): array
     {
         $parsed = $request->getParsedBody();
-        if (is_array($parsed) && [] !== $parsed) {
+        $isCoreFormDecodedJson = self::isJson($request)
+            && in_array($request->getMethod(), self::CORE_FORM_DECODED_METHODS, true);
+        if (is_array($parsed) && [] !== $parsed && !$isCoreFormDecodedJson) {
             return $parsed;
         }
 

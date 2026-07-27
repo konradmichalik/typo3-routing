@@ -29,9 +29,10 @@ This extension lets you register **frontend endpoints via PHP attributes** on co
 - [**Opt-in caching**](docs/CACHING.md) — cache responses with `#[Cache]`, with tag-based invalidation
 - [**Opt-in rate limiting**](docs/RATE-LIMITING.md) — throttle requests per client IP with `#[RateLimit]`
 - [**Opt-in authentication & CSRF**](docs/AUTHENTICATION.md) — protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
-- [**CORS**](docs/CONFIGURATION.md#cors) — opt-in cross-origin support with automatic preflight handling, configured globally
+- [**CORS**](docs/CONFIGURATION.md#cors) — opt-in cross-origin support with automatic preflight handling, configured globally or per route with `#[Cors]`
 - [**Debug command**](docs/HOW-IT-WORKS.md#debug-command) — list every registered route as a table or JSON, including an `--unprotected` audit
 - [**OpenAPI export**](docs/HOW-IT-WORKS.md#openapi-export) — generate an OpenAPI 3.1 document from your routes with `routing:openapi`
+- [**Swagger UI**](docs/HOW-IT-WORKS.md#swagger-ui-development-only) — opt-in, development-only Swagger UI served over the same OpenAPI export
 
 ## 🔥 Installation
 

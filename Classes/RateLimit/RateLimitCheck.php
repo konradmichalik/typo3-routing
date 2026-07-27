@@ -53,8 +53,11 @@ final readonly class RateLimitCheck
             return ['blocked' => null, 'headers' => $headers];
         }
 
+        $retryAfter = max(0, $result->getRetryAfter()->getTimestamp() - time());
         $blocked = JsonErrorResponse::create(429, 'Too Many Requests', [
-            'Retry-After' => (string) max(0, $result->getRetryAfter()->getTimestamp() - time()),
+            'Retry-After' => (string) $retryAfter,
+        ], [
+            'retryAfter' => $retryAfter,
         ]);
 
         return ['blocked' => $blocked, 'headers' => $headers];

@@ -31,6 +31,21 @@ The allowed **methods** for a preflight are derived automatically from the route
 > [!WARNING]
 > `cors.allowCredentials` only takes effect with an **explicit** origin list. Combined with the `*` wildcard it is ignored (a PHP warning is logged): reflecting arbitrary origins with `Access-Control-Allow-Credentials: true` would let **any** website read authenticated API responses — exactly what the CORS spec's wildcard/credentials prohibition exists to prevent.
 
+### Per-route overrides with `#[Cors]`
+
+Cross-origin access is often only needed for a handful of routes — e.g. a public widget endpoint consumed by a partner site — while the rest of the API should stay same-origin. `#[Cors]` overrides the global configuration entirely for that route (or, at class level, for every method route without its own):
+
+```php
+#[Route(path: '/api/widget/data', name: 'widget_data')]
+#[Cors(allowedOrigins: ['https://partner.example.org'], allowCredentials: true, maxAge: 3600)]
+public function data(): ResponseInterface { /* … */ }
+```
+
+- **Precedence**: a method's own `#[Cors]` wins entirely over a class-level one, which wins entirely over the global configuration — it is not merged field by field.
+- `#[Cors]` **enables CORS for that route even when the global configuration is entirely off** (`cors.allowedOrigins` empty).
+- `allowedOrigins: ['*']` combined with `allowCredentials: true` is rejected at **build time** (container compile fails) — unlike the global configuration's runtime downgrade-with-warning, a per-route attribute is an explicit, deliberate choice, so a misconfiguration fails loudly instead of silently falling back.
+- Preflight (`OPTIONS` + `Access-Control-Request-Method`) is answered using the resolved per-route policy: the dispatcher matches on the *intended* method (from `Access-Control-Request-Method`) to resolve the specific route — and with it, its own `#[Cors]` — before authentication ever runs.
+
 ## Environment-bound routes
 
 A route with `env: 'Development'` only exists while the top-level application context matches (case-insensitive). Outside that context the route behaves as if it does not exist (`404`) — no ExpressionLanguage, just a match-time check against `Environment::getContext()`.
@@ -39,6 +54,19 @@ A route with `env: 'Development'` only exists while the top-level application co
 #[Route(path: '/api/debug/dump', name: 'debug_dump', env: 'Development')]
 public function dump(ServerRequestInterface $request): ResponseInterface { /* … */ }
 ```
+
+## Swagger UI (development only)
+
+The extension can serve a Swagger UI page over its own OpenAPI export — no extra setup beyond enabling a flag. Both routes are double-gated: they only exist in the `Development` [application context](#environment-bound-routes) **and** only when explicitly enabled (via **Settings → Extension Configuration → typo3_routing**); outside either condition they behave as if they don't exist (`404`), same as any other environment-bound route.
+
+| Setting     | Description                                                                                   | Default |
+|-------------|-------------------------------------------------------------------------------------------------|---------|
+| `swaggerUi` | Serve the Swagger UI (`/api/_routing/docs`) and its OpenAPI JSON document (`/api/_routing/openapi.json`). | `0` (off) |
+
+The routes sit under the configured [path prefix](#path-prefix-gate) (`/api/` by default) so they are reachable without further changes; if you've customized `prefix` away from `/api/`, make sure it still covers `/api/_routing/` (or add it explicitly to the comma-separated list), or the request never reaches the dispatcher at all.
+
+> [!WARNING]
+> Never enable `swaggerUi` in a production context — the `Development` gate alone already prevents this in a correctly configured instance, but the flag exists as a second, independent safeguard.
 
 ## Middleware placement
 

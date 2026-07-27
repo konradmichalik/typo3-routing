@@ -256,6 +256,24 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesCorsConfigPerRouteName(): void
+    {
+        $registry = new RouteRegistry(
+            [],
+            new ServiceLocator([]),
+            corsConfigs: ['restricted' => ['allowedOrigins' => ['https://app.example.com'], 'allowedHeaders' => 'Content-Type', 'allowCredentials' => true, 'exposeHeaders' => '', 'maxAge' => 600]],
+        );
+
+        $cors = $registry->getCorsConfig('restricted');
+
+        self::assertNotNull($cors);
+        self::assertSame(['https://app.example.com'], $cors['allowedOrigins']);
+        self::assertTrue($cors['allowCredentials']);
+        self::assertSame(600, $cors['maxAge']);
+        self::assertNull($registry->getCorsConfig('unrestricted'));
+    }
+
+    #[Test]
     public function exposesArgumentSpecsPerRouteName(): void
     {
         $spec = ['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null];

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, HttpProblemException, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, HttpProblemException, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, RouteRegistry};
 use Override;
@@ -62,6 +62,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private ControllerArgumentResolver $argumentResolver,
         private AccessGuard $accessGuard,
         private CorsHandler $cors,
+        private CorsPreflightResolver $corsPreflight,
         private CacheBypassGuard $cacheBypass,
         private ClientKeyResolver $clientKeyResolver,
         ExtensionConfiguration $extensionConfiguration,
@@ -96,16 +97,18 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $preflight;
         }
 
-        $response = $this->handleApiRequest($request, $path);
+        $corsConfig = null;
+        $response = $this->handleApiRequest($request, $path, $corsConfig);
         if (null === $response) {
             // No prefix claims this path exclusively, and it matched no route either — a page, presumably.
             return $handler->handle($request);
         }
 
-        // Every attribute-route response gets a correlation id and, finally, the CORS headers stamped on.
+        // Every attribute-route response gets a correlation id and, finally, the CORS headers stamped on
+        // — using the matched route's own #[Cors] override when it declared one, else the global config.
         $response = RequestIdResolver::decorate($response, $request);
 
-        return $this->cors->decorate($response, $request);
+        return $this->cors->decorate($response, $request, $corsConfig);
     }
 
     private function matchesAnyPrefix(string $path): bool
@@ -116,14 +119,18 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     /**
      * Returns null when nothing claims the path: no route matched, and no prefix reserves it exclusively
      * for this middleware. The caller then falls through to normal page rendering.
+     *
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $corsConfig the matched route's own #[Cors] override, set as soon as a route matches; null when no route matched or it declares none
      */
-    private function handleApiRequest(ServerRequestInterface $request, string $path): ?ResponseInterface
+    private function handleApiRequest(ServerRequestInterface $request, string $path, ?array &$corsConfig): ?ResponseInterface
     {
         // 2. Matching → 404 / 405, or null (unprefixed mode, let the page router try).
         $match = $this->matchRoute($request, $path);
         if (null === $match || $match instanceof ResponseInterface) {
             return $match;
         }
+
+        $corsConfig = $this->registry->getCorsConfig((string) ($match['_route'] ?? ''));
 
         // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
         $env = $match['_env'] ?? null;
@@ -176,28 +183,12 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
     /**
      * Answers a CORS preflight for a path that matches at least one route. Returns null when CORS is
-     * off, the request is not a preflight, or the path matches nothing (so it continues the gauntlet).
+     * off (globally and for the matched route), the request is not a preflight, or the path matches
+     * nothing (so it continues the gauntlet).
      */
     private function preflight(ServerRequestInterface $request, string $path): ?ResponseInterface
     {
-        if (!$this->cors->isEnabled() || 'OPTIONS' !== $request->getMethod() || '' === $request->getHeaderLine('Access-Control-Request-Method')) {
-            return null;
-        }
-
-        try {
-            // OPTIONS is rarely a declared method, so the matcher usually reports the allowed methods
-            // for the path via MethodNotAllowedException — exactly what the preflight needs.
-            $match = $this->registry->getMatcher($this->requestContext($request))->match($path);
-        } catch (MethodNotAllowedException $exception) {
-            return $this->cors->preflightResponse(array_values($exception->getAllowedMethods()), $request);
-        } catch (ResourceNotFoundException) {
-            return null;
-        }
-
-        $routeName = (string) ($match['_route'] ?? '');
-        $methods = $this->registry->getRoutes()[$routeName]['methods'] ?? [];
-
-        return $this->cors->preflightResponse($methods, $request);
+        return $this->corsPreflight->resolve($request, $path, $this->requestContext($request));
     }
 
     private function requestContext(ServerRequestInterface $request): RequestContext

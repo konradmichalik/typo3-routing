@@ -90,15 +90,15 @@ final class RouteDebugCommand extends Command
             $io->comment('Filters: '.implode(', ', array_keys($filters)));
         }
         $io->table(
-            ['Name', 'Path', 'Methods', 'Controller', 'Env', 'Requirements', 'Auth', 'CSRF'],
-            array_map(self::toTableRow(...), $rows),
+            ['Name', 'Path', 'Methods', 'Controller', 'Env', 'Requirements', 'Auth', 'CSRF', 'Description'],
+            array_map(RouteTableFormatter::tableRow(...), $rows),
         );
 
         return Command::SUCCESS;
     }
 
     /**
-     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}>
+     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}>
      */
     private function collectRows(): array
     {
@@ -118,6 +118,7 @@ final class RouteDebugCommand extends Command
                 'requirements' => $route['requirements'],
                 'schemes' => $route['schemes'] ?? [],
                 'host' => $route['host'] ?? null,
+                'description' => $route['description'] ?? null,
                 'auth' => $authenticators,
                 'csrf' => $this->registry->getRequestTokenScope($name),
                 'cache' => $this->registry->getCacheConfig($name),
@@ -132,7 +133,7 @@ final class RouteDebugCommand extends Command
     /**
      * Active filters as label => predicate. The labels double as the human-readable summary.
      *
-     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}): bool>
+     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}): bool>
      */
     private function activeFilters(InputInterface $input, ?string $name): array
     {
@@ -179,8 +180,8 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}                                $row
-     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}): bool> $filters
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}                                $row
+     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>}): bool> $filters
      */
     private function matches(array $row, array $filters): bool
     {
@@ -194,7 +195,7 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>} $row
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>} $row
      */
     private function renderDetail(SymfonyStyle $io, array $row): void
     {
@@ -214,55 +215,20 @@ final class RouteDebugCommand extends Command
             : sprintf('limit: %d, interval: %s, policy: %s, keyBy: %s', $row['rateLimit']['limit'], $row['rateLimit']['interval'], $row['rateLimit']['policy'], $row['rateLimit']['keyBy']);
 
         $io->definitionList(
+            ['Description' => $row['description'] ?? '-'],
             ['Path' => $row['path']],
             ['Methods' => [] === $row['methods'] ? 'ANY' : implode(', ', $row['methods'])],
             ['Controller' => $row['controller']],
             ['Env' => $row['env'] ?? '-'],
-            ['Requirements' => self::formatRequirements($row['requirements'])],
+            ['Requirements' => RouteTableFormatter::requirements($row['requirements'])],
             ['Schemes' => [] === $row['schemes'] ? 'ANY' : implode(', ', $row['schemes'])],
             ['Host' => $row['host'] ?? '-'],
             ['Auth' => [] === $row['auth'] ? '-' : implode(', ', $row['auth'])],
             ['CSRF' => $row['csrf'] ?? '-'],
             ['Cache' => $cache],
             ['Rate limit' => $rateLimit],
-            ['Arguments' => self::formatArguments($row['arguments'])],
+            ['Arguments' => RouteTableFormatter::arguments($row['arguments'])],
         );
-    }
-
-    /**
-     * @param array<string, string> $requirements
-     */
-    private static function formatRequirements(array $requirements): string
-    {
-        if ([] === $requirements) {
-            return '-';
-        }
-
-        $parts = [];
-        foreach ($requirements as $parameter => $pattern) {
-            $parts[] = $parameter.': '.$pattern;
-        }
-
-        return implode(', ', $parts);
-    }
-
-    /**
-     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
-     */
-    private static function formatArguments(array $arguments): string
-    {
-        if ([] === $arguments) {
-            return '-';
-        }
-
-        $parts = [];
-        foreach ($arguments as $argument) {
-            $type = $argument['type'] ?? 'mixed';
-            $suffix = $argument['nullable'] ? '?' : '';
-            $parts[] = sprintf('$%s (%s%s, from %s)', $argument['name'], $suffix, $type, $argument['source']);
-        }
-
-        return implode(\PHP_EOL, $parts);
     }
 
     private function stringArgument(InputInterface $input, string $name): ?string
@@ -277,24 +243,5 @@ final class RouteDebugCommand extends Command
         $value = $input->getOption($name);
 
         return is_string($value) && '' !== $value ? $value : null;
-    }
-
-    /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>} $row
-     *
-     * @return list<string>
-     */
-    private static function toTableRow(array $row): array
-    {
-        return [
-            $row['name'],
-            $row['path'],
-            implode(', ', $row['methods']),
-            $row['controller'],
-            $row['env'] ?? '-',
-            self::formatRequirements($row['requirements']),
-            [] === $row['auth'] ? '-' : implode(', ', $row['auth']),
-            $row['csrf'] ?? '-',
-        ];
     }
 }

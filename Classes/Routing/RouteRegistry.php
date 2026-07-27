@@ -30,13 +30,14 @@ final class RouteRegistry
     private ?RouteCollection $collection = null;
 
     /**
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> $routes
-     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                               $cacheConfigs
-     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                 $rateLimits
-     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                     $arguments
-     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                        $authenticators
-     * @param array<string, string>                                                                                                                                                                                                             $requestTokenScopes
-     * @param array<mixed>                                                                                                                                                                                                                      $compiledRoutes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes
+     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                                                          $cacheConfigs
+     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                                            $rateLimits
+     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                                                $arguments
+     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                   $authenticators
+     * @param array<string, string>                                                                                                                                                                                                                                        $requestTokenScopes
+     * @param array<mixed>                                                                                                                                                                                                                                                 $compiledRoutes
+     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                       $corsConfigs
      */
     public function __construct(
         private readonly array $routes,
@@ -48,6 +49,7 @@ final class RouteRegistry
         private readonly array $requestTokenScopes = [],
         private readonly ?ContainerInterface $authenticatorLocator = null,
         private readonly array $compiledRoutes = [],
+        private readonly array $corsConfigs = [],
     ) {}
 
     /**
@@ -57,7 +59,7 @@ final class RouteRegistry
      *
      * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/EXTENDING.md
      *
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> $routes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes
      */
     public static function buildCollection(array $routes): RouteCollection
     {
@@ -160,6 +162,16 @@ final class RouteRegistry
     }
 
     /**
+     * The route's own #[Cors] override, or null when it falls back to the global CORS configuration.
+     *
+     * @return array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null
+     */
+    public function getCorsConfig(string $routeName): ?array
+    {
+        return $this->corsConfigs[$routeName] ?? null;
+    }
+
+    /**
      * The controller method's parameters in declaration order, as resolved at compile time.
      * An empty list means the method takes no arguments (or has no recorded spec).
      *
@@ -171,7 +183,7 @@ final class RouteRegistry
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}>
      */
     public function getRoutes(): array
     {

@@ -24,7 +24,7 @@ use Symfony\Component\DependencyInjection\Reference;
  */
 final class CollectedRoutes
 {
-    /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null}> */
+    /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> */
     public array $routes = [];
 
     /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> */
@@ -44,4 +44,7 @@ final class CollectedRoutes
 
     /** @var array<string, Reference> */
     public array $authenticatorReferences = [];
+
+    /** @var array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}> */
+    public array $corsConfigs = [];
 }

@@ -41,17 +41,9 @@ use const E_USER_WARNING;
 final readonly class CorsHandler
 {
     /**
-     * @var list<string>
+     * @var array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}
      */
-    private array $allowedOrigins;
-
-    private string $allowedHeaders;
-
-    private bool $allowCredentials;
-
-    private string $exposeHeaders;
-
-    private int $maxAge;
+    private array $defaultPolicy;
 
     public function __construct(ExtensionConfiguration $extensionConfiguration)
     {
@@ -65,39 +57,49 @@ final readonly class CorsHandler
             // Extension not configured yet — CORS stays disabled.
         }
 
-        $this->allowedOrigins = $this->toList($this->string($cors, 'allowedOrigins', ''));
-        $this->allowedHeaders = $this->normalizeCsv($this->string($cors, 'allowedHeaders', 'Content-Type, Authorization'));
-        $this->allowCredentials = $this->resolveAllowCredentials('1' === $this->string($cors, 'allowCredentials', '0'));
-        $this->exposeHeaders = $this->normalizeCsv($this->string($cors, 'exposeHeaders', ''));
-        $this->maxAge = (int) $this->string($cors, 'maxAge', '3600');
+        $allowedOrigins = $this->toList($this->string($cors, 'allowedOrigins', ''));
+
+        $this->defaultPolicy = [
+            'allowedOrigins' => $allowedOrigins,
+            'allowedHeaders' => $this->normalizeCsv($this->string($cors, 'allowedHeaders', 'Content-Type, Authorization')),
+            'allowCredentials' => $this->resolveAllowCredentials('1' === $this->string($cors, 'allowCredentials', '0'), $allowedOrigins),
+            'exposeHeaders' => $this->normalizeCsv($this->string($cors, 'exposeHeaders', '')),
+            'maxAge' => (int) $this->string($cors, 'maxAge', '3600'),
+        ];
     }
 
     /**
-     * CORS is opt-in: it stays off until at least one allowed origin is configured.
+     * CORS is opt-in: it stays off until at least one allowed origin is configured — globally, or via
+     * the resolved route override, which takes over the policy entirely when present.
+     *
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $routeCors
      */
-    public function isEnabled(): bool
+    public function isEnabled(?array $routeCors = null): bool
     {
-        return [] !== $this->allowedOrigins;
+        return [] !== $this->resolvePolicy($routeCors)['allowedOrigins'];
     }
 
     /**
      * Adds the CORS response headers to an actual (non-preflight) response when the request origin is
      * allowed. A disallowed or absent origin leaves the response untouched.
+     *
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $routeCors
      */
-    public function decorate(ResponseInterface $response, ServerRequestInterface $request): ResponseInterface
+    public function decorate(ResponseInterface $response, ServerRequestInterface $request, ?array $routeCors = null): ResponseInterface
     {
-        if (!$this->isEnabled()) {
+        $policy = $this->resolvePolicy($routeCors);
+        if ([] === $policy['allowedOrigins']) {
             return $response;
         }
 
-        $origin = $this->resolveAllowedOrigin($request);
+        $origin = $this->resolveAllowedOrigin($request, $policy);
         if (null === $origin) {
             return $response;
         }
 
-        $response = $this->applyOriginHeaders($response, $origin);
-        if ('' !== $this->exposeHeaders) {
-            $response = $response->withHeader('Access-Control-Expose-Headers', $this->exposeHeaders);
+        $response = $this->applyOriginHeaders($response, $origin, $policy);
+        if ('' !== $policy['exposeHeaders']) {
+            $response = $response->withHeader('Access-Control-Expose-Headers', $policy['exposeHeaders']);
         }
 
         return $response;
@@ -107,15 +109,17 @@ final readonly class CorsHandler
      * Builds the 204 answer to a CORS preflight (OPTIONS) request. The allowed methods come from the
      * route(s) matching the path; OPTIONS is always added.
      *
-     * @param list<string> $allowedMethods
+     * @param list<string>                                                                                                                 $allowedMethods
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $routeCors
      */
-    public function preflightResponse(array $allowedMethods, ServerRequestInterface $request): ResponseInterface
+    public function preflightResponse(array $allowedMethods, ServerRequestInterface $request, ?array $routeCors = null): ResponseInterface
     {
+        $policy = $this->resolvePolicy($routeCors);
         $response = new Response('php://temp', 204);
 
-        $origin = $this->resolveAllowedOrigin($request);
+        $origin = $this->resolveAllowedOrigin($request, $policy);
         if (null !== $origin) {
-            $response = $this->applyOriginHeaders($response, $origin);
+            $response = $this->applyOriginHeaders($response, $origin, $policy);
         }
 
         $methods = $allowedMethods;
@@ -125,8 +129,22 @@ final readonly class CorsHandler
 
         return $response
             ->withHeader('Access-Control-Allow-Methods', implode(', ', $methods))
-            ->withHeader('Access-Control-Allow-Headers', $this->allowedHeaders)
-            ->withHeader('Access-Control-Max-Age', (string) $this->maxAge);
+            ->withHeader('Access-Control-Allow-Headers', $policy['allowedHeaders'])
+            ->withHeader('Access-Control-Max-Age', (string) $policy['maxAge']);
+    }
+
+    /**
+     * A route's #[Cors] overrides the global configuration entirely (not merged field by field); the
+     * compiler pass already rejects allowCredentials + a wildcard origin at build time for it, so
+     * unlike the global policy, a route override never needs the runtime credentials downgrade below.
+     *
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $routeCors
+     *
+     * @return array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}
+     */
+    private function resolvePolicy(?array $routeCors): array
+    {
+        return $routeCors ?? $this->defaultPolicy;
     }
 
     /**
@@ -134,10 +152,12 @@ final readonly class CorsHandler
      * `Access-Control-Allow-Credentials: true` would let ANY website read authenticated API
      * responses — exactly what the spec's wildcard/credentials prohibition exists to prevent —
      * so the wildcard downgrades credentialed CORS to plain wildcard CORS.
+     *
+     * @param list<string> $allowedOrigins
      */
-    private function resolveAllowCredentials(bool $requested): bool
+    private function resolveAllowCredentials(bool $requested, array $allowedOrigins): bool
     {
-        if (!$requested || !in_array('*', $this->allowedOrigins, true)) {
+        if (!$requested || !in_array('*', $allowedOrigins, true)) {
             return $requested;
         }
 
@@ -146,14 +166,17 @@ final readonly class CorsHandler
         return false;
     }
 
-    private function applyOriginHeaders(ResponseInterface $response, string $origin): ResponseInterface
+    /**
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int} $policy
+     */
+    private function applyOriginHeaders(ResponseInterface $response, string $origin, array $policy): ResponseInterface
     {
         $response = $response->withHeader('Access-Control-Allow-Origin', $origin);
         if ('*' !== $origin) {
             // Responses vary by Origin so shared caches don't serve one origin's headers to another.
             $response = $response->withAddedHeader('Vary', 'Origin');
         }
-        if ($this->allowCredentials) {
+        if ($policy['allowCredentials']) {
             $response = $response->withHeader('Access-Control-Allow-Credentials', 'true');
         }
 
@@ -162,18 +185,20 @@ final readonly class CorsHandler
 
     /**
      * The value to echo in Access-Control-Allow-Origin, or null when the request origin is not allowed.
+     *
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int} $policy
      */
-    private function resolveAllowedOrigin(ServerRequestInterface $request): ?string
+    private function resolveAllowedOrigin(ServerRequestInterface $request, array $policy): ?string
     {
         $origin = $request->getHeaderLine('Origin');
         $origin = '' === $origin ? null : $origin;
 
-        if (in_array('*', $this->allowedOrigins, true)) {
+        if (in_array('*', $policy['allowedOrigins'], true)) {
             // Credentials are force-disabled for the wildcard (see resolveAllowCredentials), so '*' is always safe here.
             return '*';
         }
 
-        if (null !== $origin && in_array($origin, $this->allowedOrigins, true)) {
+        if (null !== $origin && in_array($origin, $policy['allowedOrigins'], true)) {
             return $origin;
         }
 

@@ -32,6 +32,7 @@ This extension lets you register **frontend endpoints via PHP attributes** on co
 - [**CORS**](docs/CONFIGURATION.md#cors) — opt-in cross-origin support with automatic preflight handling, configured globally
 - [**Debug command**](docs/HOW-IT-WORKS.md#debug-command) — list every registered route as a table or JSON, including an `--unprotected` audit
 - [**OpenAPI export**](docs/HOW-IT-WORKS.md#openapi-export) — generate an OpenAPI 3.1 document from your routes with `routing:openapi`
+- [**Swagger UI**](docs/HOW-IT-WORKS.md#swagger-ui-development-only) — opt-in, development-only Swagger UI served over the same OpenAPI export
 
 ## 🔥 Installation
 

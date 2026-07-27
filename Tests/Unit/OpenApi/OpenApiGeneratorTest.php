@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
+use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
@@ -165,6 +166,12 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function excludesTheSwaggerUiControllersOwnRoutesFromTheDocument(): void
+    {
+        self::assertArrayNotHasKey('/api/_routing/openapi.json', $this->features()['paths']);
+    }
+
+    #[Test]
     public function usesRouteDescriptionAndSplitsOffTheFirstSentenceAsSummary(): void
     {
         $operation = $this->features()['paths']['/api/described']['get'];
@@ -221,6 +228,7 @@ final class OpenApiGeneratorTest extends TestCase
             'note' => ['path' => '/api/note', 'methods' => ['POST'], 'controller' => 'ctrl::note', 'env' => null, 'requirements' => []],
             'custom' => ['path' => '/api/custom', 'methods' => ['GET'], 'controller' => 'ctrl::custom', 'env' => null, 'requirements' => []],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
+            'routing_swagger_openapi_json' => ['path' => '/api/_routing/openapi.json', 'methods' => ['GET'], 'controller' => SwaggerUiController::class.'::openApiJson', 'env' => 'Development', 'requirements' => []],
             'described' => ['path' => '/api/described', 'methods' => ['GET'], 'controller' => 'ctrl::described', 'env' => null, 'requirements' => [], 'description' => 'Fetch a single course by its numeric ID. Includes schedule and availability.'],
             'singleSentence' => ['path' => '/api/single-sentence', 'methods' => ['GET'], 'controller' => 'ctrl::singleSentence', 'env' => null, 'requirements' => [], 'description' => 'A lone sentence with no split point'],
         ];
@@ -241,6 +249,7 @@ final class OpenApiGeneratorTest extends TestCase
             ],
             'custom' => [],
             'dev' => [],
+            'routing_swagger_openapi_json' => [],
             'described' => [],
             'singleSentence' => [],
         ];

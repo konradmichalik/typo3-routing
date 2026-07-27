@@ -114,3 +114,12 @@ What is derived automatically from the attributes:
 - **Security** — `#[Authenticate]` routes reference a matching security scheme (`BearerTokenAuthenticator` → HTTP bearer; FE/BE user → cookie API key). OR-combined authenticators emit multiple requirements.
 - **Responses** — a generic `200` plus the error responses each route can actually produce (`400`/`401`/`403`/`404`/`405`/`429`), all served as `application/problem+json` sharing the RFC 9457 `{type, title, status, detail}` `Error` schema.
 - **Description & summary** — a route's `#[Route(description: …)]` becomes the operation `description`; if it splits into more than one sentence, the first sentence is also emitted as `summary`. Routes without a `description` fall back to a synthesized one-liner naming the controller, CSRF requirement, and application context.
+
+### Swagger UI (development only)
+
+A live Swagger UI is a thin, opt-in HTTP layer on top of the same export — no separate spec generation logic. Enable it via the [`swaggerUi` configuration flag](CONFIGURATION.md#swagger-ui-development-only); it's inert everywhere else:
+
+- `GET /api/_routing/openapi.json` — the OpenAPI document, generated the same way as `routing:openapi`
+- `GET /api/_routing/docs` — a minimal HTML page loading Swagger UI from a CDN, pointed at the JSON route above
+
+Both routes are excluded from the OpenAPI document itself (they describe tooling, not the API surface) and only ever exist in the `Development` application context, on top of the config flag — see [Environment-bound routes](CONFIGURATION.md#environment-bound-routes) for how that gate works.

@@ -65,7 +65,7 @@ final class CacheControlBypassTest extends TestCase
 
     private function request(?string $cacheControl = null): ServerRequest
     {
-        $builder = Requests::get('https://example.com/api/cached')->withoutNormalizedParams();
+        $builder = Requests::get('https://example.com/api/cached');
 
         if (null !== $cacheControl) {
             $builder->withHeader('Cache-Control', $cacheControl);

@@ -85,7 +85,7 @@ final class SwaggerUiControllerTest extends TestCase
         $controller = $this->controller('1');
         $request = Requests::get('https://example.com/sub/')
             ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']))
-            ->withoutNormalizedParams()->build();
+            ->build();
 
         $response = $controller->openApiJson($request);
 
@@ -143,7 +143,7 @@ final class SwaggerUiControllerTest extends TestCase
     {
         return Requests::get('https://example.com/')
             ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/']))
-            ->withoutNormalizedParams()->build();
+            ->build();
     }
 
     private function registry(): RouteRegistry

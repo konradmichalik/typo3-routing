@@ -875,7 +875,7 @@ final class RouteDispatcherTest extends TestCase
             ->withAttribute('site', $site)
             ->withAttribute('language', $site->getDefaultLanguage())
             ->withQueryParams($query) // @phpstan-ignore argument.type
-            ->withoutNormalizedParams()->build();
+            ->build();
     }
 
     private function handler(ResponseInterface $response): RequestHandlerInterface

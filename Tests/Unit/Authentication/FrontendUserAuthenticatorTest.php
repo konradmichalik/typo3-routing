@@ -33,7 +33,7 @@ final class FrontendUserAuthenticatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->request = Requests::get('https://example.com/api')->withoutNormalizedParams()->build();
+        $this->request = Requests::get('https://example.com/api')->build();
     }
 
     #[Test]

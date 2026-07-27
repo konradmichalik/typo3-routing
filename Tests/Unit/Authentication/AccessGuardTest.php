@@ -164,6 +164,6 @@ final class AccessGuardTest extends TestCase
 
     private function request(string $method): ServerRequest
     {
-        return (new RequestBuilder($method, 'https://example.com/api/x'))->withoutNormalizedParams()->build();
+        return (new RequestBuilder($method, 'https://example.com/api/x'))->build();
     }
 }

@@ -38,7 +38,7 @@ final class ConditionalGetTest extends TestCase
     #[Test]
     public function returnsNullWhenThereIsNoIfNoneMatchHeader(): void
     {
-        $request = Requests::get('https://example.com/api/x')->withoutNormalizedParams()->build();
+        $request = Requests::get('https://example.com/api/x')->build();
         $response = (new Response('php://temp', 200))->withHeader('ETag', '"abc"');
 
         self::assertNull(ConditionalGet::notModified($request, $response));
@@ -84,6 +84,6 @@ final class ConditionalGetTest extends TestCase
 
     private function request(string $ifNoneMatch): ServerRequest
     {
-        return Requests::get('https://example.com/api/x')->withHeader('If-None-Match', $ifNoneMatch)->withoutNormalizedParams()->build();
+        return Requests::get('https://example.com/api/x')->withHeader('If-None-Match', $ifNoneMatch)->build();
     }
 }

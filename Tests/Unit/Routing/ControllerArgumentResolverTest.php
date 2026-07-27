@@ -373,7 +373,7 @@ final class ControllerArgumentResolverTest extends TestCase
 
     private function request(string $method = 'GET'): ServerRequest
     {
-        return (new RequestBuilder($method, 'https://example.com/'))->withoutNormalizedParams()->build();
+        return (new RequestBuilder($method, 'https://example.com/'))->build();
     }
 
     private function jsonRequest(string $method, string $body): ServerRequest
@@ -383,7 +383,7 @@ final class ControllerArgumentResolverTest extends TestCase
         $stream->rewind();
 
         return (new RequestBuilder($method, 'https://example.com/'))
-            ->withoutNormalizedParams()->build()
+            ->build()
             ->withBody($stream)
             ->withHeader('Content-Type', 'application/json');
     }

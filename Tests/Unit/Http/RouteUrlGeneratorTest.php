@@ -146,6 +146,6 @@ final class RouteUrlGeneratorTest extends TestCase
 
     private function request(string $url, string $base): ServerRequest
     {
-        return Requests::get($url)->withAttribute('site', new Site('main', 1, ['base' => $base]))->withoutNormalizedParams()->build();
+        return Requests::get($url)->withAttribute('site', new Site('main', 1, ['base' => $base]))->build();
     }
 }

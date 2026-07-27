@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\RateLimit;
 
-use KonradMichalik\Ttt\Attribute\WithEnvironment;
 use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\FakeUser;
@@ -40,10 +39,8 @@ final class ClientKeyResolverTest extends TestCase
     private const USER_CONFIG = ['limit' => 60, 'interval' => '1 minute', 'policy' => 'sliding_window', 'keyBy' => 'user'];
 
     #[Test]
-    #[WithEnvironment]
     public function keysByIpFromNormalizedParams(): void
     {
-        // Real (not mocked) NormalizedParams — computing getRemoteAddress() requires an initialized Environment.
         $request = Requests::get('https://example.com/api/x')->withRemoteAddress('203.0.113.5')->build();
 
         self::assertSame('ip:203.0.113.5', $this->resolver()->resolve(self::IP_CONFIG, $request));
@@ -71,13 +68,12 @@ final class ClientKeyResolverTest extends TestCase
     #[Test]
     public function keysByUserWhenAFrontendUserIsLoggedIn(): void
     {
-        $request = Requests::get('https://example.com/api/x')->withoutNormalizedParams()->build();
+        $request = Requests::get('https://example.com/api/x')->build();
 
         self::assertSame('user:7', $this->resolver($this->userContext(7))->resolve(self::USER_CONFIG, $request));
     }
 
     #[Test]
-    #[WithEnvironment]
     public function keysByUserFallsBackToIpForAnonymousRequests(): void
     {
         $request = Requests::get('https://example.com/api/x')->withRemoteAddress('203.0.113.5')->build();

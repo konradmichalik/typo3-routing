@@ -133,6 +133,6 @@ final class CorsPreflightResolverTest extends TestCase
             $builder->withHeader('Access-Control-Request-Method', $intendedMethod);
         }
 
-        return $builder->withoutNormalizedParams()->build();
+        return $builder->build();
     }
 }

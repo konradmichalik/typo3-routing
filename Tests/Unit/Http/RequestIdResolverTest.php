@@ -106,7 +106,7 @@ final class RequestIdResolverTest extends TestCase
 
     private function request(?string $requestId = null): ServerRequest
     {
-        $builder = Requests::get('https://example.com/api/count')->withoutNormalizedParams();
+        $builder = Requests::get('https://example.com/api/count');
 
         if (null !== $requestId) {
             $builder->withHeader('X-Request-ID', $requestId);

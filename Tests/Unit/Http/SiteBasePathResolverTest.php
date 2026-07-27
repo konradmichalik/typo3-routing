@@ -40,7 +40,7 @@ final class SiteBasePathResolverTest extends TestCase
     {
         $request = Requests::get('https://example.com/sub/api/count')
             ->withAttribute('language', $this->makeLanguage('https://example.com/sub/'))
-            ->withoutNormalizedParams()->build();
+            ->build();
 
         self::assertSame('/api/count', $this->subject->stripSiteBase($request));
     }
@@ -64,7 +64,7 @@ final class SiteBasePathResolverTest extends TestCase
     #[Test]
     public function returnsNormalizedPathWhenNoSiteContextAvailable(): void
     {
-        $request = Requests::get('https://example.com/api/count')->withoutNormalizedParams()->build();
+        $request = Requests::get('https://example.com/api/count')->build();
 
         self::assertSame('/api/count', $this->subject->stripSiteBase($request));
     }
@@ -106,6 +106,6 @@ final class SiteBasePathResolverTest extends TestCase
     {
         $site = new Site('main', 1, ['base' => $base]);
 
-        return Requests::get($url)->withAttribute('site', $site)->withoutNormalizedParams()->build();
+        return Requests::get($url)->withAttribute('site', $site)->build();
     }
 }

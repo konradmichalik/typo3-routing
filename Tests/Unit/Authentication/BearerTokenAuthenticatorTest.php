@@ -73,7 +73,7 @@ final class BearerTokenAuthenticatorTest extends TestCase
     {
         $request = Requests::get('https://example.com/api')
             ->withServerParam('REDIRECT_HTTP_AUTHORIZATION', 'Bearer s3cret-token')
-            ->withoutNormalizedParams()->build();
+            ->build();
 
         self::assertTrue($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
@@ -84,7 +84,7 @@ final class BearerTokenAuthenticatorTest extends TestCase
     {
         $request = Requests::get('https://example.com/api')
             ->withServerParam('SOME_OTHER_PARAM', 'irrelevant')
-            ->withoutNormalizedParams()->build();
+            ->build();
 
         self::assertFalse($this->authenticator()->authenticate($request, ['envName' => self::ENV_NAME]));
     }
@@ -116,7 +116,7 @@ final class BearerTokenAuthenticatorTest extends TestCase
 
     private function request(?string $authorization = null): ServerRequest
     {
-        $builder = Requests::get('https://example.com/api')->withoutNormalizedParams();
+        $builder = Requests::get('https://example.com/api');
 
         if (null !== $authorization) {
             $builder->withHeader('Authorization', $authorization);

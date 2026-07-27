@@ -241,6 +241,6 @@ final class CorsHandlerTest extends TestCase
 
     private function request(string $origin): ServerRequest
     {
-        return Requests::get('https://example.com/api/count')->withHeader('Origin', $origin)->withoutNormalizedParams()->build();
+        return Requests::get('https://example.com/api/count')->withHeader('Origin', $origin)->build();
     }
 }

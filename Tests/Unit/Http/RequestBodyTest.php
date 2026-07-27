@@ -31,7 +31,7 @@ final class RequestBodyTest extends TestCase
     #[Test]
     public function returnsParsedBodyWhenPresent(): void
     {
-        $request = (new RequestBuilder('POST', 'https://example.com/'))->withParsedBody(['n' => '9'])->withoutNormalizedParams()->build();
+        $request = (new RequestBuilder('POST', 'https://example.com/'))->withParsedBody(['n' => '9'])->build();
 
         self::assertSame(['n' => '9'], RequestBody::toArray($request));
     }
@@ -166,7 +166,7 @@ final class RequestBodyTest extends TestCase
         $stream->rewind();
 
         return (new RequestBuilder($method, 'https://example.com/'))
-            ->withoutNormalizedParams()->build()
+            ->build()
             ->withBody($stream)
             ->withHeader('Content-Type', $contentType);
     }

@@ -4,7 +4,7 @@
          displayDetailsOnTestsThatTriggerWarnings="true"
          displayDetailsOnTestsThatTriggerNotices="true"
          displayDetailsOnSkippedTests="true"
-         bootstrap="vendor/autoload.php"
+         bootstrap="Tests/Unit/UnitTestsBootstrap.php"
          colors="true"
 >
     <php>

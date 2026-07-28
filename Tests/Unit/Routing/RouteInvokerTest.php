@@ -141,6 +141,19 @@ final class RouteInvokerTest extends TestCase
         self::assertJsonStringEqualsJsonString('{"id":42}', (string) $response->getBody());
     }
 
+    /**
+     * `$input` is a mixed map, so a caller can hand over a value no JSON body could carry. That is a
+     * client error like any other bad input — not an exception escaping the response contract.
+     */
+    #[Test]
+    public function mapsABodyValueThatCannotBeSerialisedToBadRequest(): void
+    {
+        $response = $this->invoker()->invoke('body', ['title' => "\xB1\x31"], $this->request());
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonPath((string) $response->getBody(), 'detail', 'Invalid body input');
+    }
+
     #[Test]
     public function resolvesAVariadicArgument(): void
     {

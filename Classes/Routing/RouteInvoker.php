@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Routing;
 
 use InvalidArgumentException;
+use JsonException;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, RouteUrlGenerator};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface, UriInterface};
@@ -59,6 +60,8 @@ final readonly class RouteInvoker
      *
      * @param array<string, mixed> $input values keyed by the argument's wire name (see RouteRegistry::getArguments())
      *
+     * @return ResponseInterface the route's own response, or a problem response for input the route rejects
+     *
      * @throws InvalidArgumentException when no route of that name is registered
      */
     public function invoke(string $routeName, array $input, ServerRequestInterface $request): ResponseInterface
@@ -92,7 +95,13 @@ final readonly class RouteInvoker
             '_requirements' => $route['requirements'],
         ] + $pathValues + ($route['defaults'] ?? []);
 
-        $synthetic = $this->syntheticRequest($request, $route, $path, $input, $placeholders, $this->registry->getArguments($routeName));
+        // A value that cannot be carried in a JSON body is bad input, so it answers like any other —
+        // over HTTP such a payload would not have decoded either.
+        try {
+            $synthetic = $this->syntheticRequest($request, $route, $path, $input, $placeholders, $this->registry->getArguments($routeName));
+        } catch (JsonException) {
+            return JsonErrorResponse::create(400, 'Invalid body input');
+        }
 
         // 3. Input requirements (query/body) → 400, exactly as for an inbound request.
         $error = $this->invoker->firstInputRequirementError($match, $synthetic);

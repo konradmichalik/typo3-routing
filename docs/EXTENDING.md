@@ -28,6 +28,50 @@ public function __construct(
 
 The per-route array shapes (the `array{...}` types above) are part of the `@api` contract: adding a key is a minor-version change, removing or renaming one is a breaking change from `1.0.0` on.
 
+## Invoking a route without an HTTP request
+
+Reading metadata is one half of consuming routes; the other is *calling* one for a given set of values, without an inbound request against the route's own path — an MCP server turning routes into callable tools, a job replaying a stored payload, a smoke-test harness. [`RouteInvoker`](../Classes/Routing/RouteInvoker.php) is the `@api` seam for that, fetched from the container like the registry:
+
+```php
+public function __construct(
+    private readonly \KonradMichalik\Typo3Routing\Routing\RouteInvoker $invoker,
+) {}
+
+// …
+$response = $this->invoker->invoke('example_item', ['id' => 42], $request);
+```
+
+`invoke(string $routeName, array $input, ServerRequestInterface $request): ResponseInterface`
+
+- **`$routeName`** — a name from `getRoutes()`. An unknown name is a programming error rather than an HTTP condition, so it throws `InvalidArgumentException` instead of answering 404.
+- **`$input`** — a flat map of argument values, keyed by the **wire name** the argument is read under: `getArguments()`'s `name`, which `#[Param(name: …)]` may have set to something other than the PHP parameter name. Each value is placed where that argument's `source` expects it (path segment, query parameter, or JSON body), so all six sources — `path`, `query`, `body`, `input`, `request`, `variadic` — resolve exactly as they would for an inbound request. Keys no argument and no requirement claims are ignored.
+- **`$request`** — the calling request. It supplies the context a controller may depend on (`site`, `language`, the authenticated user, the credentials) and is deliberately required: there is no sensible default for *which site* a programmatic invocation happens in. A caller without an inbound request (a CLI process, say) has to build one.
+
+The request the controller finally sees is synthesised from it: the route's first declared method, the route's own URL as the request target, the inputs in query and body, path placeholders additionally exposed as request attributes — and always a fresh body stream, so nothing of the calling request's own payload can bleed into a body-sourced argument.
+
+### What it replicates, and what it skips
+
+| Step | Programmatic invocation | Why |
+|---|---|---|
+| Env filter (`Route::$env`) | enforced → 404 | a route unreachable over HTTP must stay unreachable |
+| Mandatory placeholders, path `requirements` | enforced → 404 | such a path could never have matched, so it must not reach a controller |
+
+One consequence is worth spelling out: a violated path requirement is the single case where the answer *differs* from an HTTP call by design. Over HTTP that path matches no route, so — unless `exclusivePrefixes` claims it — the middleware declines and the page router takes over. An invocation names the route explicitly and has no page to fall back to, so the route's own "no resource for this value" answer stands as a 404.
+| Query/body `requirements` | enforced → 400 | part of the route's input contract |
+| Authentication (`#[Authenticate]`) | enforced → 401 | a route's own access rule, independent of transport |
+| Request token (`#[RequireRequestToken]`) | **skipped** | CSRF protects browser-initiated state changes; no browser is involved, and the calling client's token is not the target route's |
+| CORS, including preflight | **skipped** | no browser, no origin to negotiate |
+| Rate limiting (`#[RateLimit]`) | **skipped** | HTTP-transport abuse control, not correctness |
+| Response cache (`#[Cache]`, ETag, conditional GET) | **skipped** | a transport-level performance mechanism; an invocation always sees fresh output |
+
+Exception handling is the dispatcher's, so error semantics match a real call to the same route: an unresolvable argument is a 400, a missing entity a 404, a controller-thrown [`HttpProblemException`](../Classes/Http/HttpProblemException.php) keeps its own status, and every other exception stays untouched for TYPO3's error handling. `Tests/Functional/Routing/RouteInvokerTest.php` pins that agreement route by route.
+
+### The two boundaries this shifts to you
+
+**Credentials.** The synthetic request carries the calling request's headers verbatim, so `#[Authenticate]` is checked against whatever the caller presented — a bearer token reaching your own endpoint is the token checked against the target route's expectation. If those are not meant to be the same secret, the invocation answers 401; it never waves authentication through.
+
+**Abuse control.** Because rate limiting is skipped, a consumer that re-exposes routes over its own transport takes over responsibility for rate limiting and authorisation *there*. `RouteInvoker` is a seam for trusted in-process callers, not a guard against the caller.
+
 ## Reference consumer: the OpenAPI export
 
 [`Classes/OpenApi/OpenApiGenerator.php`](../Classes/OpenApi/OpenApiGenerator.php) (internal) is the extension's own reference consumer of this API — it builds an OpenAPI 3.1 document purely from `RouteRegistry::getRoutes()`, `getArguments()`, `getAuthenticators()`, `getRequestTokenScope()`, `getCacheConfig()`, and `getRateLimit()`, with no access to anything `@internal`. Reading it end to end is the fastest way to see the metadata API used for something non-trivial: parameter/request-body construction from argument specs, security scheme mapping from authenticators, and error-response generation from which modifiers are present.
@@ -35,7 +79,7 @@ The per-route array shapes (the `array{...}` types above) are part of the `@api`
 ## What's deliberately not exposed
 
 - **Compile-time internals** (`RouteCompilerPass`, `CollectedRoutes`, `ArgumentSpecFactory`, `CorsResolver`) exist only to build the arrays `RouteRegistry` holds. They run once per container build and are never available at runtime — there is nothing to consume there even if you wanted to.
-- **Dispatch internals** (`RouteDispatcher`, `ControllerArgumentResolver`, `AccessGuard`, `CorsPreflightResolver`, the `Cache`/`RateLimit`/`Http` namespaces) implement request handling. Their behavior is documented (see [How It Works](HOW-IT-WORKS.md), [Configuration](CONFIGURATION.md)) but their classes are not a PHP API — nothing about them is meant to be called, extended, or type-hinted against from outside.
+- **Dispatch internals** (`RouteDispatcher`, `ControllerInvoker`, `ControllerArgumentResolver`, `AccessGuard`, `CorsPreflightResolver`, the `Cache`/`RateLimit`/`Http` namespaces) implement request handling. Their behavior is documented (see [How It Works](HOW-IT-WORKS.md), [Configuration](CONFIGURATION.md)) but their classes are not a PHP API — nothing about them is meant to be called, extended, or type-hinted against from outside. `ControllerInvoker` in particular is the step-sharing collaborator behind both `RouteDispatcher` and `RouteInvoker`: consume the latter, never it.
 - **Commands** (`routing:debug`, `routing:match`, `routing:openapi`) are a documented, stable *CLI* interface (arguments, options, `--json` output shape), but the PHP command classes themselves — including the `RouteTableFormatter` helper behind `routing:debug` — are `@internal`; consume the CLI, not the classes.
 - **The Swagger UI route** (`SwaggerUiController`, see [Configuration](CONFIGURATION.md#swagger-ui-development-only)) is a development-only HTTP endpoint, not a PHP extension point — consume it over HTTP like any other route, not by referencing the controller class.
 

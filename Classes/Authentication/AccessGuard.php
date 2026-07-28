@@ -43,14 +43,30 @@ final readonly class AccessGuard
      */
     public function enforce(array $match, ServerRequestInterface $request): ?ResponseInterface
     {
-        $routeName = (string) ($match['_route'] ?? '');
-
-        if (!$this->isAuthenticated($routeName, $request)) {
-            return JsonErrorResponse::create(401, 'Unauthorized');
+        $denied = $this->enforceAuthentication($match, $request);
+        if (null !== $denied) {
+            return $denied;
         }
 
-        if (!$this->passesRequestToken($routeName, $request)) {
+        if (!$this->passesRequestToken((string) ($match['_route'] ?? ''), $request)) {
             return JsonErrorResponse::create(403, 'Forbidden');
+        }
+
+        return null;
+    }
+
+    /**
+     * Authentication alone, without the request-token check: for callers that carry no browser
+     * request token because no browser is involved (see RouteInvoker).
+     *
+     * @param array<string, mixed> $match
+     *
+     * @return ResponseInterface|null the error response when access is denied, or null when granted
+     */
+    public function enforceAuthentication(array $match, ServerRequestInterface $request): ?ResponseInterface
+    {
+        if (!$this->isAuthenticated((string) ($match['_route'] ?? ''), $request)) {
+            return JsonErrorResponse::create(401, 'Unauthorized');
         }
 
         return null;

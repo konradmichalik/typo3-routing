@@ -15,9 +15,9 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, HttpProblemException, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, JsonErrorResponse, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
-use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, PathPrefixGate, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
@@ -25,15 +25,8 @@ use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotF
 use Symfony\Component\Routing\RequestContext;
 use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
-use TYPO3\CMS\Core\Core\Environment;
 
-use function array_key_exists;
-use function assert;
-use function explode;
-use function is_array;
-use function is_object;
 use function is_string;
-use function sprintf;
 
 /**
  * RouteDispatcher.
@@ -62,7 +55,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private SiteBasePathResolver $basePathResolver,
         private ResponseCacheManager $cache,
         private RateLimitCheck $rateLimitCheck,
-        private ControllerArgumentResolver $argumentResolver,
+        private ControllerInvoker $invoker,
         private AccessGuard $accessGuard,
         private CorsHandler $cors,
         private CorsPreflightResolver $corsPreflight,
@@ -135,13 +128,12 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $corsConfig = $this->registry->getCorsConfig((string) ($match['_route'] ?? ''));
 
         // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
-        $env = $match['_env'] ?? null;
-        if (is_string($env) && '' !== $env && !$this->matchesCurrentContext($env)) {
+        if (!$this->invoker->isVisibleInCurrentContext($match['_env'] ?? null)) {
             return JsonErrorResponse::create(404, 'Not Found');
         }
 
         // 4. Input requirements (query/body) → 400. Path requirements are matcher-enforced (404).
-        $error = $this->firstInputRequirementError($match, $request);
+        $error = $this->invoker->firstInputRequirementError($match, $request);
         if (null !== $error) {
             return JsonErrorResponse::create(400, $error);
         }
@@ -232,42 +224,6 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
-     * Validates `requirements` whose name is not a matched path placeholder against the query and parsed
-     * body: a missing parameter or a value violating the regex yields a 400.
-     *
-     * @param array<string, mixed> $match
-     */
-    private function firstInputRequirementError(array $match, ServerRequestInterface $request): ?string
-    {
-        $requirements = $match['_requirements'] ?? null;
-        $inputs = array_merge($request->getQueryParams(), RequestBody::toArray($request));
-
-        foreach (is_array($requirements) ? $requirements : [] as $name => $pattern) {
-            $key = (string) $name;
-            // A matched path placeholder is already validated by the matcher.
-            if (array_key_exists($key, $match)) {
-                continue;
-            }
-            if (!array_key_exists($key, $inputs)) {
-                return sprintf('Missing required parameter: %s', $key);
-            }
-            if (is_string($pattern) && $this->inputViolatesPattern($pattern, $inputs[$key])) {
-                return sprintf('Invalid value for parameter: %s', $key);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * A non-empty pattern is violated when the value is not a string or does not fully match the regex.
-     */
-    private function inputViolatesPattern(string $pattern, mixed $value): bool
-    {
-        return '' !== $pattern && (!is_string($value) || 1 !== preg_match('#^(?:'.$pattern.')$#', $value));
-    }
-
-    /**
      * @param array<string, mixed> $match
      */
     private function dispatch(array $match, ServerRequestInterface $request): ResponseInterface
@@ -288,7 +244,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return ConditionalGet::notModified($request, $cached) ?? $cached;
         }
 
-        $response = $this->invokeController($match, $routeName, $request);
+        $response = $this->invoker->invoke($match, $request);
         $response = $this->writeCache($cacheConfig, $routeName, $request, $response);
         $response = $this->cache->withCacheStatus($response, $cacheConfig, $request, 'MISS');
 
@@ -328,57 +284,5 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $this->cache->store($this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']), $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
 
         return $response;
-    }
-
-    /**
-     * @param array<string, mixed> $match
-     */
-    private function invokeController(array $match, string $routeName, ServerRequestInterface $request): ResponseInterface
-    {
-        [$serviceId, $method] = explode('::', (string) $match['_controller'], 2);
-        $controller = $this->registry->getControllerLocator()->get($serviceId);
-        assert(is_object($controller));
-
-        $request = $this->withPathAttributes($match, $request);
-
-        try {
-            $arguments = $this->argumentResolver->resolve($this->registry->getArguments($routeName), $match, $request);
-
-            /** @var callable(mixed...): ResponseInterface $target */
-            $target = [$controller, $method];
-
-            return $target(...$arguments);
-        } catch (ArgumentResolutionException $exception) {
-            return JsonErrorResponse::create(400, $exception->getMessage());
-        } catch (EntityNotFoundException) {
-            return JsonErrorResponse::create(404, 'Not Found');
-        } catch (HttpProblemException $exception) {
-            // A controller-thrown problem maps onto the dispatcher's regular error format; every
-            // other exception stays untouched and reaches TYPO3's error handling (and logging).
-            return JsonErrorResponse::create($exception->status, $exception->getMessage());
-        }
-    }
-
-    /**
-     * Path placeholders stay available as request attributes for controllers that take the request.
-     *
-     * @param array<string, mixed> $match
-     */
-    private function withPathAttributes(array $match, ServerRequestInterface $request): ServerRequestInterface
-    {
-        foreach ($match as $key => $value) {
-            if (!str_starts_with($key, '_')) {
-                $request = $request->withAttribute($key, $value);
-            }
-        }
-
-        return $request;
-    }
-
-    private function matchesCurrentContext(string $env): bool
-    {
-        $current = explode('/', (string) Environment::getContext())[0];
-
-        return strtolower($current) === strtolower($env);
     }
 }

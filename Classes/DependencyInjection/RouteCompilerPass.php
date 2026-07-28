@@ -106,8 +106,12 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$authenticators', $collected->authenticators);
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
         $registry->setArgument('$corsConfigs', $collected->corsConfigs);
+
+        $collection = RouteRegistry::buildCollection($collected->routes);
         // Pre-compile the matcher tables so request-time matching never re-compiles route regexes.
-        $registry->setArgument('$compiledRoutes', (new CompiledUrlMatcherDumper(RouteRegistry::buildCollection($collected->routes)))->getCompiledRoutes());
+        $registry->setArgument('$compiledRoutes', (new CompiledUrlMatcherDumper($collection))->getCompiledRoutes());
+        // The dispatcher's path gate is derived from the routes themselves, so it needs no configuration.
+        $registry->setArgument('$staticPrefixes', RouteRegistry::staticPrefixes($collection));
     }
 
     /**

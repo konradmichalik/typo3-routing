@@ -17,7 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, HttpProblemException, JsonErrorResponse, RequestBody, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
-use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException, PathPrefixGate, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
@@ -27,17 +27,13 @@ use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Core\Environment;
 
-use function array_filter;
 use function array_key_exists;
-use function array_map;
-use function array_values;
 use function assert;
 use function explode;
 use function is_array;
 use function is_object;
 use function is_string;
 use function sprintf;
-use function trim;
 
 /**
  * RouteDispatcher.
@@ -50,9 +46,16 @@ use function trim;
 final readonly class RouteDispatcher implements MiddlewareInterface
 {
     /**
-     * @var list<string>
+     * Where routes actually live (derived from the compiled routes) plus every exclusively claimed path
+     * space. A path outside it can never match, so it never reaches the matcher.
      */
-    private array $prefixes;
+    private PathPrefixGate $gate;
+
+    /**
+     * The path spaces reserved for this middleware by configuration: inside them an unmatched path is a
+     * JSON 404 rather than a page. Empty by default — nothing is claimed, everything else is a page.
+     */
+    private PathPrefixGate $exclusive;
 
     public function __construct(
         private RouteRegistry $registry,
@@ -67,17 +70,20 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private ClientKeyResolver $clientKeyResolver,
         ExtensionConfiguration $extensionConfiguration,
     ) {
-        $prefix = '/api/';
+        $configured = '';
         try {
-            $configured = $extensionConfiguration->get('typo3_routing', 'prefix');
-            if (is_string($configured)) {
-                $prefix = $configured;
+            $value = $extensionConfiguration->get('typo3_routing', 'exclusivePrefixes');
+            if (is_string($value)) {
+                $configured = $value;
             }
         } catch (Throwable) {
-            // Extension not configured yet — fall back to the default prefix.
+            // Extension not configured yet — then no path space is claimed exclusively.
         }
-        // Comma-separated list, mirroring CorsHandler::$allowedOrigins parsing.
-        $this->prefixes = array_values(array_filter(array_map(trim(...), explode(',', $prefix)), static fn (string $item): bool => '' !== $item));
+
+        $this->exclusive = PathPrefixGate::fromCommaList($configured);
+        // A claimed path space must reach the dispatcher even where it holds no route at all, so it is
+        // merged into the gate rather than checked separately.
+        $this->gate = (new PathPrefixGate($this->registry->getStaticPrefixes()))->mergedWith($this->exclusive);
     }
 
     #[Override]
@@ -85,8 +91,9 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     {
         $path = $this->basePathResolver->stripSiteBase($request);
 
-        // 1. Prefix gate (pure performance filter): outside every configured prefix → regular page request.
-        if ([] !== $this->prefixes && !$this->matchesAnyPrefix($path)) {
+        // 1. Path gate (pure performance filter): a path no route could ever claim → regular page request.
+        //    With no routes registered and nothing claimed the gate is empty and rejects everything.
+        if (!$this->gate->matches($path)) {
             return $handler->handle($request);
         }
 
@@ -100,7 +107,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $corsConfig = null;
         $response = $this->handleApiRequest($request, $path, $corsConfig);
         if (null === $response) {
-            // No prefix claims this path exclusively, and it matched no route either — a page, presumably.
+            // Nothing claims this path exclusively, and it matched no route either — a page, presumably.
             return $handler->handle($request);
         }
 
@@ -111,20 +118,15 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         return $this->cors->decorate($response, $request, $corsConfig);
     }
 
-    private function matchesAnyPrefix(string $path): bool
-    {
-        return [] !== array_filter($this->prefixes, static fn (string $prefix): bool => str_starts_with($path, $prefix));
-    }
-
     /**
-     * Returns null when nothing claims the path: no route matched, and no prefix reserves it exclusively
-     * for this middleware. The caller then falls through to normal page rendering.
+     * Returns null when nothing claims the path: no route matched, and no configured prefix reserves it
+     * exclusively for this middleware. The caller then falls through to normal page rendering.
      *
      * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $corsConfig the matched route's own #[Cors] override, set as soon as a route matches; null when no route matched or it declares none
      */
     private function handleApiRequest(ServerRequestInterface $request, string $path, ?array &$corsConfig): ?ResponseInterface
     {
-        // 2. Matching → 404 / 405, or null (unprefixed mode, let the page router try).
+        // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try).
         $match = $this->matchRoute($request, $path);
         if (null === $match || $match instanceof ResponseInterface) {
             return $match;
@@ -163,8 +165,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
-     * Null means: no route matched, and no prefix is configured — routes then declare their full path
-     * individually per controller and must coexist with ordinary pages everywhere else.
+     * Null means: no route matched, and the path is not inside an exclusively claimed prefix — routes
+     * then coexist with ordinary pages, so an unmatched path stays the page router's business.
      *
      * @return array<string, mixed>|ResponseInterface|null the matched route attributes, or a 404/405 error response
      */
@@ -173,7 +175,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         try {
             return $this->registry->getMatcher($this->requestContext($request))->match($path);
         } catch (ResourceNotFoundException) {
-            return [] === $this->prefixes ? null : JsonErrorResponse::create(404, 'Not Found');
+            return $this->exclusive->matches($path) ? JsonErrorResponse::create(404, 'Not Found') : null;
         } catch (MethodNotAllowedException $exception) {
             return JsonErrorResponse::create(405, 'Method Not Allowed', [
                 'Allow' => implode(', ', $exception->getAllowedMethods()),

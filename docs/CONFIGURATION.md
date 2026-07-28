@@ -1,18 +1,36 @@
 # Configuration
 
-## Path prefix gate
+## Path gate
 
-The dispatcher first checks whether the request path (after stripping the site/language base) starts with one or more configurable prefixes. Paths outside every prefix fall through to normal page rendering at zero cost — this is a pure performance gate. Configure it via **Settings → Extension Configuration → typo3_routing**:
+The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path, baked into the compiled container next to the compiled matcher. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
 
-| Setting  | Description                                                                                                                  | Default |
-|----------|-------------------------------------------------------------------------------------------------------------------------------|---------|
-| `prefix` | Comma-separated list; only paths starting with one of these are matched against attribute routes. Leave **empty** to disable the gate. | `/api/` |
+A path outside the gate falls through to normal page rendering at zero cost. With no routes registered at all the gate is empty and rejects everything, so the dispatcher costs a single string comparison per page request.
 
-Use a comma-separated list to serve multiple namespaces, e.g. `/api/, /va/`.
+> [!NOTE]
+> A route whose path starts with a placeholder (e.g. `/{slug}`) has no static prefix, so it opens the gate for every path — the matcher then decides. That is unavoidable and correct: such a route can match anywhere.
 
-Leaving `prefix` **empty** disables the gate: every request path is checked against your routes, at a performance cost for every page request. A path that still matches nothing falls through to normal page rendering, same as a path outside a configured prefix — so routes can declare their full path individually per controller and coexist with ordinary pages anywhere on the site. A path that matches a route's shape but the wrong HTTP method still gets a hard `405`, since that path was deliberately claimed by that route.
+Route paths in the `#[Route]` attribute are always written in full.
 
-Route paths in the `#[Route]` attribute are always written in full, including the prefix.
+## Exclusive path prefixes
+
+Separate from the gate, you can reserve path spaces **exclusively** for attribute routes. Inside them a path matching no route returns a JSON `404` instead of falling through to page rendering. Configure it via **Settings → Extension Configuration → typo3_routing**:
+
+| Setting             | Description                                                                                       | Default   |
+|---------------------|---------------------------------------------------------------------------------------------------|-----------|
+| `exclusivePrefixes` | Comma-separated list of path spaces reserved for the API, e.g. `/api/, /va/`. **Empty disables it.** | *(empty)* |
+
+This is **not** needed to make routes work — only to control what happens to unmatched paths:
+
+| Request                                    | `exclusivePrefixes` empty (default) | `exclusivePrefixes = /api/` |
+|--------------------------------------------|-------------------------------------|-----------------------------|
+| `/api/example` (matches a route)           | dispatched                          | dispatched                  |
+| `/api/typo` (matches nothing)              | page rendering → TYPO3 404 page     | JSON `404`                  |
+| `/api/item/abc` (violates a requirement)   | page rendering → TYPO3 404 page     | JSON `404`                  |
+| `/some/page`                               | page rendering                      | page rendering              |
+
+A path that matches a route's shape but the wrong HTTP method always gets a hard `405` regardless, since that path was deliberately claimed by that route.
+
+Reach for `exclusivePrefixes` when API clients should receive machine-readable errors for mistyped endpoints. Leave it empty when your routes coexist with ordinary pages.
 
 ## CORS
 
@@ -63,7 +81,7 @@ The extension can serve a Swagger UI page over its own OpenAPI export — no ext
 |-------------|-------------------------------------------------------------------------------------------------|---------|
 | `swaggerUi` | Serve the Swagger UI (`/api/_routing/docs`) and its OpenAPI JSON document (`/api/_routing/openapi.json`). | `0` (off) |
 
-The routes sit under the configured [path prefix](#path-prefix-gate) (`/api/` by default) so they are reachable without further changes; if you've customized `prefix` away from `/api/`, make sure it still covers `/api/_routing/` (or add it explicitly to the comma-separated list), or the request never reaches the dispatcher at all.
+Both are ordinary attribute routes, so the [path gate](#path-gate) covers them automatically — no configuration can accidentally make them unreachable.
 
 > [!WARNING]
 > Never enable `swaggerUi` in a production context — the `Development` gate alone already prevents this in a correctly configured instance, but the flag exists as a second, independent safeguard.

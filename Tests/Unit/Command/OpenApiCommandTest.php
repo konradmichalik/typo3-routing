@@ -18,10 +18,8 @@ use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ServiceLocator;
-use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 
 /**
  * OpenApiCommandTest.
@@ -32,9 +30,9 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 final class OpenApiCommandTest extends TestCase
 {
     #[Test]
-    public function outputsOpenApiDocumentWithDefaultsAndConfiguredServer(): void
+    public function outputsOpenApiDocumentWithDefaults(): void
     {
-        $tester = $this->tester('/api/');
+        $tester = $this->tester();
 
         $exitCode = $tester->execute([]);
         $document = $this->decode($tester->getDisplay());
@@ -42,14 +40,27 @@ final class OpenApiCommandTest extends TestCase
         self::assertSame(0, $exitCode);
         self::assertSame('3.1.0', $document['openapi']);
         self::assertSame(['title' => 'TYPO3 Routing API', 'version' => '1.0.0'], $document['info']);
-        self::assertSame([['url' => '/api/']], $document['servers']);
         self::assertArrayHasKey('/api/x', $document['paths']);
+    }
+
+    /**
+     * Route paths are stored in full, so any base URL would be doubled into every path. Omitting
+     * `servers` means "/" per the OpenAPI spec — exactly right for full paths.
+     */
+    #[Test]
+    public function omitsServersWhenNoServerOptionIsGiven(): void
+    {
+        $tester = $this->tester();
+
+        $tester->execute([]);
+
+        self::assertArrayNotHasKey('servers', $this->decode($tester->getDisplay()));
     }
 
     #[Test]
     public function honorsTitleVersionAndServerOptions(): void
     {
-        $tester = $this->tester('/api/');
+        $tester = $this->tester();
 
         $tester->execute(['--title' => 'My API', '--api-version' => '2.5.0', '--server' => 'https://api.example.com']);
         $document = $this->decode($tester->getDisplay());
@@ -61,42 +72,16 @@ final class OpenApiCommandTest extends TestCase
     #[Test]
     public function prettyPrintsWhenRequested(): void
     {
-        $tester = $this->tester('/api/');
+        $tester = $this->tester();
 
         $tester->execute(['--pretty' => true]);
 
         self::assertStringContainsString("\n", trim($tester->getDisplay()));
     }
 
-    #[Test]
-    public function fallsBackToDefaultServerWhenPrefixIsNotAString(): void
+    private function tester(): CommandTester
     {
-        $tester = $this->tester(null);
-
-        $tester->execute([]);
-        $document = $this->decode($tester->getDisplay());
-
-        self::assertSame([['url' => '/api/']], $document['servers']);
-    }
-
-    #[Test]
-    public function fallsBackToDefaultServerWhenExtensionConfigurationThrows(): void
-    {
-        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
-        $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
-
-        $tester = new CommandTester(new OpenApiCommand(new OpenApiGenerator($this->registry()), $extensionConfiguration));
-        $tester->execute([]);
-
-        self::assertSame([['url' => '/api/']], $this->decode($tester->getDisplay())['servers']);
-    }
-
-    private function tester(?string $prefix): CommandTester
-    {
-        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
-        $extensionConfiguration->method('get')->willReturn($prefix);
-
-        return new CommandTester(new OpenApiCommand(new OpenApiGenerator($this->registry()), $extensionConfiguration));
+        return new CommandTester(new OpenApiCommand(new OpenApiGenerator($this->registry())));
     }
 
     /**

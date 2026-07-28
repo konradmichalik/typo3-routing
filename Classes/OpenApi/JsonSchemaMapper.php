@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3Routing\OpenApi;
 
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
+use TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface;
 use UnitEnum;
 
 use function is_a;
@@ -33,7 +34,8 @@ final readonly class JsonSchemaMapper
      * fragment. docs/EXTENDING.md documents the resulting schema per type, and the BC promise.
      *
      * @param string|null $type    a scalar name (`int`, `float`, `bool`, `array`, `mixed`, `string`), a
-     *                             `class-string<UnitEnum>` of a **backed** enum, or `null` for untyped
+     *                             `class-string<UnitEnum>` of a **backed** enum, a
+     *                             `class-string<DomainObjectInterface>`, or `null` for untyped
      * @param string|null $pattern the route's requirement for this argument, applied only to a schema
      *                             that ends up `{"type": "string"}`
      *
@@ -43,6 +45,10 @@ final readonly class JsonSchemaMapper
     {
         if (null !== $type && is_a($type, UnitEnum::class, true)) {
             return $this->enumSchema($type);
+        }
+
+        if (null !== $type && is_a($type, DomainObjectInterface::class, true)) {
+            return ['type' => 'integer'];
         }
 
         $schema = match ($type) {

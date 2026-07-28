@@ -98,10 +98,12 @@ $schema = $this->schemas->schemaForType($argument['type'], $pattern);
 | `mixed` | `{}` — constrains nothing |
 | `string`, `null` (untyped), or any unrecognised type | `{"type": "string"}` |
 | A **backed** enum's class name | `{"type": …, "enum": [<backing values>]}`, `integer` for an `int` backing type, `string` otherwise |
+| An Extbase domain object's class name | `{"type": "integer"}` — the record UID |
 
-Two details are part of the contract rather than incidental:
+Three details are part of the contract rather than incidental:
 
-- **`$pattern` reaches only a `{"type": "string"}` schema.** It is the route's `requirements` regex for that argument, and it is applied *only* when the mapping above produced a plain string schema — never to an `integer`/`number`/`boolean`/`array` schema, never to `mixed`, and **never to an enum**, whose `enum` list already constrains the value. Pass `''` as no pattern (`null`); the OpenAPI export normalises it that way.
+- **`$pattern` reaches only a `{"type": "string"}` schema.** It is the route's `requirements` regex for that argument, and it is applied *only* when the mapping above produced a plain string schema — never to an `integer`/`number`/`boolean`/`array` schema, never to `mixed`, and never to an enum or a domain object, whose own keywords already constrain the value. Pass `''` as no pattern (`null`); the OpenAPI export normalises it that way.
+- **An Extbase domain object describes its UID, not the object.** Such an argument is resolved by looking the record up by UID, and `ControllerArgumentResolver::toEntity()` accepts nothing but an integer — so `integer` is what a client has to send. Note this is a **change from earlier `0.x` releases**, which described these arguments as `{"type": "string"}`; an OpenAPI document regenerated after upgrading will differ for every entity-typed argument.
 - **Only backed enums are expected.** The extension's own compile step rejects a pure enum outright, so one cannot reach this mapper through a registered route. An external caller passing one gets `{"type": "string", "enum": []}` rather than an exception.
 
 ## Reference consumer: the OpenAPI export

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\OpenApi\JsonSchemaMapper;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
@@ -90,6 +91,24 @@ final class JsonSchemaMapperTest extends TestCase
             ['type' => 'string', 'enum' => []],
             (new JsonSchemaMapper())->schemaForType(Suit::class),
         );
+    }
+
+    /**
+     * Such an argument is resolved from a record UID (ControllerArgumentResolver::toEntity() accepts
+     * nothing else), so `integer` describes the wire value, not the entity.
+     */
+    #[Test]
+    public function mapsAnExtbaseDomainObjectToAnIntegerUidSchema(): void
+    {
+        self::assertSame(['type' => 'integer'], (new JsonSchemaMapper())->schemaForType(Item::class));
+    }
+
+    #[Test]
+    public function doesNotApplyPatternToADomainObjectSchema(): void
+    {
+        $schema = (new JsonSchemaMapper())->schemaForType(Item::class, '\d+');
+
+        self::assertArrayNotHasKey('pattern', $schema);
     }
 
     #[Test]

@@ -19,8 +19,6 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\{InputInterface, InputOption};
 use Symfony\Component\Console\Output\OutputInterface;
-use Throwable;
-use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 
 use function is_string;
 use function json_encode;
@@ -37,7 +35,6 @@ final class OpenApiCommand extends Command
 {
     public function __construct(
         private readonly OpenApiGenerator $generator,
-        private readonly ExtensionConfiguration $extensionConfiguration,
     ) {
         parent::__construct();
     }
@@ -47,7 +44,7 @@ final class OpenApiCommand extends Command
     {
         $this->addOption('title', null, InputOption::VALUE_REQUIRED, 'The API title', 'TYPO3 Routing API');
         $this->addOption('api-version', null, InputOption::VALUE_REQUIRED, 'The API version', '1.0.0');
-        $this->addOption('server', null, InputOption::VALUE_REQUIRED, 'The server base URL (defaults to the configured path prefix)');
+        $this->addOption('server', null, InputOption::VALUE_REQUIRED, 'The server base URL (omitted by default, which per the OpenAPI spec means "/")');
         $this->addOption('pretty', null, InputOption::VALUE_NONE, 'Pretty-print the JSON output');
     }
 
@@ -57,7 +54,10 @@ final class OpenApiCommand extends Command
         $document = $this->generator->generate(
             $this->stringOption($input, 'title', 'TYPO3 Routing API'),
             $this->stringOption($input, 'api-version', '1.0.0'),
-            $this->stringOption($input, 'server', $this->defaultServer()),
+            // Route paths are stored in full, so a base URL would be doubled into every path
+            // (`/api/` + `/api/example` = `/api/api/example`). Omitting `servers` defaults to "/",
+            // which is exactly right; SwaggerUiController does the same with the site base.
+            $this->stringOption($input, 'server', ''),
         );
 
         $flags = \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES;
@@ -68,17 +68,6 @@ final class OpenApiCommand extends Command
         $output->writeln(json_encode($document, $flags));
 
         return Command::SUCCESS;
-    }
-
-    private function defaultServer(): string
-    {
-        try {
-            $prefix = $this->extensionConfiguration->get('typo3_routing', 'prefix');
-
-            return is_string($prefix) ? $prefix : '/api/';
-        } catch (Throwable) {
-            return '/api/';
-        }
     }
 
     private function stringOption(InputInterface $input, string $name, string $default): string

@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
-use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
+use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -43,7 +43,7 @@ final class OpenApiGeneratorTest extends TestCase
     #[Test]
     public function omitsServersWhenServerIsEmpty(): void
     {
-        $document = (new OpenApiGenerator($this->registry()))->generate('My API', '2.0.0', '');
+        $document = (new OpenApiGenerator($this->registry(), new JsonSchemaMapper()))->generate('My API', '2.0.0', '');
 
         self::assertArrayNotHasKey('servers', $document);
     }
@@ -194,7 +194,7 @@ final class OpenApiGeneratorTest extends TestCase
      */
     private function generate(): array
     {
-        return (new OpenApiGenerator($this->registry()))->generate('My API', '2.0.0', '/api/');
+        return (new OpenApiGenerator($this->registry(), new JsonSchemaMapper()))->generate('My API', '2.0.0', '/api/');
     }
 
     /**
@@ -202,7 +202,7 @@ final class OpenApiGeneratorTest extends TestCase
      */
     private function features(): array
     {
-        return (new OpenApiGenerator($this->featureRegistry()))->generate('My API', '1.0.0', '/api/');
+        return (new OpenApiGenerator($this->featureRegistry(), new JsonSchemaMapper()))->generate('My API', '1.0.0', '/api/');
     }
 
     /**

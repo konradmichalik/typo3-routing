@@ -16,14 +16,10 @@ namespace KonradMichalik\Typo3Routing\OpenApi;
 use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, BearerTokenAuthenticator, FrontendUserAuthenticator};
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
-use ReflectionEnum;
-use ReflectionEnumBackedCase;
-use UnitEnum;
 
 use function array_key_exists;
 use function explode;
 use function in_array;
-use function is_a;
 use function lcfirst;
 use function sprintf;
 use function str_contains;
@@ -61,6 +57,7 @@ final readonly class OpenApiGenerator
 
     public function __construct(
         private RouteRegistry $registry,
+        private JsonSchemaMapper $schemas,
     ) {}
 
     /**
@@ -120,7 +117,7 @@ final readonly class OpenApiGenerator
 
         foreach ($arguments as $argument) {
             $pattern = $route['requirements'][$argument['name']] ?? null;
-            $schema = $this->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
+            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
 
             match ($this->target($argument['source'], $hasBody)) {
                 'path' => $parameters[] = $this->parameter($argument['name'], 'path', true, $schema),
@@ -221,56 +218,6 @@ final readonly class OpenApiGenerator
         return [
             'required' => [] !== $required,
             'content' => ['application/json' => ['schema' => $schema]],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function schemaForType(?string $type, ?string $pattern): array
-    {
-        if (null !== $type && is_a($type, UnitEnum::class, true)) {
-            return $this->enumSchema($type);
-        }
-
-        $schema = match ($type) {
-            'int' => ['type' => 'integer'],
-            'float' => ['type' => 'number'],
-            'bool' => ['type' => 'boolean'],
-            'array' => ['type' => 'array', 'items' => (object) []],
-            'mixed' => [],
-            // Untyped parameters arrive as raw strings.
-            default => ['type' => 'string'],
-        };
-
-        if (null !== $pattern && 'string' === ($schema['type'] ?? null)) {
-            $schema['pattern'] = $pattern;
-        }
-
-        return $schema;
-    }
-
-    /**
-     * @param class-string<UnitEnum> $enum
-     *
-     * @return array<string, mixed>
-     */
-    private function enumSchema(string $enum): array
-    {
-        $reflection = new ReflectionEnum($enum);
-        $backingType = $reflection->getBackingType()?->getName();
-
-        $values = [];
-        foreach ($reflection->getCases() as $case) {
-            // A backed enum's cases are always backed; the guard keeps the type checker happy.
-            if ($case instanceof ReflectionEnumBackedCase) {
-                $values[] = $case->getBackingValue();
-            }
-        }
-
-        return [
-            'type' => 'int' === $backingType ? 'integer' : 'string',
-            'enum' => $values,
         ];
     }
 

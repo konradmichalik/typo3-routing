@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Command;
 
 use KonradMichalik\Typo3Routing\Command\OpenApiCommand;
-use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
+use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -81,7 +81,7 @@ final class OpenApiCommandTest extends TestCase
 
     private function tester(): CommandTester
     {
-        return new CommandTester(new OpenApiCommand(new OpenApiGenerator($this->registry())));
+        return new CommandTester(new OpenApiCommand(new OpenApiGenerator($this->registry(), new JsonSchemaMapper())));
     }
 
     /**

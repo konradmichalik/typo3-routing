@@ -209,6 +209,31 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesTheStaticPathPrefixesFormingTheDispatcherGate(): void
+    {
+        $container = $this->buildContainer(['fixture_controller' => FixtureController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var list<string> $prefixes */
+        $prefixes = $container->getDefinition(RouteRegistry::class)->getArgument('$staticPrefixes');
+
+        self::assertContains('/api/count', $prefixes);
+        // A placeholder ends the static part, so the gate covers every /api/blog/… path.
+        self::assertContains('/api/blog', $prefixes);
+        // No route may widen the gate to everything here.
+        self::assertNotContains('', $prefixes);
+    }
+
+    #[Test]
+    public function bakesAnEmptyPrefixListWhenNoRouteControllerIsRegistered(): void
+    {
+        $container = $this->buildContainer([]);
+        (new RouteCompilerPass())->process($container);
+
+        self::assertSame([], $container->getDefinition(RouteRegistry::class)->getArgument('$staticPrefixes'));
+    }
+
+    #[Test]
     public function throwsOnDuplicateRouteName(): void
     {
         $this->expectException(LogicException::class);

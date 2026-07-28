@@ -100,7 +100,7 @@ final class RouteDispatcherTest extends TestCase
     #[Test]
     public function matchesPathUnderAnyCommaSeparatedPrefix(): void
     {
-        $dispatcher = $this->dispatcherWithPrefix('/api/, /va/');
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('/api/, /va/');
 
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/va/count'),
@@ -115,17 +115,20 @@ final class RouteDispatcherTest extends TestCase
     public function fallsThroughForPathOutsideEveryCommaSeparatedPrefix(): void
     {
         $sentinel = new Response('php://temp', 418);
-        $dispatcher = $this->dispatcherWithPrefix('/api/, /va/');
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('/api/, /va/');
 
         $response = $dispatcher->process($this->request('GET', 'https://example.com/some/page'), $this->handler($sentinel));
 
         self::assertSame($sentinel, $response);
     }
 
+    /**
+     * The gate needs no configuration at all: it is derived from the registered route paths.
+     */
     #[Test]
-    public function dispatchesMatchingRouteWithNoPrefixConfigured(): void
+    public function dispatchesMatchingRouteWithoutAnyExclusivePrefixConfigured(): void
     {
-        $dispatcher = $this->dispatcherWithPrefix('');
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('');
 
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
@@ -137,20 +140,49 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
-    public function fallsThroughInsteadOfNotFoundWhenNoPrefixIsConfiguredAndNothingMatches(): void
+    public function fallsThroughInsteadOfNotFoundWhenNothingIsClaimedExclusively(): void
     {
         $sentinel = new Response('php://temp', 418);
-        $dispatcher = $this->dispatcherWithPrefix('');
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('');
 
         $response = $dispatcher->process($this->request('GET', 'https://example.com/some/page'), $this->handler($sentinel));
 
         self::assertSame($sentinel, $response);
     }
 
+    /**
+     * `/va/count/extra` clears the gate derived from the `/va/count` route but matches nothing, and only
+     * `/api/` is claimed exclusively — so the path stays the page router's business.
+     */
     #[Test]
-    public function stillReturnsMethodNotAllowedWhenNoPrefixIsConfigured(): void
+    public function fallsThroughForUnmatchedPathInsideADerivedButNotExclusivePrefix(): void
     {
-        $dispatcher = $this->dispatcherWithPrefix('');
+        $sentinel = new Response('php://temp', 418);
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('/api/');
+
+        $response = $dispatcher->process($this->request('GET', 'https://example.com/va/count/extra'), $this->handler($sentinel));
+
+        self::assertSame($sentinel, $response);
+    }
+
+    /**
+     * Nothing registered and nothing claimed: the gate rejects every path before the matcher is built.
+     */
+    #[Test]
+    public function fallsThroughImmediatelyWhenNoRoutesAreRegistered(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('', new RouteRegistry([], new ServiceLocator([])));
+
+        $response = $dispatcher->process($this->request('GET', 'https://example.com/api/count'), $this->handler($sentinel));
+
+        self::assertSame($sentinel, $response);
+    }
+
+    #[Test]
+    public function stillReturnsMethodNotAllowedWithoutAnyExclusivePrefixConfigured(): void
+    {
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('');
 
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/submit'),
@@ -721,12 +753,12 @@ final class RouteDispatcherTest extends TestCase
         return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, $context);
     }
 
-    private function dispatcherWithPrefix(string $prefix): RouteDispatcher
+    private function dispatcherWithExclusivePrefixes(string $prefixes, ?RouteRegistry $registry = null): RouteDispatcher
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
-        $extensionConfiguration->method('get')->willReturn($prefix);
+        $extensionConfiguration->method('get')->willReturn($prefixes);
 
-        return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration);
+        return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, null, $registry);
     }
 
     /**
@@ -735,7 +767,7 @@ final class RouteDispatcherTest extends TestCase
     private function dispatcherWithCors(array $cors, ?Context $context = null): RouteDispatcher
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
-        // The path-less get() feeds CorsHandler the full config; the get(..., 'prefix') call resolves the prefix.
+        // The path-less get() feeds CorsHandler the full config; the get(..., 'exclusivePrefixes') call resolves the claim.
         $extensionConfiguration->method('get')->willReturnCallback(
             static fn (string $extension, string $path = ''): mixed => '' === $path ? ['cors' => $cors] : '/api/',
         );
@@ -743,9 +775,9 @@ final class RouteDispatcherTest extends TestCase
         return $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, $context);
     }
 
-    private function dispatcherWith(CorsHandler $cors, ExtensionConfiguration $extensionConfiguration, ?Context $context = null): RouteDispatcher
+    private function dispatcherWith(CorsHandler $cors, ExtensionConfiguration $extensionConfiguration, ?Context $context = null, ?RouteRegistry $registry = null): RouteDispatcher
     {
-        $registry = $this->registry();
+        $registry ??= $this->registry();
         $context ??= new Context();
         $accessGuard = new AccessGuard($registry, $context);
 

@@ -55,6 +55,8 @@ The request the controller finally sees is synthesised from it: the route's firs
 |---|---|---|
 | Env filter (`Route::$env`) | enforced → 404 | a route unreachable over HTTP must stay unreachable |
 | Mandatory placeholders, path `requirements` | enforced → 404 | such a path could never have matched, so it must not reach a controller |
+
+One consequence is worth spelling out: a violated path requirement is the single case where the answer *differs* from an HTTP call by design. Over HTTP that path matches no route, so — unless `exclusivePrefixes` claims it — the middleware declines and the page router takes over. An invocation names the route explicitly and has no page to fall back to, so the route's own "no resource for this value" answer stands as a 404.
 | Query/body `requirements` | enforced → 400 | part of the route's input contract |
 | Authentication (`#[Authenticate]`) | enforced → 401 | a route's own access rule, independent of transport |
 | Request token (`#[RequireRequestToken]`) | **skipped** | CSRF protects browser-initiated state changes; no browser is involved, and the calling client's token is not the target route's |

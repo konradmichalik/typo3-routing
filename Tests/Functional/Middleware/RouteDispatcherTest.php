@@ -97,13 +97,19 @@ final class RouteDispatcherTest extends FunctionalTestCase
         );
     }
 
+    /**
+     * No prefix is claimed exclusively here (the default), so an unmatched path — whether unknown, in
+     * violation of a requirement, or barred by scheme/host — stays the page router's business. See
+     * ExclusivePrefixesTest for the same paths under a configured claim.
+     */
     #[Test]
-    public function returnsNotFoundForUnknownPathUnderPrefix(): void
+    public function fallsThroughForUnknownPathWhenNothingIsClaimedExclusively(): void
     {
-        $response = $this->process($this->request('GET', 'https://example.com/api/example/missing'));
+        $sentinel = new Response('php://temp', 418);
 
-        self::assertSame(404, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/missing'), $sentinel);
+
+        self::assertSame($sentinel, $response);
     }
 
     #[Test]
@@ -164,14 +170,6 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertSame(200, $response->getStatusCode());
         // The controller declares `int $id`; the placeholder is cast and encoded as a JSON number.
         self::assertJsonStringEqualsJsonString('{"id":42}', (string) $response->getBody());
-    }
-
-    #[Test]
-    public function rejectsRouteParameterViolatingRequirement(): void
-    {
-        $response = $this->process($this->request('GET', 'https://example.com/api/example/item/abc'));
-
-        self::assertSame(404, $response->getStatusCode());
     }
 
     #[Test]
@@ -333,22 +331,6 @@ final class RouteDispatcherTest extends FunctionalTestCase
         $response = $this->process($this->request('GET', 'https://example.com/api/example/restricted'));
 
         self::assertSame(200, $response->getStatusCode());
-    }
-
-    #[Test]
-    public function returnsNotFoundWhenSchemeDoesNotMatch(): void
-    {
-        $response = $this->process($this->request('GET', 'http://example.com/api/example/restricted'));
-
-        self::assertSame(404, $response->getStatusCode());
-    }
-
-    #[Test]
-    public function returnsNotFoundWhenHostDoesNotMatch(): void
-    {
-        $response = $this->process($this->request('GET', 'https://other.example.com/api/example/restricted', 'https://other.example.com/'));
-
-        self::assertSame(404, $response->getStatusCode());
     }
 
     #[Test]

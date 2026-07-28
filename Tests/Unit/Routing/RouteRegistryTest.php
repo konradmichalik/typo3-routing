@@ -46,6 +46,62 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function staticPrefixesStopAtTheFirstPlaceholder(): void
+    {
+        $prefixes = RouteRegistry::staticPrefixes($this->constrainedRegistry()->getRouteCollection());
+
+        self::assertSame(['/api/item'], $prefixes);
+    }
+
+    /**
+     * A leading placeholder leaves no static part at all. The empty string matches every path, so such
+     * a route correctly disables the dispatcher's gate instead of hiding behind it.
+     */
+    #[Test]
+    public function staticPrefixesAreEmptyStringsForRoutesStartingWithAPlaceholder(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'catch_all' => ['path' => '/{slug}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+
+        $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
+
+        self::assertSame([''], $prefixes);
+    }
+
+    #[Test]
+    public function exposesTheStaticPrefixesBakedInAtCompileTime(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'fixture_count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+        ];
+
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), staticPrefixes: ['/baked/']);
+
+        self::assertSame(['/baked/'], $registry->getStaticPrefixes());
+    }
+
+    /**
+     * Mirrors the getMatcher() fallback: a registry wired by hand carries no compiled data, and a gate
+     * derived as empty would make the dispatcher drop every one of its routes.
+     */
+    #[Test]
+    public function derivesStaticPrefixesWhenNoneWereBakedIn(): void
+    {
+        $registry = $this->createRegistry();
+
+        self::assertSame(['/api/count', '/api/submit'], $registry->getStaticPrefixes());
+    }
+
+    #[Test]
+    public function derivesNoStaticPrefixesWithoutAnyRoute(): void
+    {
+        self::assertSame([], (new RouteRegistry([], new ServiceLocator([])))->getStaticPrefixes());
+    }
+
+    #[Test]
     public function matcherResolvesAKnownPath(): void
     {
         $context = new RequestContext();

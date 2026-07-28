@@ -88,7 +88,6 @@ final class RouteInvokerTest extends FunctionalTestCase
         yield 'aliased argument' => ['example_aliased', ['q' => 'chair'], '/api/example/aliased?q=chair'];
         yield 'backed enum' => ['example_status', ['status' => 'draft'], '/api/example/status/draft'];
         yield 'unresolvable argument' => ['example_range', [], '/api/example/range'];
-        yield 'violated path requirement' => ['example_item', ['id' => 'abc'], '/api/example/item/abc'];
         yield 'violated query requirement' => ['example_search', ['q' => 'abc'], '/api/example/search?q=abc'];
         yield 'controller problem' => ['example_problem', [], '/api/example/problem'];
         yield 'env-bound route' => ['example_dev', [], '/api/example/dev'];
@@ -106,6 +105,22 @@ final class RouteInvokerTest extends FunctionalTestCase
 
         self::assertSame($overHttp->getStatusCode(), $invoked->getStatusCode());
         self::assertJsonStringEqualsJsonString((string) $overHttp->getBody(), (string) $invoked->getBody());
+    }
+
+    /**
+     * The one place where a rejected input cannot answer alike: a violated path requirement matches no
+     * route at all, and with no `exclusivePrefixes` configured such a path is not claimed by this
+     * middleware — the page router takes it. Invoking by name has no such alternative, so the route's
+     * own "no resource for this value" answer stands.
+     */
+    #[Test]
+    public function answersNotFoundWhereAnHttpCallLetsAViolatedPathRequirementFallThrough(): void
+    {
+        $overHttp = $this->process($this->request('GET', 'https://example.com/api/example/item/abc'), 418);
+        $invoked = $this->get(RouteInvoker::class)->invoke('example_item', ['id' => 'abc'], $this->request('GET', 'https://example.com/mcp'));
+
+        self::assertSame(418, $overHttp->getStatusCode(), 'the dispatcher should have fallen through to the page handler');
+        self::assertSame(404, $invoked->getStatusCode());
     }
 
     #[Test]
@@ -180,17 +195,19 @@ final class RouteInvokerTest extends FunctionalTestCase
         self::assertNotSame($first, $second);
     }
 
-    private function process(ServerRequestInterface $request): ResponseInterface
+    private function process(ServerRequestInterface $request, int $fallThroughStatus = 200): ResponseInterface
     {
-        return $this->get(RouteDispatcher::class)->process($request, $this->handler());
+        return $this->get(RouteDispatcher::class)->process($request, $this->handler($fallThroughStatus));
     }
 
-    private function handler(): RequestHandlerInterface
+    private function handler(int $status): RequestHandlerInterface
     {
-        return new class implements RequestHandlerInterface {
+        return new class($status) implements RequestHandlerInterface {
+            public function __construct(private readonly int $status) {}
+
             public function handle(ServerRequestInterface $request): ResponseInterface
             {
-                return new Response('php://temp', 200);
+                return new Response('php://temp', $this->status);
             }
         };
     }

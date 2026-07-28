@@ -30,6 +30,10 @@ services:
     KonradMichalik\Typo3Routing\Http\RouteUrlGenerator:
         public: true
 
+    # Public so consumers of the @api invocation seam can also reach it via makeInstance().
+    KonradMichalik\Typo3Routing\Routing\RouteInvoker:
+        public: true
+
     # Dedicated TYPO3 cache backing the rate-limiter bucket store.
     cache.typo3_routing_ratelimit:
         class: TYPO3\CMS\Core\Cache\Frontend\FrontendInterface

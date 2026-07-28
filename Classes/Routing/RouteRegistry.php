@@ -18,6 +18,9 @@ use Psr\Container\ContainerInterface;
 use Symfony\Component\Routing\Matcher\{CompiledUrlMatcher, UrlMatcher, UrlMatcherInterface};
 use Symfony\Component\Routing\{RequestContext, Route as SymfonyRoute, RouteCollection};
 
+use function array_unique;
+use function array_values;
+
 /**
  * RouteRegistry.
  *
@@ -38,6 +41,7 @@ final class RouteRegistry
      * @param array<string, string>                                                                                                                                                                                                                                        $requestTokenScopes
      * @param array<mixed>                                                                                                                                                                                                                                                 $compiledRoutes
      * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                       $corsConfigs
+     * @param list<string>                                                                                                                                                                                                                                                 $staticPrefixes
      */
     public function __construct(
         private readonly array $routes,
@@ -50,6 +54,7 @@ final class RouteRegistry
         private readonly ?ContainerInterface $authenticatorLocator = null,
         private readonly array $compiledRoutes = [],
         private readonly array $corsConfigs = [],
+        private readonly array $staticPrefixes = [],
     ) {}
 
     /**
@@ -84,6 +89,25 @@ final class RouteRegistry
         }
 
         return $collection;
+    }
+
+    /**
+     * Every route path's static leading segment, as computed by symfony's own route compiler. A path
+     * starting with a placeholder (`/{slug}`) yields the empty string, which matches every path —
+     * correct, since such a route can live anywhere.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     *
+     * @return list<string>
+     */
+    public static function staticPrefixes(RouteCollection $collection): array
+    {
+        $prefixes = [];
+        foreach ($collection->all() as $route) {
+            $prefixes[] = $route->compile()->getStaticPrefix();
+        }
+
+        return array_values(array_unique($prefixes));
     }
 
     /**
@@ -188,5 +212,24 @@ final class RouteRegistry
     public function getRoutes(): array
     {
         return $this->routes;
+    }
+
+    /**
+     * The prefixes the dispatcher turns into its path gate, so no configuration is needed to keep
+     * matching off the hot path for ordinary page requests. Baked in at container build time; the
+     * fallback mirrors getMatcher() and covers registries constructed without compiled data (tests,
+     * manual wiring), which would otherwise end up behind a gate that lets nothing through.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     *
+     * @return list<string>
+     */
+    public function getStaticPrefixes(): array
+    {
+        if ([] !== $this->staticPrefixes || [] === $this->routes) {
+            return $this->staticPrefixes;
+        }
+
+        return self::staticPrefixes($this->getRouteCollection());
     }
 }

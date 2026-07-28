@@ -78,11 +78,11 @@ final readonly class SwaggerUiController implements RouteControllerInterface
     }
 
     /**
-     * Route paths are already stored in full (including the configured `prefix` gate) and are
-     * resolved relative to the site base, not the domain root — so the OpenAPI `servers` entry must
-     * be the site's own base path, never the `prefix` config: reusing that would double it into every
-     * path (e.g. `/api/` + `/api/example` = `/api/api/example`). An empty result (root-mounted site)
-     * omits `servers` entirely, which per the OpenAPI spec defaults to "/" — exactly correct here.
+     * Route paths are already stored in full and are resolved relative to the site base, not the domain
+     * root — so the OpenAPI `servers` entry must be the site's own base path and nothing else: prepending
+     * an API prefix would double it into every path (e.g. `/api/` + `/api/example` = `/api/api/example`).
+     * An empty result (root-mounted site) omits `servers` entirely, which per the OpenAPI spec defaults
+     * to "/" — exactly correct here.
      */
     private function siteServer(ServerRequestInterface $request): string
     {

@@ -15,8 +15,9 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
-use KonradMichalik\Typo3Routing\OpenApi\OpenApiGenerator;
+use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -43,7 +44,7 @@ final class OpenApiGeneratorTest extends TestCase
     #[Test]
     public function omitsServersWhenServerIsEmpty(): void
     {
-        $document = (new OpenApiGenerator($this->registry()))->generate('My API', '2.0.0', '');
+        $document = (new OpenApiGenerator($this->registry(), new JsonSchemaMapper()))->generate('My API', '2.0.0', '');
 
         self::assertArrayNotHasKey('servers', $document);
     }
@@ -136,6 +137,17 @@ final class OpenApiGeneratorTest extends TestCase
         self::assertSame(['type' => 'integer', 'enum' => [1, 5]], $params['level']);
     }
 
+    /**
+     * An Extbase-entity-typed argument is resolved from a record UID, so the export describes the UID.
+     */
+    #[Test]
+    public function mapsExtbaseDomainObjectToIntegerUidSchema(): void
+    {
+        $params = $this->schemasByName($this->features()['paths']['/api/types']['get']['parameters']);
+
+        self::assertSame(['type' => 'integer'], $params['item']);
+    }
+
     #[Test]
     public function buildsOptionalRequestBodyWithoutRequiredList(): void
     {
@@ -194,7 +206,7 @@ final class OpenApiGeneratorTest extends TestCase
      */
     private function generate(): array
     {
-        return (new OpenApiGenerator($this->registry()))->generate('My API', '2.0.0', '/api/');
+        return (new OpenApiGenerator($this->registry(), new JsonSchemaMapper()))->generate('My API', '2.0.0', '/api/');
     }
 
     /**
@@ -202,7 +214,7 @@ final class OpenApiGeneratorTest extends TestCase
      */
     private function features(): array
     {
-        return (new OpenApiGenerator($this->featureRegistry()))->generate('My API', '1.0.0', '/api/');
+        return (new OpenApiGenerator($this->featureRegistry(), new JsonSchemaMapper()))->generate('My API', '1.0.0', '/api/');
     }
 
     /**
@@ -242,6 +254,7 @@ final class OpenApiGeneratorTest extends TestCase
                 ['name' => 'raw', 'type' => null, 'source' => 'input', 'nullable' => true, 'hasDefault' => false, 'default' => null],
                 ['name' => 'ids', 'type' => 'int', 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null],
                 ['name' => 'level', 'type' => Priority::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+                ['name' => 'item', 'type' => Item::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
             ],
             'note' => [
                 // Optional body parameter → not in the required list.

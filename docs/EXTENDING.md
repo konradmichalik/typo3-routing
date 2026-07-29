@@ -72,6 +72,41 @@ Exception handling is the dispatcher's, so error semantics match a real call to 
 
 **Abuse control.** Because rate limiting is skipped, a consumer that re-exposes routes over its own transport takes over responsibility for rate limiting and authorisation *there*. `RouteInvoker` is a seam for trusted in-process callers, not a guard against the caller.
 
+## Describing an argument as JSON Schema
+
+`getArguments()` reports each argument's `type` as a string — a scalar name, a backed enum's class name, an Extbase domain object's FQCN, or `null` when the parameter is untyped. Turning that into a JSON Schema fragment is what both the OpenAPI export and any consumer describing routes to a schema-driven client (an MCP server's `inputSchema`, a client generator) needs to do, identically. [`JsonSchemaMapper`](../Classes/OpenApi/JsonSchemaMapper.php) is the `@api` seam for it, so the mapping rules cannot drift between consumers:
+
+```php
+public function __construct(
+    private readonly \KonradMichalik\Typo3Routing\OpenApi\JsonSchemaMapper $schemas,
+) {}
+
+// …
+$argument = $this->routes->getArguments('example_item')[0];
+$pattern = $this->routes->getRoutes()['example_item']['requirements'][$argument['name']] ?? null;
+// A requirement of '' means "presence only" (see #[Route]), not a regex — normalise it away.
+$schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
+```
+
+`schemaForType(?string $type, ?string $pattern = null): array`
+
+| `$type` | Resulting schema |
+|---|---|
+| `int` | `{"type": "integer"}` |
+| `float` | `{"type": "number"}` |
+| `bool` | `{"type": "boolean"}` |
+| `array` | `{"type": "array", "items": {}}` |
+| `mixed` | `{}` — constrains nothing |
+| `string`, `null` (untyped), or any unrecognised type | `{"type": "string"}` |
+| A **backed** enum's class name | `{"type": …, "enum": [<backing values>]}`, `integer` for an `int` backing type, `string` otherwise |
+| An Extbase domain object's class name | `{"type": "integer"}` — the record UID |
+
+Three details are part of the contract rather than incidental:
+
+- **`$pattern` reaches only a `{"type": "string"}` schema.** It is the route's `requirements` regex for that argument, and it is applied *only* when the mapping above produced a plain string schema — never to an `integer`/`number`/`boolean`/`array` schema, never to `mixed`, and never to an enum or a domain object, whose own keywords already constrain the value. Pass `null` when there is no pattern — the mapper treats **only** `null` that way. A requirement of `''` means "presence only" rather than a regex (see [`#[Route]`](../Classes/Attribute/Route.php)), so normalise it to `null` yourself before calling; `''` would otherwise land in the schema as `"pattern": ""`.
+- **An Extbase domain object describes its UID, not the object.** Such an argument is resolved by looking the record up by UID, and `ControllerArgumentResolver::toEntity()` accepts nothing but an integer — so `integer` is what a client has to send. Note this is a **change from earlier `0.x` releases**, which described these arguments as `{"type": "string"}`; an OpenAPI document regenerated after upgrading will differ for every entity-typed argument.
+- **Only backed enums are expected.** The extension's own compile step rejects a pure enum outright, so one cannot reach this mapper through a registered route. An external caller passing one gets `{"type": "string", "enum": []}` rather than an exception.
+
 ## Reference consumer: the OpenAPI export
 
 [`Classes/OpenApi/OpenApiGenerator.php`](../Classes/OpenApi/OpenApiGenerator.php) (internal) is the extension's own reference consumer of this API — it builds an OpenAPI 3.1 document purely from `RouteRegistry::getRoutes()`, `getArguments()`, `getAuthenticators()`, `getRequestTokenScope()`, `getCacheConfig()`, and `getRateLimit()`, with no access to anything `@internal`. Reading it end to end is the fastest way to see the metadata API used for something non-trivial: parameter/request-body construction from argument specs, security scheme mapping from authenticators, and error-response generation from which modifiers are present.

@@ -160,15 +160,115 @@ final class JsonSchemaMapperTest extends TestCase
     }
 
     /**
-     * The enum branch returns before the pattern is applied, so a string-backed enum carrying a route
-     * requirement gets no `pattern` — even though its schema type *is* `string`.
+     * A requirement narrows the `enum` list instead of becoming a `pattern`: after narrowing, `enum`
+     * states the accepted values exactly, so a second keyword saying the same thing would be noise.
      */
     #[Test]
-    public function doesNotApplyPatternToABackedStringEnumSchema(): void
+    public function narrowsABackedStringEnumToTheCasesTheRequirementAccepts(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => ['active']],
+            (new JsonSchemaMapper())->schemaForType(Status::class, 'active'),
+        );
+    }
+
+    #[Test]
+    public function doesNotAddAPatternKeyWhenNarrowingAnEnum(): void
+    {
+        $schema = (new JsonSchemaMapper())->schemaForType(Status::class, 'active');
+
+        self::assertArrayNotHasKey('pattern', $schema);
+    }
+
+    #[Test]
+    public function keepsEveryCaseWhenTheRequirementAcceptsThemAll(): void
     {
         self::assertSame(
             ['type' => 'string', 'enum' => ['active', 'inactive']],
-            (new JsonSchemaMapper())->schemaForType(Status::class, 'active'),
+            (new JsonSchemaMapper())->schemaForType(Status::class, '[a-z]+'),
+        );
+    }
+
+    /**
+     * Alternation must group: an unanchored `^active|inactive$` reading would keep both cases for the
+     * wrong reason. Symfony wraps the requirement in a group, and so does the mapper.
+     */
+    #[Test]
+    public function narrowsUsingGroupedAlternation(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => ['active', 'inactive']],
+            (new JsonSchemaMapper())->schemaForType(Status::class, 'active|inactive'),
+        );
+    }
+
+    /**
+     * The requirement is a full match, not a search — Symfony compiles it into an anchored regex, so a
+     * case merely *containing* the requirement is rejected.
+     */
+    #[Test]
+    public function narrowsWithFullMatchesOnly(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => []],
+            (new JsonSchemaMapper())->schemaForType(Status::class, 'activ'),
+        );
+    }
+
+    #[Test]
+    public function narrowsABackedIntEnumAgainstTheStringFormOfItsValues(): void
+    {
+        self::assertSame(
+            ['type' => 'integer', 'enum' => [5]],
+            (new JsonSchemaMapper())->schemaForType(Priority::class, '5'),
+        );
+    }
+
+    /**
+     * A requirement excluding every case describes a route that can never match. The empty list says
+     * so rather than overstating what is accepted.
+     */
+    #[Test]
+    public function yieldsAnEmptyEnumWhenNoCaseSatisfiesTheRequirement(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => []],
+            (new JsonSchemaMapper())->schemaForType(Status::class, 'pending'),
+        );
+    }
+
+    /**
+     * '' means "presence only" rather than a regex (see #[Route]), so it narrows nothing — matching
+     * how ControllerInvoker skips pattern validation for it.
+     */
+    #[Test]
+    public function treatsAnEmptyRequirementAsNoNarrowing(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => ['active', 'inactive']],
+            (new JsonSchemaMapper())->schemaForType(Status::class, ''),
+        );
+    }
+
+    /**
+     * An unusable regex cannot be evaluated, so the enum stays unnarrowed and — crucially — no PHP
+     * warning escapes into what is a read-only describe operation.
+     */
+    #[Test]
+    public function keepsEveryCaseWhenTheRequirementIsNotAUsableRegex(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => ['active', 'inactive']],
+            (new JsonSchemaMapper())->schemaForType(Status::class, '[unclosed'),
+        );
+    }
+
+    #[Test]
+    public function narrowingIsUnaffectedByPureEnumsHavingNoValues(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => []],
+            (new JsonSchemaMapper())->schemaForType(Suit::class, 'Hearts'),
         );
     }
 }

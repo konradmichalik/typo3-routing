@@ -138,6 +138,18 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     /**
+     * A requirement on an enum-typed argument narrows the exported `enum` to what the route accepts —
+     * without it the document would advertise values the router rejects with a 404.
+     */
+    #[Test]
+    public function narrowsEnumParameterSchemaToTheCasesTheRequirementAccepts(): void
+    {
+        $params = $this->schemasByName($this->features()['paths']['/api/types']['get']['parameters']);
+
+        self::assertSame(['type' => 'string', 'enum' => ['active']], $params['state']);
+    }
+
+    /**
      * An Extbase-entity-typed argument is resolved from a record UID, so the export describes the UID.
      */
     #[Test]
@@ -236,7 +248,7 @@ final class OpenApiGeneratorTest extends TestCase
     {
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, description?: string|null}> $routes */
         $routes = [
-            'types' => ['path' => '/api/types', 'methods' => ['GET'], 'controller' => 'ctrl::types', 'env' => null, 'requirements' => ['raw' => '[a-z]+']],
+            'types' => ['path' => '/api/types', 'methods' => ['GET'], 'controller' => 'ctrl::types', 'env' => null, 'requirements' => ['raw' => '[a-z]+', 'state' => 'active']],
             'note' => ['path' => '/api/note', 'methods' => ['POST'], 'controller' => 'ctrl::note', 'env' => null, 'requirements' => []],
             'custom' => ['path' => '/api/custom', 'methods' => ['GET'], 'controller' => 'ctrl::custom', 'env' => null, 'requirements' => []],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
@@ -255,6 +267,7 @@ final class OpenApiGeneratorTest extends TestCase
                 ['name' => 'ids', 'type' => 'int', 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null],
                 ['name' => 'level', 'type' => Priority::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
                 ['name' => 'item', 'type' => Item::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+                ['name' => 'state', 'type' => Status::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
             ],
             'note' => [
                 // Optional body parameter → not in the required list.

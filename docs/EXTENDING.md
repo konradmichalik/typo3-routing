@@ -84,7 +84,8 @@ public function __construct(
 // …
 $argument = $this->routes->getArguments('example_item')[0];
 $pattern = $this->routes->getRoutes()['example_item']['requirements'][$argument['name']] ?? null;
-$schema = $this->schemas->schemaForType($argument['type'], $pattern);
+// A requirement of '' means "presence only" (see #[Route]), not a regex — normalise it away.
+$schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
 ```
 
 `schemaForType(?string $type, ?string $pattern = null): array`
@@ -102,7 +103,7 @@ $schema = $this->schemas->schemaForType($argument['type'], $pattern);
 
 Three details are part of the contract rather than incidental:
 
-- **`$pattern` reaches only a `{"type": "string"}` schema.** It is the route's `requirements` regex for that argument, and it is applied *only* when the mapping above produced a plain string schema — never to an `integer`/`number`/`boolean`/`array` schema, never to `mixed`, and never to an enum or a domain object, whose own keywords already constrain the value. Pass `''` as no pattern (`null`); the OpenAPI export normalises it that way.
+- **`$pattern` reaches only a `{"type": "string"}` schema.** It is the route's `requirements` regex for that argument, and it is applied *only* when the mapping above produced a plain string schema — never to an `integer`/`number`/`boolean`/`array` schema, never to `mixed`, and never to an enum or a domain object, whose own keywords already constrain the value. Pass `null` when there is no pattern — the mapper treats **only** `null` that way. A requirement of `''` means "presence only" rather than a regex (see [`#[Route]`](../Classes/Attribute/Route.php)), so normalise it to `null` yourself before calling; `''` would otherwise land in the schema as `"pattern": ""`.
 - **An Extbase domain object describes its UID, not the object.** Such an argument is resolved by looking the record up by UID, and `ControllerArgumentResolver::toEntity()` accepts nothing but an integer — so `integer` is what a client has to send. Note this is a **change from earlier `0.x` releases**, which described these arguments as `{"type": "string"}`; an OpenAPI document regenerated after upgrading will differ for every entity-typed argument.
 - **Only backed enums are expected.** The extension's own compile step rejects a pure enum outright, so one cannot reach this mapper through a registered route. An external caller passing one gets `{"type": "string", "enum": []}` rather than an exception.
 

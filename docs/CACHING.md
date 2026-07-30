@@ -10,9 +10,9 @@ use KonradMichalik\Typo3Routing\Attribute\Route;
 //   → cached per "page", but the volatile "search" query parameter is excluded from the cache key
 #[Route(path: '/api/news', name: 'news_list')]
 #[Cache(lifetime: 3600, tags: ['tx_news_domain_model_news'], ignoreParams: ['search'])]
-public function list(ServerRequestInterface $request): ResponseInterface
+public function list(int $page = 1): ResponseInterface
 {
-    $page = (int) ($request->getQueryParams()['page'] ?? 1);
+    // $page ← ?page=… query param, defaults to 1 (see Typed controller arguments in Usage)
     // …
 }
 ```

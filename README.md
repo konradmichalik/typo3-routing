@@ -95,18 +95,6 @@ public function show(int $id, int $page = 1): ResponseInterface
 }
 ```
 
-Protecting a route is just as declarative — require a logged-in frontend user (or a bearer token / BE user, OR-combined):
-
-```php
-#[Route(path: '/api/account', name: 'account')]
-#[Authenticate(FrontendUserAuthenticator::class)]
-public function account(): ResponseInterface
-{
-    // Reached only when a frontend user is logged in — 401 otherwise.
-    return new JsonResponse(/* … */);
-}
-```
-
 See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments.
 
 ## 📚 Documentation

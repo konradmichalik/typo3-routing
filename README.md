@@ -5,7 +5,7 @@
 # TYPO3 extension `typo3_routing`
 
 [![Latest Stable Version](https://typo3-badges.dev/badge/typo3_routing/version/shields.svg)](https://extensions.typo3.org/extension/typo3_routing)
-![TYPO3](https://img.shields.io/badge/TYPO3-13.4%20%7C%2014.0-orange.svg)
+![TYPO3](https://img.shields.io/badge/TYPO3-13.4%20%7C%2014.3-orange.svg)
 [![Supported PHP Versions](https://img.shields.io/packagist/dependency-v/konradmichalik/typo3-routing/php?logo=php)](https://packagist.org/packages/konradmichalik/typo3-routing)
 [![CGL](https://img.shields.io/github/actions/workflow/status/konradmichalik/typo3-routing/cgl.yml?label=cgl&logo=github)](https://github.com/konradmichalik/typo3-routing/actions/workflows/cgl.yml)
 [![Coverage](https://img.shields.io/coverallsCoverage/github/konradmichalik/typo3-routing?logo=coveralls)](https://coveralls.io/github/konradmichalik/typo3-routing)
@@ -14,25 +14,25 @@
 
 </div>
 
-This extension lets you register **frontend endpoints via PHP attributes** on controller methods — the attribute-based counterpart to the backend-only [`Configuration/Backend/AjaxRoutes.php`](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Backend/Ajax.html). It is response-format agnostic: return JSON, HTML, XML, or a download.
+This extension lets you register **frontend endpoints via PHP attributes** on controller methods: the attribute-based counterpart to the backend-only [`Configuration/Backend/AjaxRoutes.php`](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Backend/Ajax.html). It is response-format agnostic: return JSON, HTML, XML, or a download.
 
 > [!NOTE]
 > The goal is a familiar, Symfony-Routing-like developer experience: declare a frontend endpoint with a single `#[Route]` attribute instead of wiring a custom middleware and duplicating the path across PHP and JavaScript.
 
 ## ✨ Features
 
-- [**Attribute routing**](docs/USAGE.md) — declare an endpoint with `#[Route]` directly on a controller method
-- [**Route groups**](docs/USAGE.md#class-level-prefix-route-groups) — a class-level `#[Route]` prefixes every method route, e.g. for API versioning
-- [**Typed arguments**](docs/USAGE.md#typed-controller-arguments) — methods receive type-cast path/query/body values, no manual request reading
-- [**Zero-config discovery**](docs/HOW-IT-WORKS.md) — routes are collected at container compile time, no extra cache
-- [**URL generation**](docs/URL-GENERATION.md) — a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
-- [**Opt-in caching**](docs/CACHING.md) — cache responses with `#[Cache]`, with tag-based invalidation
-- [**Opt-in rate limiting**](docs/RATE-LIMITING.md) — throttle requests per client IP with `#[RateLimit]`
-- [**Opt-in authentication & CSRF**](docs/AUTHENTICATION.md) — protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
-- [**CORS**](docs/CONFIGURATION.md#cors) — opt-in cross-origin support with automatic preflight handling, configured globally or per route with `#[Cors]`
-- [**Debug command**](docs/HOW-IT-WORKS.md#debug-command) — list every registered route as a table or JSON, including an `--unprotected` audit
-- [**OpenAPI export**](docs/HOW-IT-WORKS.md#openapi-export) — generate an OpenAPI 3.1 document from your routes with `routing:openapi`
-- [**Swagger UI**](docs/HOW-IT-WORKS.md#swagger-ui-development-only) — opt-in, development-only Swagger UI served over the same OpenAPI export
+- [**Attribute routing**](docs/USAGE.md): declare an endpoint with `#[Route]` directly on a controller method
+- [**Route groups**](docs/USAGE.md#class-level-prefix-route-groups): a class-level `#[Route]` prefixes every method route, e.g. for API versioning
+- [**Typed arguments**](docs/USAGE.md#typed-controller-arguments): methods receive type-cast path/query/body values, no manual request reading
+- [**Zero-config discovery**](docs/HOW-IT-WORKS.md): routes are collected at container compile time, no extra cache
+- [**URL generation**](docs/URL-GENERATION.md): a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
+- [**Opt-in caching**](docs/CACHING.md): cache responses with `#[Cache]`, with tag-based invalidation
+- [**Opt-in rate limiting**](docs/RATE-LIMITING.md): throttle requests per client IP with `#[RateLimit]`
+- [**Opt-in authentication & CSRF**](docs/AUTHENTICATION.md): protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
+- [**CORS**](docs/CONFIGURATION.md#cors): opt-in cross-origin support with automatic preflight handling, configured globally or per route with `#[Cors]`
+- [**Debug command**](docs/HOW-IT-WORKS.md#debug-command): list every registered route as a table or JSON, including an `--unprotected` audit
+- [**OpenAPI export**](docs/HOW-IT-WORKS.md#openapi-export): generate an OpenAPI 3.1 document from your routes with `routing:openapi`
+- [**Swagger UI**](docs/HOW-IT-WORKS.md#swagger-ui-development-only): opt-in, development-only Swagger UI served over the same OpenAPI export
 
 ## 🔥 Installation
 
@@ -77,9 +77,9 @@ final readonly class CourseSearchController implements RouteControllerInterface
 }
 ```
 
-That's it — `GET /api/course-search/count` now returns your JSON.
+That's it: `GET /api/course-search/count` now returns your JSON.
 
-Everything else is opt-in on top of that. A route can take typed arguments, validate input, cache its response, and throttle clients — all declared with attributes, the controller stays plain:
+Everything else is opt-in on top of that. A route can take typed arguments, validate input, cache its response, and throttle clients, all declared with attributes, while the controller stays plain:
 
 ```php
 use Symfony\Component\Routing\Requirement\Requirement;
@@ -95,36 +95,24 @@ public function show(int $id, int $page = 1): ResponseInterface
 }
 ```
 
-Protecting a route is just as declarative — require a logged-in frontend user (or a bearer token / BE user, OR-combined):
-
-```php
-#[Route(path: '/api/account', name: 'account')]
-#[Authenticate(FrontendUserAuthenticator::class)]
-public function account(): ResponseInterface
-{
-    // Reached only when a frontend user is logged in — 401 otherwise.
-    return new JsonResponse(/* … */);
-}
-```
-
 See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments.
 
 ## 📚 Documentation
 
 | Topic | What's inside |
 |-------|---------------|
+| [How It Works](docs/HOW-IT-WORKS.md) | Compile-time discovery, runtime dispatch, and the `routing:debug` command |
+| [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
 | [Usage](docs/USAGE.md) | The `#[Route]` attribute, `requirements`, and typed controller arguments |
 | [URL Generation](docs/URL-GENERATION.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator |
 | [Configuration](docs/CONFIGURATION.md) | Derived path gate, exclusive path prefixes, environment-bound routes, middleware placement |
 | [Caching](docs/CACHING.md) | Opt-in response caching with `#[Cache]` and tag-based invalidation |
 | [Rate Limiting](docs/RATE-LIMITING.md) | Opt-in per-IP throttling with `#[RateLimit]` |
 | [Authentication & CSRF](docs/AUTHENTICATION.md) | Protecting routes with `#[Authenticate]`, request tokens, and deployment notes |
-| [How It Works](docs/HOW-IT-WORKS.md) | Compile-time discovery, runtime dispatch, and the `routing:debug` command |
-| [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
 | [Extending](docs/EXTENDING.md) | Building tooling on top of the route metadata (`RouteRegistry`), the `@api`/`@internal` surface, and the BC promise |
 
-> [!NOTE]
-> **BC promise**: every class carries `@api` or `@internal`. From `1.0.0`, `@api` classes and methods follow semver; `@internal` ones may change in any release, including a patch. See [Extending](docs/EXTENDING.md) for the full public surface.
+> [!TIP]
+> Want to expose these routes to AI agents/MCP clients? <img src="https://github.com/konradmichalik/typo3-routing-mcp/raw/main/Resources/Public/Icons/Extension.png?raw=true" width="16" height="16" alt=""> [`typo3-routing-mcp`](https://github.com/konradmichalik/typo3-routing-mcp) adds a `#[McpTool]` attribute next to an existing `#[Route]` and serves it over Streamable HTTP.
 
 ## 🧑‍💻 Contributing
 

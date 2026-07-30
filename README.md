@@ -101,18 +101,18 @@ See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments
 
 | Topic | What's inside |
 |-------|---------------|
+| [How It Works](docs/HOW-IT-WORKS.md) | Compile-time discovery, runtime dispatch, and the `routing:debug` command |
+| [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
 | [Usage](docs/USAGE.md) | The `#[Route]` attribute, `requirements`, and typed controller arguments |
 | [URL Generation](docs/URL-GENERATION.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator |
 | [Configuration](docs/CONFIGURATION.md) | Derived path gate, exclusive path prefixes, environment-bound routes, middleware placement |
 | [Caching](docs/CACHING.md) | Opt-in response caching with `#[Cache]` and tag-based invalidation |
 | [Rate Limiting](docs/RATE-LIMITING.md) | Opt-in per-IP throttling with `#[RateLimit]` |
 | [Authentication & CSRF](docs/AUTHENTICATION.md) | Protecting routes with `#[Authenticate]`, request tokens, and deployment notes |
-| [How It Works](docs/HOW-IT-WORKS.md) | Compile-time discovery, runtime dispatch, and the `routing:debug` command |
-| [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
 | [Extending](docs/EXTENDING.md) | Building tooling on top of the route metadata (`RouteRegistry`), the `@api`/`@internal` surface, and the BC promise |
 
-> [!NOTE]
-> **BC promise**: every class carries `@api` or `@internal`. From `1.0.0`, `@api` classes and methods follow semver; `@internal` ones may change in any release, including a patch. See [Extending](docs/EXTENDING.md) for the full public surface.
+> [!TIP]
+> Want to expose these routes to AI agents/MCP clients? <img src="https://github.com/konradmichalik/typo3-routing-mcp/raw/main/Resources/Public/Icons/Extension.png?raw=true" width="16" height="16" alt=""> [`typo3-routing-mcp`](https://github.com/konradmichalik/typo3-routing-mcp) adds a `#[McpTool]` attribute next to an existing `#[Route]` and serves it over Streamable HTTP.
 
 ## 🧑‍💻 Contributing
 

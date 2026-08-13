@@ -14,7 +14,9 @@
 
 </div>
 
-This extension lets you register **frontend endpoints via PHP attributes** on controller methods: the attribute-based counterpart to the backend-only [`Configuration/Backend/AjaxRoutes.php`](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Backend/Ajax.html). It is response-format agnostic: return JSON, HTML, XML, or a download.
+This extension lets you register **frontend endpoints via PHP attributes** on controller methods — the path, its typed arguments and its caching, rate limiting, authentication and CORS policy all declared where the endpoint lives. It is response-format agnostic: return JSON, HTML, XML, or a download.
+
+The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxRoutes.php`](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/Backend/Ajax.html); closing that gap is where this extension started, though a `#[Route]` today carries considerably more than a path-to-controller mapping.
 
 > [!NOTE]
 > The goal is a familiar, Symfony-Routing-like developer experience: declare a frontend endpoint with a single `#[Route]` attribute instead of wiring a custom middleware and duplicating the path across PHP and JavaScript.

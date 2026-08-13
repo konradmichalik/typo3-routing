@@ -23,6 +23,27 @@ final readonly class CourseSearchController implements RouteControllerInterface
 
 A controller method declares **only the parameters it needs** — there is no fixed signature. Type-hint `ServerRequestInterface` to receive the request; everything else is resolved by name from the route (see [Typed arguments](#typed-controller-arguments)).
 
+## Contents
+
+- [The `#[Route]` attribute](#the-route-attribute)
+- [Priority](#priority)
+- [Defaults (optional placeholders)](#defaults-optional-placeholders)
+- [Schemes](#schemes)
+- [Host](#host)
+  - [Wildcards and multiple hosts](#wildcards-and-multiple-hosts)
+- [Description](#description)
+- [Class-level prefix (route groups)](#class-level-prefix-route-groups)
+- [Requirements](#requirements)
+  - [Named requirement patterns](#named-requirement-patterns)
+- [Typed controller arguments](#typed-controller-arguments)
+  - [Backed enums](#backed-enums)
+  - [Entity resolution](#entity-resolution)
+  - [Variadics](#variadics)
+  - [Overriding the source with `#[Param]`](#overriding-the-source-with-param)
+    - [Declaring the constraint at the parameter](#declaring-the-constraint-at-the-parameter)
+    - [Documenting the parameter](#documenting-the-parameter)
+- [Error responses from controllers](#error-responses-from-controllers)
+
 ## The `#[Route]` attribute
 
 The attribute is repeatable. Its parameters:
@@ -67,6 +88,8 @@ public function blog(int $page): ResponseInterface { /* … */ }
 The default flows through everywhere the placeholder does: it is available as a request attribute, resolved into the matching controller argument, and used by URL generation — `{routing:uri(route: 'blog')}` produces `/api/blog`, while `{routing:uri(route: 'blog', parameters: {page: 5})}` produces `/api/blog/5`.
 
 Keys starting with `_` are reserved for internal metadata and are rejected at build time.
+
+Instead of repeating the placeholder name in `defaults`, a [`#[Param]`](#declaring-the-constraint-at-the-parameter) on the parameter contributes its PHP default — `public function blog(#[Param] int $page = 1)` makes the trailing `{page}` optional without a `defaults` entry.
 
 ## Schemes
 
@@ -162,6 +185,8 @@ How the class-level values combine with each method:
 
 - **Path placeholders** (a name that appears as `{name}` in the path) are enforced by the **matcher**: a violating path is treated as no match → **404**.
 - **Any other name** is a required **query or POST-body** parameter, validated at **dispatch**: missing or format-violating → **400**, before your controller runs. (`''` means presence only.)
+
+A constraint can equivalently be written on the parameter itself with [`#[Param(requirement:)]`](#declaring-the-constraint-at-the-parameter) — which additionally allows an *optional but constrained* parameter.
 
 ```php
 #[Route(
@@ -286,12 +311,14 @@ public function filter(int ...$ids): ResponseInterface
 
 ### Overriding the source with `#[Param]`
 
-By default the lookup key is the parameter name and the source is auto-derived. The [`#[Param]`](../Classes/Attribute/Param.php) attribute overrides either:
+By default the lookup key is the parameter name and the source is auto-derived. The [`#[Param]`](../Classes/Attribute/Param.php) attribute overrides these, and can state the parameter's constraint next to the parameter itself:
 
-| Argument | Description                                                            |
-|----------|------------------------------------------------------------------------|
-| `name`   | Read a different input/path key than the parameter name.               |
-| `source` | Pin the source: `path`, `query`, `body` (form or JSON), or `input` (query + body). |
+| Argument      | Description                                                            |
+|---------------|------------------------------------------------------------------------|
+| `name`        | Read a different input/path key than the parameter name.               |
+| `source`      | Pin the source: `path`, `query`, `body` (form or JSON), or `input` (query + body). |
+| `requirement` | Regex the value must satisfy, equivalent to a [`requirements`](#requirements) entry on the `#[Route]`. |
+| `description` | Human-readable summary of the parameter, surfaced in the [OpenAPI export](HOW-IT-WORKS.md#openapi-export). |
 
 ```php
 use KonradMichalik\Typo3Routing\Attribute\Param;
@@ -304,6 +331,37 @@ public function search(
     // …
 }
 ```
+
+#### Declaring the constraint at the parameter
+
+A `requirement` is folded into the route's `requirements` at build time, keyed by the **wire name** — so with `#[Param(name: 'q', requirement: '\w+')] string $term` the constraint lands under `q`, not `term`. Enforcement, `routing:debug` and the OpenAPI export are therefore identical to declaring it on the `#[Route]`; only the place you write it differs.
+
+The reason to prefer it is that a `#[Param]` also carries the parameter's **PHP default** into the route:
+
+```php
+// Equivalent to requirements: ['page' => '\d+'], defaults: ['page' => 1] on the #[Route] —
+// but the signature now states the optionality itself.
+#[Route(path: '/api/blog/{page}', name: 'blog')]
+public function blog(#[Param(requirement: '\d+')] int $page = 1): ResponseInterface { /* … */ }
+```
+
+Two rules follow from this:
+
+- **A defaulted parameter is optional but still constrained.** A missing value falls back to the default instead of yielding a `400`; a value that *is* present is still checked against the regex. On the `#[Route]` a non-path requirement is always mandatory, so this combination can only be expressed here.
+- **Only `#[Param]`-carrying parameters contribute.** A parameter without the attribute behaves exactly as before — a PHP default alone never makes a path placeholder optional.
+
+#### Documenting the parameter
+
+`description` is the per-parameter counterpart to `#[Route(description:)]`, which summarises the *operation*. It reaches the OpenAPI document as the parameter's `description` — or, for a body parameter, as the `description` of its property in the request-body schema. Parameters without one stay free of the key entirely.
+
+```php
+#[Route(path: '/api/courses', name: 'courses_filter')]
+public function filter(
+    #[Param(requirement: '\d+', description: 'Page number, 1-based.')] int $page = 1,
+): ResponseInterface { /* … */ }
+```
+
+Rejected at build time: a key constrained on both the `#[Route]` and a `#[Param]` (a class-level `#[Route]` requirement is only a base and stays overridable), `requirement: ''` on a defaulted parameter (`''` means "must be present", which the default contradicts), and a default on a placeholder that is not at the end of the path (only a trailing placeholder can become optional).
 
 ## Error responses from controllers
 

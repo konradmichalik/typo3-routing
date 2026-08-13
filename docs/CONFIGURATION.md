@@ -2,7 +2,7 @@
 
 ## Path gate
 
-The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path, baked into the compiled container next to the compiled matcher. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
+The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path (plus its slashless form where it ends in a slash, so the [trailing-slash tolerance](#trailing-slashes) below can do its work), baked into the compiled container next to the compiled matcher. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
 
 A path outside the gate falls through to normal page rendering at zero cost. With no routes registered at all the gate is empty and rejects everything, so the dispatcher costs a single string comparison per page request.
 
@@ -23,7 +23,7 @@ The tolerance costs nothing in the normal case: the extra match attempt only run
 
 Two things stay untouched by it:
 
-- **Generated URLs** keep exactly the form you declared — that is still the canonical one (`{routing:uri()}`, `routing:debug`, the OpenAPI export).
+- **The declared form stays canonical.** Generated URLs (`{routing:uri()}`, `RouteUrlGenerator`) keep exactly the form you wrote, and so do the route exports that report it — `routing:debug` and the OpenAPI document.
 - **`405` beats the retry.** A path that matches a route with the wrong HTTP method answers `405` with its `Allow` header, whether or not the trailing slash matched what was declared.
 
 ## Exclusive path prefixes

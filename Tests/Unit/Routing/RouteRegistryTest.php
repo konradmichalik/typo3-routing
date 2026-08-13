@@ -70,6 +70,40 @@ final class RouteRegistryTest extends TestCase
         self::assertSame([''], $prefixes);
     }
 
+    /**
+     * A path declared with a trailing slash also has to let its slashless form reach the matcher, which
+     * tolerates the difference — so the gate keeps the shorter prefix next to the declared one.
+     */
+    #[Test]
+    public function staticPrefixesCoverTheSlashlessFormOfAPathDeclaredWithATrailingSlash(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+
+        $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
+
+        self::assertSame(['/api/slashed/', '/api/slashed'], $prefixes);
+    }
+
+    /**
+     * The root path is all slash, so trimming would leave the empty prefix. Keeping `/` loses nothing:
+     * it already matches every path.
+     */
+    #[Test]
+    public function staticPrefixesKeepTheRootPathAsItIs(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'root' => ['path' => '/', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+
+        $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
+
+        self::assertSame(['/'], $prefixes);
+    }
+
     #[Test]
     public function exposesTheStaticPrefixesBakedInAtCompileTime(): void
     {

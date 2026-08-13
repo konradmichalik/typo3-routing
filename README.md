@@ -105,7 +105,7 @@ See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments
 | [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
 | [Usage](docs/USAGE.md) | The `#[Route]` attribute, `requirements`, and typed controller arguments |
 | [URL Generation](docs/URL-GENERATION.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator |
-| [Configuration](docs/CONFIGURATION.md) | Derived path gate, exclusive path prefixes, environment-bound routes, middleware placement |
+| [Configuration](docs/CONFIGURATION.md) | Derived path gate, trailing slashes, exclusive path prefixes, environment-bound routes, middleware placement |
 | [Caching](docs/CACHING.md) | Opt-in response caching with `#[Cache]` and tag-based invalidation |
 | [Rate Limiting](docs/RATE-LIMITING.md) | Opt-in per-IP throttling with `#[RateLimit]` |
 | [Authentication & CSRF](docs/AUTHENTICATION.md) | Protecting routes with `#[Authenticate]`, request tokens, and deployment notes |

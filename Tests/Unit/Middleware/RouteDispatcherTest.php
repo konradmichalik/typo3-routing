@@ -22,7 +22,7 @@ use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
-use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
@@ -67,6 +67,67 @@ final class RouteDispatcherTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function dispatchesMatchingRouteWithAnAddedTrailingSlash(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/count/'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    /**
+     * The inverse direction has to clear the path gate first, and that gate is derived from the declared
+     * paths — so a path declared *with* a trailing slash must contribute its slashless prefix as well.
+     * Nothing is claimed exclusively here, so the derived gate is the only thing standing in front of
+     * the matcher (as in a default installation).
+     */
+    #[Test]
+    public function dispatchesARouteDeclaredWithATrailingSlashWhenTheRequestOmitsIt(): void
+    {
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('', $this->registry());
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/api/slashed'),
+            $this->handler(new Response('php://temp', 418)),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function answersACorsPreflightForARouteDeclaredWithATrailingSlashWhenTheRequestOmitsIt(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        // Path-less get() feeds CorsHandler; every keyed call yields '' — no prefix is claimed exclusively.
+        $extensionConfiguration->method('get')->willReturnCallback(
+            static fn (string $extension, string $path = ''): mixed => '' === $path
+                ? ['cors' => ['allowedOrigins' => 'https://app.example.com']]
+                : '',
+        );
+
+        $dispatcher = $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, null, $this->registry());
+        $request = $this->request('OPTIONS', 'https://example.com/api/slashed')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'GET');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 418)));
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('https://app.example.com', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('GET, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+    }
+
+    #[Test]
+    public function returnsMethodNotAllowedForTheTrailingSlashVariantOfAKnownPath(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/submit/'));
+
+        self::assertSame(405, $response->getStatusCode());
+        self::assertSame('POST', $response->getHeaderLine('Allow'));
     }
 
     #[Test]
@@ -319,7 +380,8 @@ final class RouteDispatcherTest extends TestCase
         $registry = $this->registry();
         $context = new Context();
         $cors = new CorsHandler($extensionConfiguration);
-        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
+        $matcher = new RouteMatcher($registry, $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -781,7 +843,9 @@ final class RouteDispatcherTest extends TestCase
         $context ??= new Context();
         $accessGuard = new AccessGuard($registry, $context);
 
-        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
+        $matcher = new RouteMatcher($registry, $extensionConfiguration);
+
+        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
@@ -805,6 +869,7 @@ final class RouteDispatcherTest extends TestCase
             'entity' => ['path' => '/api/entity/{item}', 'methods' => ['GET'], 'controller' => 'entityCtrl::show', 'env' => null, 'requirements' => []],
             'problem' => ['path' => '/api/problem', 'methods' => ['GET'], 'controller' => 'ctrl::problem', 'env' => null, 'requirements' => []],
             'corsOverride' => ['path' => '/api/cors-override', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -842,6 +907,7 @@ final class RouteDispatcherTest extends TestCase
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
             'problem' => [],
             'corsOverride' => [],
+            'slashed' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

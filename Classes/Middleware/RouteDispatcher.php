@@ -17,7 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, JsonErrorResponse, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
-use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteMatcher, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
@@ -52,6 +52,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
     public function __construct(
         private RouteRegistry $registry,
+        private RouteMatcher $matcher,
         private SiteBasePathResolver $basePathResolver,
         private ResponseCacheManager $cache,
         private RateLimitCheck $rateLimitCheck,
@@ -165,7 +166,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface|null
     {
         try {
-            return $this->registry->getMatcher($this->requestContext($request))->match($path);
+            return $this->matcher->match($path, $this->requestContext($request));
         } catch (ResourceNotFoundException) {
             return $this->exclusive->matches($path) ? JsonErrorResponse::create(404, 'Not Found') : null;
         } catch (MethodNotAllowedException $exception) {

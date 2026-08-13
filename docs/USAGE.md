@@ -29,7 +29,7 @@ The attribute is repeatable. Its parameters:
 
 | Parameter      | Type                    | Default   | Description                                                              |
 |----------------|-------------------------|-----------|--------------------------------------------------------------------------|
-| `path`         | `string`                | –         | Full request path, relative to the site base (e.g. `/api/...`).          |
+| `path`         | `string`                | –         | Full request path, relative to the site base (e.g. `/api/...`). A trailing slash is tolerated in either direction unless that is switched off — see [Trailing slashes](CONFIGURATION.md#trailing-slashes). |
 | `methods`      | `list<string>`          | `['GET']` | Allowed HTTP methods.                                                    |
 | `name`         | `?string`               | `null`    | Route name; auto-derived from service id + method when omitted.          |
 | `env`          | `?string`               | `null`    | Bind the route to a top-level application context (e.g. `Development`).  |

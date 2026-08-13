@@ -2,7 +2,7 @@
 
 ## Path gate
 
-The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path, baked into the compiled container next to the compiled matcher. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
+The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path (plus its slashless form where it ends in a slash, so the [trailing-slash tolerance](#trailing-slashes) below can do its work), baked into the compiled container next to the compiled matcher. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
 
 A path outside the gate falls through to normal page rendering at zero cost. With no routes registered at all the gate is empty and rejects everything, so the dispatcher costs a single string comparison per page request.
 
@@ -10,6 +10,21 @@ A path outside the gate falls through to normal page rendering at zero cost. Wit
 > A route whose path starts with a placeholder (e.g. `/{slug}`) has no static prefix, so it opens the gate for every path — the matcher then decides. That is unavoidable and correct: such a route can match anywhere.
 
 Route paths in the `#[Route]` attribute are always written in full.
+
+## Trailing slashes
+
+A route declared as `/api/example` also answers `/api/example/`, and a path declared *with* a trailing slash equally answers the form without one — the same endpoint never needs a second `#[Route]`. Both forms return the response directly; there is no redirect, so API clients never pay a second round trip.
+
+| Setting         | Description                                                                                  | Default |
+|-----------------|----------------------------------------------------------------------------------------------|---------|
+| `trailingSlash` | Tolerate a trailing slash the route did not declare (and its absence where it did). `0` matches paths strictly as declared. | `1`     |
+
+The tolerance costs nothing in the normal case: the extra match attempt only runs once the exact path has already failed to match.
+
+Two things stay untouched by it:
+
+- **The declared form stays canonical.** Generated URLs (`{routing:uri()}`, `RouteUrlGenerator`) keep exactly the form you wrote, and so do the route exports that report it — `routing:debug` and the OpenAPI document.
+- **`405` beats the retry.** A path that matches a route with the wrong HTTP method answers `405` with its `Allow` header, whether or not the trailing slash matched what was declared.
 
 ## Exclusive path prefixes
 

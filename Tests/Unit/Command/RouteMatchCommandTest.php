@@ -14,11 +14,12 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Command;
 
 use KonradMichalik\Typo3Routing\Command\RouteMatchCommand;
-use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ServiceLocator;
+use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 
 /**
  * RouteMatchCommandTest.
@@ -39,6 +40,20 @@ final class RouteMatchCommandTest extends TestCase
         self::assertSame(0, $exitCode);
         self::assertStringContainsString('Matched route "example_count"', $display);
         self::assertStringContainsString('ctrl::count', $display);
+    }
+
+    /**
+     * The simulation has to answer for the dispatcher, which serves both forms.
+     */
+    #[Test]
+    public function reportsTheWinningRouteForAPathWithAnAddedTrailingSlash(): void
+    {
+        $tester = $this->tester();
+
+        $exitCode = $tester->execute(['path' => '/api/example/count/']);
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('Matched route "example_count"', $tester->getDisplay());
     }
 
     #[Test]
@@ -127,7 +142,10 @@ final class RouteMatchCommandTest extends TestCase
 
     private function tester(): CommandTester
     {
-        return new CommandTester(new RouteMatchCommand($this->registry()));
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn('1');
+
+        return new CommandTester(new RouteMatchCommand(new RouteMatcher($this->registry(), $extensionConfiguration)));
     }
 
     private function registry(): RouteRegistry

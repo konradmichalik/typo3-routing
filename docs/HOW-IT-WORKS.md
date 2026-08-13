@@ -43,7 +43,7 @@ vendor/bin/typo3 routing:debug --cached --json             # cached routes, mach
 
 ## Match simulation command
 
-`routing:match` runs the same matcher the dispatcher uses and reports which route wins for a given path — or why none does. Give the path **without the site base** (exactly as written in `#[Route]`); the leading slash is optional. `--method` (default `GET`), `--scheme` (default `https`) and `--host` (default `localhost`) simulate the request so `schemes`/`host` constraints and priority overlaps can be debugged.
+`routing:match` runs the same matcher the dispatcher uses — [trailing-slash tolerance](CONFIGURATION.md#trailing-slashes) included — and reports which route wins for a given path, or why none does. Give the path **without the site base** (exactly as written in `#[Route]`); the leading slash is optional. `--method` (default `GET`), `--scheme` (default `https`) and `--host` (default `localhost`) simulate the request so `schemes`/`host` constraints and priority overlaps can be debugged.
 
 ``` bash
 vendor/bin/typo3 routing:match /api/item/new                        # which route claims this path?

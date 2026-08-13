@@ -11,6 +11,21 @@ A path outside the gate falls through to normal page rendering at zero cost. Wit
 
 Route paths in the `#[Route]` attribute are always written in full.
 
+## Trailing slashes
+
+A route declared as `/api/example` also answers `/api/example/`, and a path declared *with* a trailing slash equally answers the form without one — the same endpoint never needs a second `#[Route]`. Both forms return the response directly; there is no redirect, so API clients never pay a second round trip.
+
+| Setting         | Description                                                                                  | Default |
+|-----------------|----------------------------------------------------------------------------------------------|---------|
+| `trailingSlash` | Tolerate a trailing slash the route did not declare (and its absence where it did). `0` matches paths strictly as declared. | `1`     |
+
+The tolerance costs nothing in the normal case: the extra match attempt only runs once the exact path has already failed to match.
+
+Two things stay untouched by it:
+
+- **Generated URLs** keep exactly the form you declared — that is still the canonical one (`{routing:uri()}`, `routing:debug`, the OpenAPI export).
+- **`405` beats the retry.** A path that matches a route with the wrong HTTP method answers `405` with its `Allow` header, whether or not the trailing slash matched what was declared.
+
 ## Exclusive path prefixes
 
 Separate from the gate, you can reserve path spaces **exclusively** for attribute routes. Inside them a path matching no route returns a JSON `404` instead of falling through to page rendering. Configure it via **Settings → Extension Configuration → typo3_routing**:

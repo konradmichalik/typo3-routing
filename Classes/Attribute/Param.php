@@ -26,11 +26,15 @@ use Attribute;
 final readonly class Param
 {
     /**
-     * @param string|null $name   Input/path key to read instead of the parameter name
-     * @param string|null $source Pin the value source: "path", "query", "body" or "input" (query + body)
+     * @param string|null $name        Input/path key to read instead of the parameter name
+     * @param string|null $source      Pin the value source: "path", "query", "body" or "input" (query + body)
+     * @param string|null $requirement Regex the value must satisfy, hoisted into the route's requirements
+     * @param string|null $description Human-readable summary of the parameter, surfaced in the OpenAPI export
      */
     public function __construct(
         public ?string $name = null,
         public ?string $source = null,
+        public ?string $requirement = null,
+        public ?string $description = null,
     ) {}
 }

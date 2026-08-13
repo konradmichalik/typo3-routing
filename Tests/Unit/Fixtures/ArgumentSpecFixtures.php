@@ -50,6 +50,26 @@ final class ArgumentSpecFixtures
 
     public function variadicSourced(#[Param(source: 'query')] int ...$ids): void {}
 
+    public function constrainedPath(#[Param(requirement: '\d+')] int $id): void {}
+
+    public function constrainedInput(#[Param(requirement: '\d+')] int $q): void {}
+
+    public function constrainedRenamed(#[Param(name: 'foo', requirement: '\w+')] string $bar): void {}
+
+    public function optionalTrailingPath(#[Param(requirement: '\d+')] int $page = 1): void {}
+
+    public function optionalInput(#[Param(requirement: '\d+')] int $page = 1): void {}
+
+    public function unattributedDefault(int $page = 1): void {}
+
+    public function optionalLeadingPath(#[Param] int $page = 1, ?string $slug = null): void {}
+
+    public function presenceOnlyWithDefault(#[Param(requirement: '')] string $q = 'x'): void {}
+
+    public function describedParam(#[Param(description: 'Page number, 1-based.')] int $page = 1): void {}
+
+    public function describedRenamed(#[Param(name: 'q', description: 'Free-text search term.')] string $term): void {}
+
     public function unionType(int|string $value): void {}
 
     public function unsupportedObject(DateTimeImmutable $when): void {}

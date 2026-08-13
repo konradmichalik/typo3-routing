@@ -145,6 +145,28 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function acceptsAMissingInputWhoseArgumentHasADefault(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'optional', '_requirements' => ['page' => '\d+']],
+            $this->request(),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function stillRejectsAViolatingValueWhenTheArgumentHasADefault(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'optional', '_requirements' => ['page' => '\d+']],
+            $this->request(['page' => 'abc']),
+        );
+
+        self::assertSame('Invalid value for parameter: page', $error);
+    }
+
+    #[Test]
     public function treatsARouteWithoutAnEnvAsVisibleEverywhere(): void
     {
         self::assertTrue($this->invoker()->isVisibleInCurrentContext(null));
@@ -196,6 +218,7 @@ final class ControllerInvokerTest extends TestCase
             'submit' => [['name' => 'request', 'type' => null, 'source' => 'request', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
             'problem' => [],
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
+            'optional' => [['name' => 'page', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 1]],
         ];
 
         $locator = new ServiceLocator([

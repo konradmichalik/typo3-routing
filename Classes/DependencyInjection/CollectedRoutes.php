@@ -36,6 +36,9 @@ final class CollectedRoutes
     /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> */
     public array $arguments = [];
 
+    /** @var array<string, array<string, string>> Route name → wire name → #[Param] description */
+    public array $paramDescriptions = [];
+
     /** @var array<string, list<array{service: string, options: array<string, mixed>}>> */
     public array $authenticators = [];
 

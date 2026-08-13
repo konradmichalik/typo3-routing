@@ -42,6 +42,7 @@ final class RouteRegistry
      * @param array<mixed>                                                                                                                                                                                                                                                 $compiledRoutes
      * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                       $corsConfigs
      * @param list<string>                                                                                                                                                                                                                                                 $staticPrefixes
+     * @param array<string, array<string, string>>                                                                                                                                                                                                                         $paramDescriptions
      */
     public function __construct(
         private readonly array $routes,
@@ -55,6 +56,7 @@ final class RouteRegistry
         private readonly array $compiledRoutes = [],
         private readonly array $corsConfigs = [],
         private readonly array $staticPrefixes = [],
+        private readonly array $paramDescriptions = [],
     ) {}
 
     /**
@@ -216,6 +218,16 @@ final class RouteRegistry
     public function getArguments(string $routeName): array
     {
         return $this->arguments[$routeName] ?? [];
+    }
+
+    /**
+     * #[Param] descriptions for this route, keyed by wire name. Empty when no parameter declared one.
+     *
+     * @return array<string, string>
+     */
+    public function getParamDescriptions(string $routeName): array
+    {
+        return $this->paramDescriptions[$routeName] ?? [];
     }
 
     /**

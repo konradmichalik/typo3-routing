@@ -22,11 +22,13 @@ use ReflectionNamedType;
 use ReflectionParameter;
 use TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface;
 
+use function array_key_exists;
 use function enum_exists;
 use function in_array;
 use function is_a;
 use function preg_match_all;
 use function sprintf;
+use function str_ends_with;
 
 /**
  * ArgumentSpecFactory.
@@ -63,6 +65,95 @@ final class ArgumentSpecFactory
         }
 
         return $specs;
+    }
+
+    /**
+     * Compile-time only: what the #[Param] attributes on this method contribute to the route itself.
+     * All three keys are keyed by the wire name (so a #[Param(name:)] override applies): a
+     * `requirement` regex, the PHP default of a #[Param]-carrying path placeholder — which is what
+     * makes a trailing placeholder optional — and a `description` for the OpenAPI export.
+     * Parameters without #[Param] contribute nothing, so un-attributed signatures keep matching
+     * exactly as before.
+     *
+     * Specs are paired with the reflected parameters by position, as produced by build().
+     *
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs
+     * @param array<string, string>                                                                                          $routeRequirements Requirements from the method's own #[Route], to reject a key constrained twice
+     *
+     * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>}
+     */
+    public function paramContributions(ReflectionMethod $method, array $specs, string $path, array $routeRequirements, string $serviceId): array
+    {
+        $where = sprintf('%s::%s()', $serviceId, $method->getName());
+        $requirements = [];
+        $defaults = [];
+        $descriptions = [];
+
+        foreach ($method->getParameters() as $position => $parameter) {
+            $attributes = $parameter->getAttributes(Param::class);
+            if ([] === $attributes) {
+                continue;
+            }
+
+            $param = $attributes[0]->newInstance();
+            $spec = $specs[$position];
+            $key = $spec['name'];
+
+            if (null !== $param->requirement) {
+                $this->assertPresenceOnlyHasNoDefault($param->requirement, $spec['hasDefault'], $parameter->getName(), $where);
+                $this->assertNotAlreadyOnRoute($key, $routeRequirements, $parameter->getName(), $where);
+                $requirements[$key] = $param->requirement;
+            }
+
+            if ($spec['hasDefault'] && 'path' === $spec['source']) {
+                $this->assertTrailingPlaceholder($key, $path, $parameter->getName(), $where);
+                $defaults[$key] = $spec['default'];
+            }
+
+            if (null !== $param->description) {
+                $descriptions[$key] = $param->description;
+            }
+        }
+
+        return ['requirements' => $requirements, 'defaults' => $defaults, 'descriptions' => $descriptions];
+    }
+
+    /**
+     * `''` means "must be present", which a default value contradicts — the parameter could never be
+     * absent for the requirement to catch.
+     */
+    private function assertPresenceOnlyHasNoDefault(string $requirement, bool $hasDefault, string $parameterName, string $where): void
+    {
+        if ('' === $requirement && $hasDefault) {
+            throw new LogicException(sprintf('#[Param(requirement: \'\')] on "$%s" of "%s" means "must be present", which contradicts the parameter\'s default value. Drop the default or give the requirement a pattern.', $parameterName, $where), 1750000028);
+        }
+    }
+
+    /**
+     * A key constrained on both the method's #[Route] and its #[Param] leaves no single answer to
+     * which pattern applies. Only the method's own requirements are passed in: a class-level #[Route]
+     * requirement is a base, so a route group stays overridable by a #[Param] on the parameter.
+     *
+     * @param array<string, string> $routeRequirements
+     */
+    private function assertNotAlreadyOnRoute(string $key, array $routeRequirements, string $parameterName, string $where): void
+    {
+        if (array_key_exists($key, $routeRequirements)) {
+            throw new LogicException(sprintf('Requirement "%s" on "%s" is declared both on the #[Route] attribute and via #[Param] on "$%s". Keep one: #[Route] for the route-wide view, #[Param] to state it next to the parameter.', $key, $where, $parameterName), 1750000029);
+        }
+    }
+
+    /**
+     * Only a trailing placeholder can be made optional by a default; anywhere else the default would
+     * be silently inert, so it is rejected rather than quietly ignored.
+     */
+    private function assertTrailingPlaceholder(string $key, string $path, string $parameterName, string $where): void
+    {
+        if (str_ends_with($path, '{'.$key.'}')) {
+            return;
+        }
+
+        throw new LogicException(sprintf('#[Param] on "$%s" of "%s" carries a default, but the placeholder "{%s}" is not at the end of path "%s" — only a trailing placeholder can become optional. Move it to the end or drop the default.', $parameterName, $where, $key, $path), 1750000027);
     }
 
     /**

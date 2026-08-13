@@ -160,11 +160,107 @@ final class ArgumentSpecFactoryTest extends TestCase
         $this->build('unsupportedScalar', '/api/x');
     }
 
+    #[Test]
+    public function hoistsParamRequirementForPathPlaceholder(): void
+    {
+        self::assertSame(['requirements' => ['id' => '\d+'], 'defaults' => [], 'descriptions' => []], $this->contributions('constrainedPath', '/api/x/{id}'));
+    }
+
+    #[Test]
+    public function hoistsParamRequirementForInput(): void
+    {
+        self::assertSame(['requirements' => ['q' => '\d+'], 'defaults' => [], 'descriptions' => []], $this->contributions('constrainedInput', '/api/x'));
+    }
+
+    #[Test]
+    public function keysHoistedRequirementByWireNameNotParameterName(): void
+    {
+        self::assertSame(['requirements' => ['foo' => '\w+'], 'defaults' => [], 'descriptions' => []], $this->contributions('constrainedRenamed', '/api/x'));
+    }
+
+    #[Test]
+    public function hoistsPhpDefaultOfTrailingPathPlaceholder(): void
+    {
+        self::assertSame(['requirements' => ['page' => '\d+'], 'defaults' => ['page' => 1], 'descriptions' => []], $this->contributions('optionalTrailingPath', '/api/blog/{page}'));
+    }
+
+    #[Test]
+    public function doesNotHoistPhpDefaultOfInputParameter(): void
+    {
+        self::assertSame(['requirements' => ['page' => '\d+'], 'defaults' => [], 'descriptions' => []], $this->contributions('optionalInput', '/api/blog'));
+    }
+
+    #[Test]
+    public function contributesNothingWithoutParamAttribute(): void
+    {
+        self::assertSame(['requirements' => [], 'defaults' => [], 'descriptions' => []], $this->contributions('unattributedDefault', '/api/blog/{page}'));
+    }
+
+    #[Test]
+    public function collectsParamDescription(): void
+    {
+        self::assertSame(['requirements' => [], 'defaults' => ['page' => 1], 'descriptions' => ['page' => 'Page number, 1-based.']], $this->contributions('describedParam', '/api/blog/{page}'));
+    }
+
+    #[Test]
+    public function keysADescriptionByWireNameNotParameterName(): void
+    {
+        self::assertSame(['page' => 'Page number, 1-based.'], $this->contributions('describedParam', '/api/blog/{page}')['descriptions']);
+        self::assertSame(['q' => 'Free-text search term.'], $this->contributions('describedRenamed', '/api/x')['descriptions']);
+    }
+
+    #[Test]
+    public function rejectsDefaultOnNonTrailingPathPlaceholder(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000027);
+
+        $this->contributions('optionalLeadingPath', '/api/x/{page}/{slug}');
+    }
+
+    #[Test]
+    public function rejectsARequirementAlsoDeclaredOnTheRoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000029);
+
+        $reflection = new ReflectionMethod(ArgumentSpecFixtures::class, 'constrainedPath');
+
+        $this->factory->paramContributions($reflection, $this->build('constrainedPath', '/api/x/{id}'), '/api/x/{id}', ['id' => '\d+'], 'fixtures');
+    }
+
+    #[Test]
+    public function derivesTheErrorLocationFromTheServiceId(): void
+    {
+        $this->expectExceptionMessage('"fixtures::presenceOnlyWithDefault()"');
+
+        $this->contributions('presenceOnlyWithDefault', '/api/x');
+    }
+
+    #[Test]
+    public function rejectsPresenceOnlyRequirementOnDefaultedParameter(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000028);
+
+        $this->contributions('presenceOnlyWithDefault', '/api/x');
+    }
+
     /**
      * @return list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>
      */
     private function build(string $method, string $path): array
     {
         return $this->factory->build(new ReflectionMethod(ArgumentSpecFixtures::class, $method), $path, 'fixtures');
+    }
+
+    /**
+     * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>}
+     */
+    private function contributions(string $method, string $path): array
+    {
+        $reflection = new ReflectionMethod(ArgumentSpecFixtures::class, $method);
+
+        return $this->factory->paramContributions($reflection, $this->build($method, $path), $path, [], 'fixtures');
     }
 }

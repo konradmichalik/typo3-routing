@@ -76,6 +76,10 @@ final readonly class ControllerInvoker
      * Validates `requirements` whose name is not a matched path placeholder against the query and parsed
      * body: a missing parameter or a value violating the regex yields a 400.
      *
+     * A requirement on an argument that has a PHP default is "optional but constrained": its absence
+     * falls back to the default instead of being an error, while a value that is present is still
+     * checked against the pattern.
+     *
      * @param array<string, mixed> $match
      */
     public function firstInputRequirementError(array $match, ServerRequestInterface $request): ?string
@@ -90,6 +94,10 @@ final readonly class ControllerInvoker
                 continue;
             }
             if (!array_key_exists($key, $inputs)) {
+                if ($this->argumentHasDefault((string) ($match['_route'] ?? ''), $key)) {
+                    continue;
+                }
+
                 return sprintf('Missing required parameter: %s', $key);
             }
             if (is_string($pattern) && $this->inputViolatesPattern($pattern, $inputs[$key])) {
@@ -113,6 +121,22 @@ final readonly class ControllerInvoker
         $current = explode('/', (string) Environment::getContext())[0];
 
         return strtolower($current) === strtolower($env);
+    }
+
+    /**
+     * Whether this route's argument of that wire name carries a PHP default — which makes its
+     * requirement "validate if present" instead of mandatory. Only consulted once an input is
+     * actually found missing, so routes without requirements never pay for the lookup.
+     */
+    private function argumentHasDefault(string $routeName, string $key): bool
+    {
+        foreach ($this->registry->getArguments($routeName) as $argument) {
+            if ($argument['name'] === $key) {
+                return $argument['hasDefault'];
+            }
+        }
+
+        return false;
     }
 
     /**

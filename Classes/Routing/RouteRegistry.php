@@ -96,6 +96,12 @@ final class RouteRegistry
      * starting with a placeholder (`/{slug}`) yields the empty string, which matches every path —
      * correct, since such a route can live anywhere.
      *
+     * A prefix ending in a slash contributes its slashless form as well: `RouteMatcher` tolerates that
+     * difference, but it never gets the chance if the gate rejects the path first. Widening the gate is
+     * safe in either configuration — it is a filter, so a broader prefix only means the matcher gets to
+     * decide. The root prefix `/` is left alone: trimming it would leave the empty string, and it
+     * already matches every path anyway.
+     *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
      *
      * @return list<string>
@@ -104,7 +110,13 @@ final class RouteRegistry
     {
         $prefixes = [];
         foreach ($collection->all() as $route) {
-            $prefixes[] = $route->compile()->getStaticPrefix();
+            $prefix = $route->compile()->getStaticPrefix();
+            $prefixes[] = $prefix;
+
+            $slashless = rtrim($prefix, '/');
+            if ('' !== $slashless) {
+                $prefixes[] = $slashless;
+            }
         }
 
         return array_values(array_unique($prefixes));

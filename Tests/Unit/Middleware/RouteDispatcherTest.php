@@ -78,6 +78,49 @@ final class RouteDispatcherTest extends TestCase
         self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
     }
 
+    /**
+     * The inverse direction has to clear the path gate first, and that gate is derived from the declared
+     * paths — so a path declared *with* a trailing slash must contribute its slashless prefix as well.
+     * Nothing is claimed exclusively here, so the derived gate is the only thing standing in front of
+     * the matcher (as in a default installation).
+     */
+    #[Test]
+    public function dispatchesARouteDeclaredWithATrailingSlashWhenTheRequestOmitsIt(): void
+    {
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('', $this->registry());
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/api/slashed'),
+            $this->handler(new Response('php://temp', 418)),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function answersACorsPreflightForARouteDeclaredWithATrailingSlashWhenTheRequestOmitsIt(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        // Path-less get() feeds CorsHandler; every keyed call yields '' — no prefix is claimed exclusively.
+        $extensionConfiguration->method('get')->willReturnCallback(
+            static fn (string $extension, string $path = ''): mixed => '' === $path
+                ? ['cors' => ['allowedOrigins' => 'https://app.example.com']]
+                : '',
+        );
+
+        $dispatcher = $this->dispatcherWith(new CorsHandler($extensionConfiguration), $extensionConfiguration, null, $this->registry());
+        $request = $this->request('OPTIONS', 'https://example.com/api/slashed')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'GET');
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 418)));
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('https://app.example.com', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('GET, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+    }
+
     #[Test]
     public function returnsMethodNotAllowedForTheTrailingSlashVariantOfAKnownPath(): void
     {
@@ -826,6 +869,7 @@ final class RouteDispatcherTest extends TestCase
             'entity' => ['path' => '/api/entity/{item}', 'methods' => ['GET'], 'controller' => 'entityCtrl::show', 'env' => null, 'requirements' => []],
             'problem' => ['path' => '/api/problem', 'methods' => ['GET'], 'controller' => 'ctrl::problem', 'env' => null, 'requirements' => []],
             'corsOverride' => ['path' => '/api/cors-override', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -863,6 +907,7 @@ final class RouteDispatcherTest extends TestCase
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
             'problem' => [],
             'corsOverride' => [],
+            'slashed' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

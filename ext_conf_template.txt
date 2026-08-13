@@ -1,6 +1,9 @@
 # cat=basic/enable/010; type=string; label=Exclusive API path prefixes:Path spaces reserved exclusively for attribute routes (comma-separated, e.g. /api/, /va/, checked after stripping the site/language base). Inside them a path matching no route returns a JSON 404 instead of falling through to normal page rendering. This is NOT needed to make routes work: the performance gate that keeps matching off the hot path for ordinary page requests is derived from your #[Route] paths automatically. Leave EMPTY (default) unless you want that JSON 404 behaviour.
 exclusivePrefixes =
 
+# cat=basic/enable/020; type=boolean; label=Tolerate trailing slashes:A route declared as /api/example also answers /api/example/ (and vice versa for a path declared with a trailing slash), so the same endpoint needs only one #[Route]. Both forms return the response directly — no redirect. Disable to match paths strictly as declared. The extra match attempt only runs after the exact path already failed, so ordinary requests are unaffected.
+trailingSlash = 1
+
 # cat=authentication/enable/010; type=string; label=Bearer token env variable name:Default name of the process environment variable that holds the expected bearer token for BearerTokenAuthenticator. Only the variable NAME is stored here, never the secret value. Overridable per route via #[Authenticate(BearerTokenAuthenticator::class, options: ['envName' => '...'])]. Defaults to ROUTING_BEARER_TOKEN when left empty.
 bearerTokenEnvName = ROUTING_BEARER_TOKEN
 
@@ -19,5 +22,5 @@ cors.exposeHeaders =
 # cat=cors/enable/050; type=int+; label=CORS preflight max age:How long (seconds) the browser may cache the preflight result (Access-Control-Max-Age). Defaults to 3600.
 cors.maxAge = 3600
 
-# cat=basic/enable/020; type=boolean; label=Swagger UI (development only):Serve a Swagger UI page and the underlying OpenAPI JSON document at /api/_routing/docs and /api/_routing/openapi.json. Only ever reachable in the "Development" application context AND when this flag is enabled (both required) — never available in Production, regardless of this setting.
+# cat=basic/enable/030; type=boolean; label=Swagger UI (development only):Serve a Swagger UI page and the underlying OpenAPI JSON document at /api/_routing/docs and /api/_routing/openapi.json. Only ever reachable in the "Development" application context AND when this flag is enabled (both required) — never available in Production, regardless of this setting.
 swaggerUi = 0

@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Command;
 
-use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Routing\RouteMatcher;
 use Override;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -41,7 +41,7 @@ use function strtoupper;
 final class RouteMatchCommand extends Command
 {
     public function __construct(
-        private readonly RouteRegistry $registry,
+        private readonly RouteMatcher $matcher,
     ) {
         parent::__construct();
     }
@@ -63,7 +63,8 @@ final class RouteMatchCommand extends Command
         $context = $this->context($input);
 
         try {
-            $match = $this->registry->getMatcher($context)->match($path);
+            // The dispatcher's matcher, so the simulation reflects its trailing-slash tolerance too.
+            $match = $this->matcher->match($path, $context);
         } catch (ResourceNotFoundException) {
             $io->error(sprintf('No route matches "%s %s" (scheme %s, host %s).', $context->getMethod(), $path, $context->getScheme(), $context->getHost()));
 

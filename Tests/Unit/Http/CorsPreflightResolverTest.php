@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver};
-use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
@@ -45,6 +45,17 @@ final class CorsPreflightResolverTest extends TestCase
         $resolver = $this->resolver(['allowedOrigins' => 'https://app.example.com']);
 
         self::assertNull($resolver->resolve($this->request('OPTIONS'), '/api/public', new RequestContext()));
+    }
+
+    #[Test]
+    public function answersThePreflightForTheTrailingSlashVariantOfARoute(): void
+    {
+        $resolver = $this->resolver(['allowedOrigins' => 'https://app.example.com']);
+
+        $response = $resolver->resolve($this->request('OPTIONS', 'GET'), '/api/public/', new RequestContext());
+
+        self::assertNotNull($response);
+        self::assertSame('GET, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
     }
 
     #[Test]
@@ -122,7 +133,7 @@ final class CorsPreflightResolverTest extends TestCase
 
         $registry = new RouteRegistry($routes, new ServiceLocator([]), corsConfigs: $corsConfigs);
 
-        return new CorsPreflightResolver($registry, new CorsHandler($extensionConfiguration));
+        return new CorsPreflightResolver($registry, new RouteMatcher($registry, $extensionConfiguration), new CorsHandler($extensionConfiguration));
     }
 
     private function request(string $method, ?string $intendedMethod = null): ServerRequest

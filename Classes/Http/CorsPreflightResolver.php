@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Http;
 
-use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
 use Symfony\Component\Routing\RequestContext;
@@ -31,6 +31,7 @@ final readonly class CorsPreflightResolver
 {
     public function __construct(
         private RouteRegistry $registry,
+        private RouteMatcher $matcher,
         private CorsHandler $cors,
     ) {}
 
@@ -51,7 +52,8 @@ final readonly class CorsPreflightResolver
             // "not allowed" exception with no specific route — matching on the intended method instead
             // resolves exactly the route the real request will hit, and with it its own #[Cors] override.
             $context->setMethod($intendedMethod);
-            $match = $this->registry->getMatcher($context)->match($path);
+            // Trailing-slash tolerant, like the real request the browser is about to send.
+            $match = $this->matcher->match($path, $context);
         } catch (MethodNotAllowedException $exception) {
             // No route accepts the intended method at all — same fate the real request would meet, so
             // only the global policy applies (there is no specific route to resolve an override from).

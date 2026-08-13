@@ -84,6 +84,19 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
     }
 
+    /**
+     * The route declares `/api/example/count` without a trailing slash; both forms reach it, so the
+     * same endpoint never needs a second #[Route].
+     */
+    #[Test]
+    public function dispatchesMatchingRouteWithAnAddedTrailingSlash(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/count/'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
     #[Test]
     public function mapsAControllerThrownProblemToAProblemDetailsResponse(): void
     {

@@ -66,6 +66,24 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function addsParamDescriptionToTheParameterAndOmitsItWhenAbsent(): void
+    {
+        [$id, $status] = $this->generate()['paths']['/api/v1/items/{id}']['get']['parameters'];
+
+        self::assertSame('Filter by publication status.', $status['description']);
+        // A parameter without a #[Param] description stays free of the key entirely.
+        self::assertArrayNotHasKey('description', $id);
+    }
+
+    #[Test]
+    public function addsParamDescriptionToABodyProperty(): void
+    {
+        $schema = $this->generate()['paths']['/api/v1/items']['post']['requestBody']['content']['application/json']['schema'];
+
+        self::assertSame('Human-readable item title.', $schema['properties']['title']['description']);
+    }
+
+    #[Test]
     public function buildsRequestBodyForBodyParametersOnUnsafeMethods(): void
     {
         $operation = $this->generate()['paths']['/api/v1/items']['post'];
@@ -73,7 +91,7 @@ final class OpenApiGeneratorTest extends TestCase
         self::assertArrayNotHasKey('parameters', $operation);
         $schema = $operation['requestBody']['content']['application/json']['schema'];
         self::assertSame('object', $schema['type']);
-        self::assertSame(['type' => 'string'], $schema['properties']['title']);
+        self::assertSame(['type' => 'string', 'description' => 'Human-readable item title.'], $schema['properties']['title']);
         self::assertSame(['title'], $schema['required']);
         self::assertTrue($operation['requestBody']['required']);
     }
@@ -329,6 +347,10 @@ final class OpenApiGeneratorTest extends TestCase
             $arguments,
             ['items_create' => [['service' => BearerTokenAuthenticator::class, 'options' => []]]],
             ['items_create' => 'routing/items_create'],
+            paramDescriptions: [
+                'items_show' => ['status' => 'Filter by publication status.'],
+                'items_create' => ['title' => 'Human-readable item title.'],
+            ],
         );
     }
 }

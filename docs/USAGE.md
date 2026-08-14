@@ -21,7 +21,23 @@ final readonly class CourseSearchController implements RouteControllerInterface
 }
 ```
 
-A controller method declares **only the parameters it needs** — there is no fixed signature. Type-hint `ServerRequestInterface` to receive the request; everything else is resolved by name from the route (see [Typed arguments](#typed-controller-arguments)).
+A controller method declares **only the parameters it needs** — there is no fixed signature. Type-hint `ServerRequestInterface` to receive the request; everything else is resolved by name from the route (see [Typed arguments](ARGUMENTS.md)).
+
+## Contents
+
+- [The `#[Route]` attribute](#the-route-attribute)
+- [Priority](#priority)
+- [Defaults (optional placeholders)](#defaults-optional-placeholders)
+- [Schemes](#schemes)
+- [Host](#host)
+  - [Wildcards and multiple hosts](#wildcards-and-multiple-hosts)
+- [Description](#description)
+- [Class-level prefix (route groups)](#class-level-prefix-route-groups)
+- [Requirements](#requirements)
+  - [Named requirement patterns](#named-requirement-patterns)
+- [Error responses from controllers](#error-responses-from-controllers)
+
+How a controller method's signature is fed from the request — type coercion, enums, entity binding, variadics and `#[Param]` — is covered in [Typed controller arguments](ARGUMENTS.md).
 
 ## The `#[Route]` attribute
 
@@ -67,6 +83,8 @@ public function blog(int $page): ResponseInterface { /* … */ }
 The default flows through everywhere the placeholder does: it is available as a request attribute, resolved into the matching controller argument, and used by URL generation — `{routing:uri(route: 'blog')}` produces `/api/blog`, while `{routing:uri(route: 'blog', parameters: {page: 5})}` produces `/api/blog/5`.
 
 Keys starting with `_` are reserved for internal metadata and are rejected at build time.
+
+Instead of repeating the placeholder name in `defaults`, a [`#[Param]`](ARGUMENTS.md#declaring-the-constraint-at-the-parameter) on the parameter contributes its PHP default — `public function blog(#[Param] int $page = 1)` makes the trailing `{page}` optional without a `defaults` entry.
 
 ## Schemes
 
@@ -163,6 +181,8 @@ How the class-level values combine with each method:
 - **Path placeholders** (a name that appears as `{name}` in the path) are enforced by the **matcher**: a violating path is treated as no match → **404**.
 - **Any other name** is a required **query or POST-body** parameter, validated at **dispatch**: missing or format-violating → **400**, before your controller runs. (`''` means presence only.)
 
+A constraint can equivalently be written on the parameter itself with [`#[Param(requirement:)]`](ARGUMENTS.md#declaring-the-constraint-at-the-parameter) — which additionally allows an *optional but constrained* parameter.
+
 ```php
 #[Route(
     path: '/api/item/{id}',
@@ -203,107 +223,6 @@ use Symfony\Component\Routing\Requirement\Requirement;
 | `Requirement::CATCH_ALL` | Everything, including slashes (`.+`).              |
 
 Any plain regex string still works, so the enum is opt-in and freely mixable: `['id' => Requirement::DIGITS, 'q' => '']`.
-
-## Typed controller arguments
-
-Instead of reading values off the request by hand, declare them as **typed method parameters**. The extension reflects each routed method's signature at container-compile time and resolves the arguments at dispatch:
-
-| Parameter shape                   | Resolved from                          |
-|-----------------------------------|----------------------------------------|
-| `ServerRequestInterface $request` | The PSR-7 request itself.              |
-| A name matching a `{placeholder}` | The matched path segment.              |
-| Any other scalar name             | Query string, then request body.       |
-
-Values are coerced to the declared type (`int`, `float`, `bool`, `string`, `array`, `mixed`; untyped = raw string) — including **backed enums**. A value that cannot be coerced, or a missing parameter without a default, yields a **400** before the controller runs. Optional parameters use their PHP default; nullable parameters become `null` when absent.
-
-> [!NOTE]
-> The request **body** is read as form fields for `application/x-www-form-urlencoded`/`multipart` POSTs, and decoded from the raw stream for `application/json` requests — so JSON payloads (and any `PUT`/`PATCH` body) bind to parameters the same way. The body stream stays rewound, so a controller that injects `ServerRequestInterface` can still read it.
-
-```php
-#[Route(path: '/api/courses/{id}', name: 'course_show', requirements: ['id' => '\d+'])]
-public function show(int $id, int $page = 1, ?string $sort = null, ServerRequestInterface $request): ResponseInterface
-{
-    // $id   ← path placeholder, cast to int
-    // $page ← ?page=… query param, defaults to 1
-    // $sort ← ?sort=… query param, null when omitted
-    // $request ← the full request, still available when you need headers/body
-    // …
-}
-```
-
-> [!NOTE]
-> `requirements` validates the *format* (regex) of inputs and runs first; typed parameters handle the *type* mapping. Use them together: a placeholder constrained by `requirements: ['id' => '\d+']` plus an `int $id` parameter gives you a guaranteed, type-safe value.
->
-> Unsupported parameter shapes (union/intersection types, non-request objects, pure non-backed enums) are rejected at compile time with a clear `LogicException`, so misuse surfaces during container build, not at runtime.
-
-### Backed enums
-
-A **backed enum** parameter is resolved from its backing value (string-compared, so `?priority=5` resolves an `int`-backed case). An unknown value yields a **400**.
-
-```php
-enum Status: string { case Active = 'active'; case Inactive = 'inactive'; }
-
-#[Route(path: '/api/users/{status}', name: 'users_by_status')]
-public function byStatus(Status $status): ResponseInterface
-{
-    // /api/users/active → Status::Active
-}
-```
-
-### Entity resolution
-
-A parameter typed as an **Extbase domain object** — any class implementing `TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface` — resolves to the hydrated record. The raw identifier is read using the same source rules as any other parameter (path placeholder, query, or body), then looked up via TYPO3's `PersistenceManagerInterface::getObjectByIdentifier()` — no repository wiring needed.
-
-```php
-use MyVendor\MyExtension\Domain\Model\News;
-
-#[Route(path: '/api/news/{news}', name: 'news_show')]
-public function show(News $news): ResponseInterface
-{
-    // /api/news/42 → the News record with uid 42, already hydrated
-}
-```
-
-A malformed identifier (not an integer) yields a **400**, same as an invalid `int` parameter. A well-formed identifier with no matching record yields a **404** — regardless of whether the parameter is nullable; nullability only governs a *missing* input, not one that fails to resolve. Variadic entity parameters (`News ...$items`) are rejected at compile time.
-
-> [!NOTE]
-> `getObjectByIdentifier()` respects Extbase's enable-fields (a hidden/deleted record resolves as **404**), but does not restrict by storage page or apply a workspace overlay — a record on any page/pid is resolvable by uid.
-
-> [!WARNING]
-> Entity binding resolves **any** valid identifier — it is a lookup, not an authorization check. A client can request `/api/news/{news}` for any uid, so a route exposing user- or tenant-scoped records must enforce access itself: guard it with [`#[Authenticate]`](AUTHENTICATION.md) and verify ownership in the controller. Treat the resolved object like any untrusted `id` parameter (an IDOR risk if left unchecked).
-
-### Variadics
-
-A **variadic** parameter collects zero or more values from a single input array (`?ids[]=1&ids[]=2`), each coerced to the element type. An absent input yields no arguments.
-
-```php
-#[Route(path: '/api/courses', name: 'courses_filter')]
-public function filter(int ...$ids): ResponseInterface
-{
-    // /api/courses?ids[]=3&ids[]=7 → filter(3, 7)
-}
-```
-
-### Overriding the source with `#[Param]`
-
-By default the lookup key is the parameter name and the source is auto-derived. The [`#[Param]`](../Classes/Attribute/Param.php) attribute overrides either:
-
-| Argument | Description                                                            |
-|----------|------------------------------------------------------------------------|
-| `name`   | Read a different input/path key than the parameter name.               |
-| `source` | Pin the source: `path`, `query`, `body` (form or JSON), or `input` (query + body). |
-
-```php
-use KonradMichalik\Typo3Routing\Attribute\Param;
-
-#[Route(path: '/api/search', name: 'search')]
-public function search(
-    #[Param(name: 'q')] string $term,        // reads ?q=… into $term
-    #[Param(source: 'body')] int $page = 1,  // only from the request body (form or JSON)
-): ResponseInterface {
-    // …
-}
-```
 
 ## Error responses from controllers
 

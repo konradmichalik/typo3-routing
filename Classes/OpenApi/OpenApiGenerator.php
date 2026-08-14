@@ -115,14 +115,17 @@ final readonly class OpenApiGenerator
         $bodyProperties = [];
         $bodyRequired = [];
 
+        $descriptions = $this->registry->getParamDescriptions($name);
+
         foreach ($arguments as $argument) {
             $pattern = $route['requirements'][$argument['name']] ?? null;
             $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
+            $description = $descriptions[$argument['name']] ?? null;
 
             match ($this->target($argument['source'], $hasBody)) {
-                'path' => $parameters[] = $this->parameter($argument['name'], 'path', true, $schema),
-                'query' => $parameters[] = $this->parameter($argument['name'], 'query', !$argument['nullable'] && !$argument['hasDefault'], $schema),
-                'body' => $this->collectBody($argument, $schema, $bodyProperties, $bodyRequired),
+                'path' => $parameters[] = $this->parameter($argument['name'], 'path', true, $schema, $description),
+                'query' => $parameters[] = $this->parameter($argument['name'], 'query', !$argument['nullable'] && !$argument['hasDefault'], $schema, $description),
+                'body' => $this->collectBody($argument, $schema, $bodyProperties, $bodyRequired, $description),
                 default => null, // 'request' — the PSR-7 request is not an API parameter.
             };
         }
@@ -183,9 +186,14 @@ final readonly class OpenApiGenerator
      *
      * @return array<string, mixed>
      */
-    private function parameter(string $name, string $in, bool $required, array $schema): array
+    private function parameter(string $name, string $in, bool $required, array $schema, ?string $description): array
     {
-        return ['name' => $name, 'in' => $in, 'required' => $required, 'schema' => $schema];
+        $parameter = ['name' => $name, 'in' => $in, 'required' => $required, 'schema' => $schema];
+        if (null !== $description) {
+            $parameter['description'] = $description;
+        }
+
+        return $parameter;
     }
 
     /**
@@ -194,8 +202,12 @@ final readonly class OpenApiGenerator
      * @param array<string, array<string, mixed>>                                                                      $properties
      * @param list<string>                                                                                             $required
      */
-    private function collectBody(array $argument, array $schema, array &$properties, array &$required): void
+    private function collectBody(array $argument, array $schema, array &$properties, array &$required, ?string $description): void
     {
+        if (null !== $description) {
+            $schema['description'] = $description;
+        }
+
         $properties[$argument['name']] = $schema;
         if (!$argument['nullable'] && !$argument['hasDefault']) {
             $required[] = $argument['name'];

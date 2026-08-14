@@ -25,7 +25,7 @@ The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxR
 
 - [**Attribute routing**](docs/USAGE.md): declare an endpoint with `#[Route]` directly on a controller method
 - [**Route groups**](docs/USAGE.md#class-level-prefix-route-groups): a class-level `#[Route]` prefixes every method route, e.g. for API versioning
-- [**Typed arguments**](docs/USAGE.md#typed-controller-arguments): methods receive type-cast path/query/body values, no manual request reading
+- [**Typed arguments**](docs/ARGUMENTS.md): methods receive type-cast path/query/body values, no manual request reading
 - [**Zero-config discovery**](docs/HOW-IT-WORKS.md): routes are collected at container compile time, no extra cache
 - [**URL generation**](docs/URL-GENERATION.md): a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
 - [**Opt-in caching**](docs/CACHING.md): cache responses with `#[Cache]`, with tag-based invalidation

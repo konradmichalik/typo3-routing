@@ -20,6 +20,7 @@ use TYPO3\CMS\Core\Core\Environment;
 use function array_key_exists;
 use function assert;
 use function explode;
+use function in_array;
 use function is_array;
 use function is_object;
 use function is_string;
@@ -76,12 +77,18 @@ final readonly class ControllerInvoker
      * Validates `requirements` whose name is not a matched path placeholder against the query and parsed
      * body: a missing parameter or a value violating the regex yields a 400.
      *
+     * A key the compiler marked optional — its requirement came from a #[Param] on a parameter with a
+     * PHP default — is "optional but constrained": its absence falls back to that default instead of
+     * being an error, while a value that is present is still checked against the pattern. A
+     * requirement declared on the #[Route] itself stays mandatory, PHP default or not.
+     *
      * @param array<string, mixed> $match
      */
     public function firstInputRequirementError(array $match, ServerRequestInterface $request): ?string
     {
         $requirements = $match['_requirements'] ?? null;
         $inputs = array_merge($request->getQueryParams(), RequestBody::toArray($request));
+        $optional = $this->registry->getOptionalInputs((string) ($match['_route'] ?? ''));
 
         foreach (is_array($requirements) ? $requirements : [] as $name => $pattern) {
             $key = (string) $name;
@@ -90,6 +97,10 @@ final readonly class ControllerInvoker
                 continue;
             }
             if (!array_key_exists($key, $inputs)) {
+                if (in_array($key, $optional, true)) {
+                    continue;
+                }
+
                 return sprintf('Missing required parameter: %s', $key);
             }
             if (is_string($pattern) && $this->inputViolatesPattern($pattern, $inputs[$key])) {

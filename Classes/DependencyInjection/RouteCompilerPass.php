@@ -106,6 +106,9 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$authenticators', $collected->authenticators);
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
         $registry->setArgument('$corsConfigs', $collected->corsConfigs);
+        // Routes contributing nothing are dropped rather than baked as empty arrays.
+        $registry->setArgument('$paramDescriptions', array_filter($collected->paramDescriptions));
+        $registry->setArgument('$optionalInputs', array_filter($collected->optionalInputs));
 
         $collection = RouteRegistry::buildCollection($collected->routes);
         // Pre-compile the matcher tables so request-time matching never re-compiles route regexes.
@@ -254,6 +257,16 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $path = $pathPrefix.$route->path;
         $requirements = [...$classRequirements, ...$route->requirements];
         $defaults = [...$classDefaults, ...$route->defaults];
+
+        // #[Param] contributions are collected before the route is stored, so they land in the same
+        // requirements/defaults arrays that the matcher, routing:debug and the OpenAPI export read.
+        $arguments = $this->argumentSpecs->build($method, $path, $serviceId);
+        $contributions = $this->argumentSpecs->paramContributions($method, $arguments, $path, $route->requirements, $route->defaults, $serviceId);
+        $requirements = [...$requirements, ...$contributions['requirements']];
+        $defaults = [...$defaults, ...$contributions['defaults']];
+        $collected->paramDescriptions[$name] = $contributions['descriptions'];
+        $collected->optionalInputs[$name] = $contributions['optional'];
+
         $this->assertNoReservedDefaultKeys($defaults, $serviceId, $method, $name);
 
         $methods = array_map(strtoupper(...), $route->methods);
@@ -269,7 +282,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'host' => $route->host,
             'description' => $route->description ?? $classRoute?->description,
         ];
-        $collected->arguments[$name] = $this->argumentSpecs->build($method, $path, $serviceId);
+        $collected->arguments[$name] = $arguments;
 
         if (null !== $rateLimit) {
             $collected->rateLimits[$name] = $rateLimit;

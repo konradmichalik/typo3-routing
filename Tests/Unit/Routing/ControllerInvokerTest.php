@@ -145,6 +145,41 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function acceptsAMissingInputMadeOptionalByItsParamAttribute(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'optional', '_requirements' => ['page' => '\d+']],
+            $this->request(),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function stillRejectsAViolatingValueWhenTheInputIsOptional(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'optional', '_requirements' => ['page' => '\d+']],
+            $this->request(['page' => 'abc']),
+        );
+
+        self::assertSame('Invalid value for parameter: page', $error);
+    }
+
+    #[Test]
+    public function keepsARouteLevelRequirementMandatoryDespiteAPhpDefault(): void
+    {
+        // 'legacy' mirrors #[Route(requirements: ['page' => '\d+'])] on list(int $page = 1) with no
+        // #[Param]: the requirement is the route's own, so its absence must still be a 400.
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'legacy', '_requirements' => ['page' => '\d+']],
+            $this->request(),
+        );
+
+        self::assertSame('Missing required parameter: page', $error);
+    }
+
+    #[Test]
     public function treatsARouteWithoutAnEnvAsVisibleEverywhere(): void
     {
         self::assertTrue($this->invoker()->isVisibleInCurrentContext(null));
@@ -196,6 +231,8 @@ final class ControllerInvokerTest extends TestCase
             'submit' => [['name' => 'request', 'type' => null, 'source' => 'request', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
             'problem' => [],
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
+            'optional' => [['name' => 'page', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 1]],
+            'legacy' => [['name' => 'page', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 1]],
         ];
 
         $locator = new ServiceLocator([
@@ -203,7 +240,8 @@ final class ControllerInvokerTest extends TestCase
             'entityCtrl' => static fn (): EntityController => new EntityController(),
         ]);
 
-        return new RouteRegistry([], $locator, arguments: $arguments);
+        // Only 'optional' has its requirement contributed by #[Param] on a defaulted parameter.
+        return new RouteRegistry([], $locator, arguments: $arguments, optionalInputs: ['optional' => ['page']]);
     }
 
     /**

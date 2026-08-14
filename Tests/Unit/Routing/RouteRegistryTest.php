@@ -254,6 +254,24 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesParamDescriptionsPerRouteAndEmptyForUnknownRoutes(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), paramDescriptions: ['blog' => ['page' => 'Page number.']]);
+
+        self::assertSame(['page' => 'Page number.'], $registry->getParamDescriptions('blog'));
+        self::assertSame([], $registry->getParamDescriptions('unknown'));
+    }
+
+    #[Test]
+    public function exposesOptionalInputsPerRouteAndEmptyForUnknownRoutes(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), optionalInputs: ['blog' => ['page']]);
+
+        self::assertSame(['page'], $registry->getOptionalInputs('blog'));
+        self::assertSame([], $registry->getOptionalInputs('unknown'));
+    }
+
+    #[Test]
     public function bakesUserDefaultsIntoTheRouteAlongsideInternalKeys(): void
     {
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, defaults?: array<string, mixed>}> $routes */

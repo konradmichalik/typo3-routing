@@ -108,6 +108,22 @@ final class ArgumentSpecFactoryTest extends TestCase
     }
 
     #[Test]
+    public function derivesThePathSourceFromTheParamWireNameNotTheParameterName(): void
+    {
+        // #[Param(name: 'page')] on a {page} placeholder must read the path, not the query.
+        $spec = $this->build('renamedToPlaceholder', '/api/blog/{page}')[0];
+
+        self::assertSame('page', $spec['name']);
+        self::assertSame('path', $spec['source']);
+    }
+
+    #[Test]
+    public function hoistsTheDefaultOfARenamedPathPlaceholder(): void
+    {
+        self::assertSame(['page' => 1], $this->contributions('renamedToPlaceholderWithDefault', '/api/blog/{page}')['defaults']);
+    }
+
+    #[Test]
     public function appliesParamSourceOverride(): void
     {
         $spec = $this->build('sourced', '/api/x')[0];
@@ -163,43 +179,64 @@ final class ArgumentSpecFactoryTest extends TestCase
     #[Test]
     public function hoistsParamRequirementForPathPlaceholder(): void
     {
-        self::assertSame(['requirements' => ['id' => '\d+'], 'defaults' => [], 'descriptions' => []], $this->contributions('constrainedPath', '/api/x/{id}'));
+        self::assertSame(['requirements' => ['id' => '\d+'], 'defaults' => [], 'descriptions' => [], 'optional' => []], $this->contributions('constrainedPath', '/api/x/{id}'));
     }
 
     #[Test]
     public function hoistsParamRequirementForInput(): void
     {
-        self::assertSame(['requirements' => ['q' => '\d+'], 'defaults' => [], 'descriptions' => []], $this->contributions('constrainedInput', '/api/x'));
+        self::assertSame(['requirements' => ['q' => '\d+'], 'defaults' => [], 'descriptions' => [], 'optional' => []], $this->contributions('constrainedInput', '/api/x'));
     }
 
     #[Test]
     public function keysHoistedRequirementByWireNameNotParameterName(): void
     {
-        self::assertSame(['requirements' => ['foo' => '\w+'], 'defaults' => [], 'descriptions' => []], $this->contributions('constrainedRenamed', '/api/x'));
+        self::assertSame(['requirements' => ['foo' => '\w+'], 'defaults' => [], 'descriptions' => [], 'optional' => []], $this->contributions('constrainedRenamed', '/api/x'));
     }
 
     #[Test]
     public function hoistsPhpDefaultOfTrailingPathPlaceholder(): void
     {
-        self::assertSame(['requirements' => ['page' => '\d+'], 'defaults' => ['page' => 1], 'descriptions' => []], $this->contributions('optionalTrailingPath', '/api/blog/{page}'));
+        self::assertSame(['requirements' => ['page' => '\d+'], 'defaults' => ['page' => 1], 'descriptions' => [], 'optional' => []], $this->contributions('optionalTrailingPath', '/api/blog/{page}'));
     }
 
     #[Test]
     public function doesNotHoistPhpDefaultOfInputParameter(): void
     {
-        self::assertSame(['requirements' => ['page' => '\d+'], 'defaults' => [], 'descriptions' => []], $this->contributions('optionalInput', '/api/blog'));
+        self::assertSame(['requirements' => ['page' => '\d+'], 'defaults' => [], 'descriptions' => [], 'optional' => ['page']], $this->contributions('optionalInput', '/api/blog'));
     }
 
     #[Test]
     public function contributesNothingWithoutParamAttribute(): void
     {
-        self::assertSame(['requirements' => [], 'defaults' => [], 'descriptions' => []], $this->contributions('unattributedDefault', '/api/blog/{page}'));
+        self::assertSame(['requirements' => [], 'defaults' => [], 'descriptions' => [], 'optional' => []], $this->contributions('unattributedDefault', '/api/blog/{page}'));
+    }
+
+    #[Test]
+    public function marksAParamConstrainedDefaultedInputAsOptional(): void
+    {
+        self::assertSame(['page'], $this->contributions('optionalInput', '/api/blog')['optional']);
+    }
+
+    #[Test]
+    public function doesNotMarkAnInputOptionalWithoutAParamRequirement(): void
+    {
+        // A #[Param] that only renames or documents contributes no optionality: the requirement
+        // would then be the route's own, which stays mandatory.
+        self::assertSame([], $this->contributions('describedParam', '/api/blog/{page}')['optional']);
+    }
+
+    #[Test]
+    public function doesNotMarkAPathPlaceholderAsOptionalInput(): void
+    {
+        // A path placeholder is enforced by the matcher, never by the input check.
+        self::assertSame([], $this->contributions('optionalTrailingPath', '/api/blog/{page}')['optional']);
     }
 
     #[Test]
     public function collectsParamDescription(): void
     {
-        self::assertSame(['requirements' => [], 'defaults' => ['page' => 1], 'descriptions' => ['page' => 'Page number, 1-based.']], $this->contributions('describedParam', '/api/blog/{page}'));
+        self::assertSame(['requirements' => [], 'defaults' => ['page' => 1], 'descriptions' => ['page' => 'Page number, 1-based.'], 'optional' => []], $this->contributions('describedParam', '/api/blog/{page}'));
     }
 
     #[Test]
@@ -266,7 +303,7 @@ final class ArgumentSpecFactoryTest extends TestCase
     }
 
     /**
-     * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>}
+     * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>, optional: list<string>}
      */
     private function contributions(string $method, string $path): array
     {

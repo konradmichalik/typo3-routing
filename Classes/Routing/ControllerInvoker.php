@@ -20,6 +20,7 @@ use TYPO3\CMS\Core\Core\Environment;
 use function array_key_exists;
 use function assert;
 use function explode;
+use function in_array;
 use function is_array;
 use function is_object;
 use function is_string;
@@ -76,9 +77,10 @@ final readonly class ControllerInvoker
      * Validates `requirements` whose name is not a matched path placeholder against the query and parsed
      * body: a missing parameter or a value violating the regex yields a 400.
      *
-     * A requirement on an argument that has a PHP default is "optional but constrained": its absence
-     * falls back to the default instead of being an error, while a value that is present is still
-     * checked against the pattern.
+     * A key the compiler marked optional — its requirement came from a #[Param] on a parameter with a
+     * PHP default — is "optional but constrained": its absence falls back to that default instead of
+     * being an error, while a value that is present is still checked against the pattern. A
+     * requirement declared on the #[Route] itself stays mandatory, PHP default or not.
      *
      * @param array<string, mixed> $match
      */
@@ -86,6 +88,7 @@ final readonly class ControllerInvoker
     {
         $requirements = $match['_requirements'] ?? null;
         $inputs = array_merge($request->getQueryParams(), RequestBody::toArray($request));
+        $optional = $this->registry->getOptionalInputs((string) ($match['_route'] ?? ''));
 
         foreach (is_array($requirements) ? $requirements : [] as $name => $pattern) {
             $key = (string) $name;
@@ -94,7 +97,7 @@ final readonly class ControllerInvoker
                 continue;
             }
             if (!array_key_exists($key, $inputs)) {
-                if ($this->argumentHasDefault((string) ($match['_route'] ?? ''), $key)) {
+                if (in_array($key, $optional, true)) {
                     continue;
                 }
 
@@ -121,22 +124,6 @@ final readonly class ControllerInvoker
         $current = explode('/', (string) Environment::getContext())[0];
 
         return strtolower($current) === strtolower($env);
-    }
-
-    /**
-     * Whether this route's argument of that wire name carries a PHP default — which makes its
-     * requirement "validate if present" instead of mandatory. Only consulted once an input is
-     * actually found missing, so routes without requirements never pay for the lookup.
-     */
-    private function argumentHasDefault(string $routeName, string $key): bool
-    {
-        foreach ($this->registry->getArguments($routeName) as $argument) {
-            if ($argument['name'] === $key) {
-                return $argument['hasDefault'];
-            }
-        }
-
-        return false;
     }
 
     /**

@@ -43,6 +43,7 @@ final class RouteRegistry
      * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                       $corsConfigs
      * @param list<string>                                                                                                                                                                                                                                                 $staticPrefixes
      * @param array<string, array<string, string>>                                                                                                                                                                                                                         $paramDescriptions
+     * @param array<string, list<string>>                                                                                                                                                                                                                                  $optionalInputs
      */
     public function __construct(
         private readonly array $routes,
@@ -57,6 +58,7 @@ final class RouteRegistry
         private readonly array $corsConfigs = [],
         private readonly array $staticPrefixes = [],
         private readonly array $paramDescriptions = [],
+        private readonly array $optionalInputs = [],
     ) {}
 
     /**
@@ -228,6 +230,18 @@ final class RouteRegistry
     public function getParamDescriptions(string $routeName): array
     {
         return $this->paramDescriptions[$routeName] ?? [];
+    }
+
+    /**
+     * Input keys of this route whose requirement was contributed by a #[Param] on a defaulted
+     * parameter: their absence falls back to that default instead of being a 400. A requirement
+     * declared on the #[Route] itself is never listed here and stays mandatory.
+     *
+     * @return list<string>
+     */
+    public function getOptionalInputs(string $routeName): array
+    {
+        return $this->optionalInputs[$routeName] ?? [];
     }
 
     /**

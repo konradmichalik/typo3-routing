@@ -70,6 +70,10 @@ final class ArgumentSpecFixtures
 
     public function describedRenamed(#[Param(name: 'q', description: 'Free-text search term.')] string $term): void {}
 
+    public function renamedToPlaceholder(#[Param(name: 'page')] int $number): void {}
+
+    public function renamedToPlaceholderWithDefault(#[Param(name: 'page')] int $number = 1): void {}
+
     public function unionType(int|string $value): void {}
 
     public function unsupportedObject(DateTimeImmutable $when): void {}

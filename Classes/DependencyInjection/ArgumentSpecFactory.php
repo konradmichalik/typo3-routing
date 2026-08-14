@@ -81,7 +81,7 @@ final class ArgumentSpecFactory
      * @param array<string, string>                                                                                          $routeRequirements Requirements from the method's own #[Route], to reject a key constrained twice
      * @param array<string, mixed>                                                                                           $routeDefaults     Defaults from the method's own #[Route], to reject a key defaulted twice
      *
-     * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>}
+     * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>, optional: list<string>}
      */
     public function paramContributions(ReflectionMethod $method, array $specs, string $path, array $routeRequirements, array $routeDefaults, string $serviceId): array
     {
@@ -89,14 +89,14 @@ final class ArgumentSpecFactory
         $requirements = [];
         $defaults = [];
         $descriptions = [];
+        $optional = [];
 
         foreach ($method->getParameters() as $position => $parameter) {
-            $attributes = $parameter->getAttributes(Param::class);
-            if ([] === $attributes) {
+            if ([] === $parameter->getAttributes(Param::class)) {
                 continue;
             }
 
-            $param = $attributes[0]->newInstance();
+            $param = self::paramAttribute($parameter);
             $spec = $specs[$position];
             $key = $spec['name'];
 
@@ -104,6 +104,10 @@ final class ArgumentSpecFactory
                 $this->assertPresenceOnlyHasNoDefault($param->requirement, $spec['hasDefault'], $parameter->getName(), $where);
                 $this->assertNotAlreadyOnRoute($key, $routeRequirements, $parameter->getName(), $where);
                 $requirements[$key] = $param->requirement;
+            }
+
+            if (self::isOptionalInput($param, $spec)) {
+                $optional[] = $key;
             }
 
             if ($spec['hasDefault'] && 'path' === $spec['source']) {
@@ -117,7 +121,7 @@ final class ArgumentSpecFactory
             }
         }
 
-        return ['requirements' => $requirements, 'defaults' => $defaults, 'descriptions' => $descriptions];
+        return ['requirements' => $requirements, 'defaults' => $defaults, 'descriptions' => $descriptions, 'optional' => $optional];
     }
 
     /**
@@ -186,6 +190,11 @@ final class ArgumentSpecFactory
         }
 
         $name = $parameter->getName();
+        $param = self::paramAttribute($parameter);
+
+        // The lookup key is resolved first: source inference asks whether *that* key is a path
+        // placeholder, so #[Param(name: 'page')] on a {page} route reads the path, not the query.
+        $key = $param->name ?? $name;
 
         // A variadic collects zero or more values from a single input array — it never injects the request.
         if ($parameter->isVariadic()) {
@@ -193,16 +202,16 @@ final class ArgumentSpecFactory
             if (null !== $variadicType && is_a($variadicType, DomainObjectInterface::class, true)) {
                 throw new LogicException(sprintf('Entity type "%s" on variadic parameter "$%s" of "%s" is not supported by route argument resolution.', $variadicType, $name, $where), 1750000009);
             }
-            $spec = ['name' => $name, 'type' => $variadicType, 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null];
+            $spec = ['name' => $key, 'type' => $variadicType, 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null];
 
-            return $this->applyParamOverride($spec, $parameter, $where);
+            return $this->applySourceOverride($spec, $param, $name, $where);
         }
 
         $hasDefault = $parameter->isDefaultValueAvailable();
-        $sourceAndType = $this->resolveSourceAndType($type, $name, $placeholders, $where);
+        $sourceAndType = $this->resolveSourceAndType($type, $key, $name, $placeholders, $where);
 
         $spec = [
-            'name' => $name,
+            'name' => $key,
             'type' => $sourceAndType['type'],
             'source' => $sourceAndType['source'],
             'nullable' => $type?->allowsNull() ?? true,
@@ -210,25 +219,25 @@ final class ArgumentSpecFactory
             'default' => $hasDefault ? $parameter->getDefaultValue() : null,
         ];
 
-        return $this->applyParamOverride($spec, $parameter, $where);
+        return $this->applySourceOverride($spec, $param, $name, $where);
     }
 
     /**
      * Decides where a parameter's value comes from and which type to coerce it to: the PSR-7 request
-     * for a request interface type-hint, a path placeholder when the name is in the route path,
-     * otherwise a query/body input.
+     * for a request interface type-hint, a path placeholder when the **lookup key** is in the route
+     * path, otherwise a query/body input. Type errors still name the PHP parameter, not the key.
      *
      * @param list<string> $placeholders
      *
      * @return array{source: string, type: string|null}
      */
-    private function resolveSourceAndType(?ReflectionNamedType $type, string $name, array $placeholders, string $where): array
+    private function resolveSourceAndType(?ReflectionNamedType $type, string $key, string $parameterName, array $placeholders, string $where): array
     {
         if (null !== $type && !$type->isBuiltin() && is_a(ServerRequestInterface::class, $type->getName(), true)) {
             return ['source' => 'request', 'type' => null];
         }
 
-        return ['source' => in_array($name, $placeholders, true) ? 'path' : 'input', 'type' => $this->resolveValueType($type, $name, $where)];
+        return ['source' => in_array($key, $placeholders, true) ? 'path' : 'input', 'type' => $this->resolveValueType($type, $parameterName, $where)];
     }
 
     /**
@@ -263,27 +272,41 @@ final class ArgumentSpecFactory
     }
 
     /**
-     * Applies an optional #[Param] override (lookup key and/or source) on top of the auto-derived spec.
+     * Whether this parameter's requirement may be relaxed to "validate if present". All three
+     * conditions must hold: the requirement is the attribute's own contribution (a #[Route] one stays
+     * mandatory), the parameter has a PHP default to fall back to, and it is an input — a path
+     * placeholder is enforced by the matcher, never by the input check.
+     *
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
+     */
+    private static function isOptionalInput(Param $param, array $spec): bool
+    {
+        return null !== $param->requirement && $spec['hasDefault'] && 'path' !== $spec['source'];
+    }
+
+    /**
+     * The #[Param] attribute on a parameter, or an all-null instance when there is none — so callers
+     * can read its arguments without repeating the attribute lookup.
+     */
+    private static function paramAttribute(ReflectionParameter $parameter): Param
+    {
+        $attributes = $parameter->getAttributes(Param::class);
+
+        return [] === $attributes ? new Param() : $attributes[0]->newInstance();
+    }
+
+    /**
+     * Applies an explicit #[Param(source:)] on top of the derived source. The lookup key is already
+     * resolved by the caller, because source inference depends on it.
      *
      * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
      *
      * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
      */
-    private function applyParamOverride(array $spec, ReflectionParameter $parameter, string $where): array
+    private function applySourceOverride(array $spec, Param $param, string $parameterName, string $where): array
     {
-        $attributes = $parameter->getAttributes(Param::class);
-        if ([] === $attributes) {
-            return $spec;
-        }
-
-        $param = $attributes[0]->newInstance();
-
-        if (null !== $param->name) {
-            $spec['name'] = $param->name;
-        }
-
         if (null !== $param->source) {
-            $spec['source'] = $this->overrideSource($spec['source'], $param->source, $parameter->getName(), $where);
+            $spec['source'] = $this->overrideSource($spec['source'], $param->source, $parameterName, $where);
         }
 
         return $spec;

@@ -125,8 +125,10 @@ public function blog(#[Param(requirement: '\d+')] int $page = 1): ResponseInterf
 
 Two rules follow from this:
 
-- **A defaulted parameter is optional but still constrained.** A missing value falls back to the default instead of yielding a `400`; a value that *is* present is still checked against the regex. On the `#[Route]` a non-path requirement is always mandatory, so this combination can only be expressed here.
+- **A parameter with a `#[Param]` requirement *and* a PHP default is optional but still constrained.** A missing value falls back to the default instead of yielding a `400`; a value that *is* present is still checked against the regex. On the `#[Route]` a non-path requirement is always mandatory, so this combination can only be expressed here — and only the `#[Param]`'s own requirement is relaxed: `#[Route(requirements: ['page' => '\d+'])]` on `int $page = 1` stays mandatory, PHP default or not.
 - **Only `#[Param]`-carrying parameters contribute.** A parameter without the attribute behaves exactly as before — a PHP default alone never makes a path placeholder optional.
+
+`name` is resolved *before* the source is inferred, so the lookup key decides where the value comes from: `#[Param(name: 'page')] int $number` on a `/api/blog/{page}` route reads the **path** placeholder, and its default is hoisted like any other.
 
 ### Documenting the parameter
 

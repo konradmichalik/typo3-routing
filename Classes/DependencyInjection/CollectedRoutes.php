@@ -39,6 +39,9 @@ final class CollectedRoutes
     /** @var array<string, array<string, string>> Route name → wire name → #[Param] description */
     public array $paramDescriptions = [];
 
+    /** @var array<string, list<string>> Route name → input keys whose #[Param] requirement is optional */
+    public array $optionalInputs = [];
+
     /** @var array<string, list<array{service: string, options: array<string, mixed>}>> */
     public array $authenticators = [];
 

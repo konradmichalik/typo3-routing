@@ -106,8 +106,9 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$authenticators', $collected->authenticators);
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
         $registry->setArgument('$corsConfigs', $collected->corsConfigs);
-        // Routes whose parameters describe nothing are dropped rather than baked as empty arrays.
+        // Routes contributing nothing are dropped rather than baked as empty arrays.
         $registry->setArgument('$paramDescriptions', array_filter($collected->paramDescriptions));
+        $registry->setArgument('$optionalInputs', array_filter($collected->optionalInputs));
 
         $collection = RouteRegistry::buildCollection($collected->routes);
         // Pre-compile the matcher tables so request-time matching never re-compiles route regexes.
@@ -264,6 +265,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $requirements = [...$requirements, ...$contributions['requirements']];
         $defaults = [...$defaults, ...$contributions['defaults']];
         $collected->paramDescriptions[$name] = $contributions['descriptions'];
+        $collected->optionalInputs[$name] = $contributions['optional'];
 
         $this->assertNoReservedDefaultKeys($defaults, $serviceId, $method, $name);
 

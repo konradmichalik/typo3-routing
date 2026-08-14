@@ -18,22 +18,14 @@ use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
 
 /**
- * ClassBaseParamController.
+ * ConflictingDefaultController.
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-#[Route(path: '/api/v2', name: 'v2_', requirements: ['id' => '\d+'], defaults: ['page' => 9])]
-final class ClassBaseParamController implements RouteControllerInterface
+final class ConflictingDefaultController implements RouteControllerInterface
 {
-    // A class-level requirement is only a base: the #[Param] on the method parameter overrides it.
-    #[Route(path: '/items/{id}', name: 'items_show')]
-    public function show(#[Param(requirement: '[a-z]+')] string $id): JsonResponse
-    {
-        return new JsonResponse(['id' => $id]);
-    }
-
-    // Same for a class-level default: it stays an overridable base, so this must not throw.
-    #[Route(path: '/blog/{page}', name: 'blog')]
+    // The same wire key defaulted on both the method #[Route] and the #[Param] — rejected at build time.
+    #[Route(path: '/api/blog/{page}', name: 'conflicting_blog', defaults: ['page' => 5])]
     public function blog(#[Param] int $page = 1): JsonResponse
     {
         return new JsonResponse(['page' => $page]);

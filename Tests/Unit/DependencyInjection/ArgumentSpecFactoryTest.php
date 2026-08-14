@@ -226,7 +226,7 @@ final class ArgumentSpecFactoryTest extends TestCase
 
         $reflection = new ReflectionMethod(ArgumentSpecFixtures::class, 'constrainedPath');
 
-        $this->factory->paramContributions($reflection, $this->build('constrainedPath', '/api/x/{id}'), '/api/x/{id}', ['id' => '\d+'], 'fixtures');
+        $this->factory->paramContributions($reflection, $this->build('constrainedPath', '/api/x/{id}'), '/api/x/{id}', ['id' => '\d+'], [], 'fixtures');
     }
 
     #[Test]
@@ -235,6 +235,17 @@ final class ArgumentSpecFactoryTest extends TestCase
         $this->expectExceptionMessage('"fixtures::presenceOnlyWithDefault()"');
 
         $this->contributions('presenceOnlyWithDefault', '/api/x');
+    }
+
+    #[Test]
+    public function rejectsADefaultAlsoDeclaredOnTheRoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000030);
+
+        $reflection = new ReflectionMethod(ArgumentSpecFixtures::class, 'optionalTrailingPath');
+
+        $this->factory->paramContributions($reflection, $this->build('optionalTrailingPath', '/api/blog/{page}'), '/api/blog/{page}', [], ['page' => 5], 'fixtures');
     }
 
     #[Test]
@@ -261,6 +272,6 @@ final class ArgumentSpecFactoryTest extends TestCase
     {
         $reflection = new ReflectionMethod(ArgumentSpecFixtures::class, $method);
 
-        return $this->factory->paramContributions($reflection, $this->build($method, $path), $path, [], 'fixtures');
+        return $this->factory->paramContributions($reflection, $this->build($method, $path), $path, [], [], 'fixtures');
     }
 }

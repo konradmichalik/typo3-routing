@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, ClassBaseParamController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -159,6 +159,24 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000029);
 
         $this->discover($this->buildContainer(['conflicting' => ConflictingParamController::class]));
+    }
+
+    #[Test]
+    public function rejectsADefaultDeclaredOnBothRouteAndParam(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000030);
+
+        $this->discover($this->buildContainer(['conflicting' => ConflictingDefaultController::class]));
+    }
+
+    #[Test]
+    public function paramDefaultOverridesAClassLevelBase(): void
+    {
+        $routes = $this->discover($this->buildContainer(['classbase' => ClassBaseParamController::class]));
+
+        // The class-level default 9 is a base only — the parameter's own default wins, without throwing.
+        self::assertSame(['page' => 1], $routes['v2_blog']['defaults'] ?? null);
     }
 
     #[Test]

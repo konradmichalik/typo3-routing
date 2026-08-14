@@ -79,10 +79,11 @@ final class ArgumentSpecFactory
      *
      * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs
      * @param array<string, string>                                                                                          $routeRequirements Requirements from the method's own #[Route], to reject a key constrained twice
+     * @param array<string, mixed>                                                                                           $routeDefaults     Defaults from the method's own #[Route], to reject a key defaulted twice
      *
      * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>}
      */
-    public function paramContributions(ReflectionMethod $method, array $specs, string $path, array $routeRequirements, string $serviceId): array
+    public function paramContributions(ReflectionMethod $method, array $specs, string $path, array $routeRequirements, array $routeDefaults, string $serviceId): array
     {
         $where = sprintf('%s::%s()', $serviceId, $method->getName());
         $requirements = [];
@@ -107,6 +108,7 @@ final class ArgumentSpecFactory
 
             if ($spec['hasDefault'] && 'path' === $spec['source']) {
                 $this->assertTrailingPlaceholder($key, $path, $parameter->getName(), $where);
+                $this->assertNotAlreadyDefaultedOnRoute($key, $routeDefaults, $parameter->getName(), $where);
                 $defaults[$key] = $spec['default'];
             }
 
@@ -140,6 +142,21 @@ final class ArgumentSpecFactory
     {
         if (array_key_exists($key, $routeRequirements)) {
             throw new LogicException(sprintf('Requirement "%s" on "%s" is declared both on the #[Route] attribute and via #[Param] on "$%s". Keep one: #[Route] for the route-wide view, #[Param] to state it next to the parameter.', $key, $where, $parameterName), 1750000029);
+        }
+    }
+
+    /**
+     * A key defaulted on both the method's #[Route] and its parameter signature leaves the two
+     * disagreeing about the value, and the parameter would silently win. Mirrors the requirement
+     * guard: only the method's own defaults are passed in, so a class-level #[Route] default stays
+     * an overridable base.
+     *
+     * @param array<string, mixed> $routeDefaults
+     */
+    private function assertNotAlreadyDefaultedOnRoute(string $key, array $routeDefaults, string $parameterName, string $where): void
+    {
+        if (array_key_exists($key, $routeDefaults)) {
+            throw new LogicException(sprintf('Default for "%s" on "%s" is declared both on the #[Route] attribute and by the default value of "$%s". Keep one: the #[Route] default for the route-wide view, the parameter default to let the signature state it.', $key, $where, $parameterName), 1750000030);
         }
     }
 

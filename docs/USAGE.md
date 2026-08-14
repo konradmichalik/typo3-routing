@@ -361,7 +361,11 @@ public function filter(
 ): ResponseInterface { /* … */ }
 ```
 
-Rejected at build time: a key constrained on both the `#[Route]` and a `#[Param]` (a class-level `#[Route]` requirement is only a base and stays overridable), `requirement: ''` on a defaulted parameter (`''` means "must be present", which the default contradicts), and a default on a placeholder that is not at the end of the path (only a trailing placeholder can become optional).
+Rejected at build time, so the route definition never contradicts itself:
+
+- A key **constrained** on both the method's `#[Route]` and a `#[Param]`, or **defaulted** on both — the two could disagree, and the `#[Param]` would silently win. A *class-level* `#[Route]` requirement or default is only a base and stays overridable.
+- `requirement: ''` on a defaulted parameter — `''` means "must be present", which the default contradicts.
+- A default on a placeholder that is not at the end of the path — only a trailing placeholder can become optional, so the default would be silently inert.
 
 ## Error responses from controllers
 

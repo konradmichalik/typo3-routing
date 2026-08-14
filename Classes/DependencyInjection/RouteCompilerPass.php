@@ -260,7 +260,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         // #[Param] contributions are collected before the route is stored, so they land in the same
         // requirements/defaults arrays that the matcher, routing:debug and the OpenAPI export read.
         $arguments = $this->argumentSpecs->build($method, $path, $serviceId);
-        $contributions = $this->argumentSpecs->paramContributions($method, $arguments, $path, $route->requirements, $serviceId);
+        $contributions = $this->argumentSpecs->paramContributions($method, $arguments, $path, $route->requirements, $route->defaults, $serviceId);
         $requirements = [...$requirements, ...$contributions['requirements']];
         $defaults = [...$defaults, ...$contributions['defaults']];
         $collected->paramDescriptions[$name] = $contributions['descriptions'];

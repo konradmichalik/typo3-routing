@@ -152,7 +152,7 @@ URL paths are case-sensitive by [RFC 3986](https://www.rfc-editor.org/rfc/rfc398
 public function show(string $slug): ResponseInterface { /* … */ }
 ```
 
-```
+```text
 /api/courses/Intro-To-Php  →  match, $slug = 'Intro-To-Php'
 /API/Courses/Intro-To-Php  →  match, $slug = 'Intro-To-Php'
 /ApI/CoUrSeS/Intro-To-Php  →  match, $slug = 'Intro-To-Php'

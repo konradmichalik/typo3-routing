@@ -55,7 +55,7 @@ A match prints the route name, controller, resolved path parameters and — for 
 
 The table lists every route with its path, methods, controller, environment binding, and requirements:
 
-```
+```text
  Attribute Routes
  ================
 

@@ -22,7 +22,6 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use function in_array;
 use function is_string;
 use function preg_match;
-use function sprintf;
 
 /**
  * RouteMatcher.
@@ -103,12 +102,13 @@ final readonly class RouteMatcher
      *
      * @param array<string, mixed> $match
      *
-     * @throws ResourceNotFoundException
+     * @throws RequirementMismatchException a ResourceNotFoundException naming what it rejected
      */
     private function assertRequirementsHold(array $match): void
     {
         /** @var array<string, string> $requirements */
         $requirements = $match['_requirements'] ?? [];
+        $routeName = (string) ($match['_route'] ?? '');
 
         foreach ($requirements as $name => $requirement) {
             $value = $match[$name] ?? null;
@@ -120,7 +120,7 @@ final readonly class RouteMatcher
             }
 
             if (1 !== preg_match('{^(?:'.$requirement.')$}sD', $value)) {
-                throw new ResourceNotFoundException(sprintf('Value "%s" does not match the requirement for parameter "%s".', $value, $name), 1750000031);
+                throw new RequirementMismatchException($routeName, $name, $value, $requirement);
             }
         }
     }

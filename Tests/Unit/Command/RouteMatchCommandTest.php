@@ -115,6 +115,35 @@ final class RouteMatchCommandTest extends TestCase
         self::assertStringContainsString('POST', $display);
     }
 
+    /**
+     * The generic "no route matches" is the misleading answer here: the path did reach a route and was
+     * turned away by its requirement, which is what the developer needs to be told.
+     */
+    #[Test]
+    public function reportsARequirementThatRejectedACaseInsensitiveMatch(): void
+    {
+        $tester = $this->tester();
+
+        $exitCode = $tester->execute(['path' => '/API/Example/Code/ABC']);
+        $display = $this->flattened($tester->getDisplay());
+
+        self::assertSame(1, $exitCode);
+        self::assertStringNotContainsString('No route matches', $display);
+        self::assertStringContainsString('matches route "example_code"', $display);
+        self::assertStringContainsString('value "ABC" for parameter "code"', $display);
+        self::assertStringContainsString('"[a-z]+"', $display);
+    }
+
+    #[Test]
+    public function explainsThatCaseInsensitiveDoesNotCoverRequirements(): void
+    {
+        $tester = $this->tester();
+
+        $tester->execute(['path' => '/API/Example/Code/ABC']);
+
+        self::assertStringContainsString('requirements stay case-sensitive', $this->flattened($tester->getDisplay()));
+    }
+
     #[Test]
     public function notesAnEnvBoundRoute(): void
     {
@@ -140,6 +169,16 @@ final class RouteMatchCommandTest extends TestCase
         self::assertStringContainsString('Matched route "example_secure"', $matched->getDisplay());
     }
 
+    /**
+     * SymfonyStyle wraps its blocks at the terminal width, which differs between a local run and CI, so
+     * a message long enough to be worth asserting on is split at an unpredictable point. Dropping the
+     * note's "!" gutter and collapsing the whitespace restores the paragraph the reader sees.
+     */
+    private function flattened(string $display): string
+    {
+        return (string) preg_replace('/\s+/', ' ', (string) preg_replace('/^\s*!/m', '', $display));
+    }
+
     private function tester(): CommandTester
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -150,12 +189,13 @@ final class RouteMatchCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, caseInsensitive?: bool}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
             'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'host' => 'api.example.com'],
             'example_item' => ['path' => '/api/example/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
+            'example_code' => ['path' => '/api/example/code/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::code', 'env' => null, 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

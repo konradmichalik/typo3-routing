@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
-use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{RequirementMismatchException, RouteMatcher, RouteRegistry};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -163,6 +163,25 @@ final class RouteMatcherTest extends TestCase
         $this->expectException(ResourceNotFoundException::class);
 
         $this->matcher()->match('/API/Loose/ABC', $this->context());
+    }
+
+    /**
+     * A bare miss and a miss that got as far as a requirement are indistinguishable to anyone catching
+     * the plain exception, and the second one is the harder to diagnose. So the rejection names what it
+     * rejected.
+     */
+    #[Test]
+    public function theEnforcedRequirementNamesTheRouteAndTheRejectedValue(): void
+    {
+        try {
+            $this->matcher()->match('/API/Loose/ABC', $this->context());
+            self::fail('Expected the requirement to reject the value.');
+        } catch (RequirementMismatchException $exception) {
+            self::assertSame('looseItem', $exception->routeName);
+            self::assertSame('code', $exception->parameter);
+            self::assertSame('ABC', $exception->value);
+            self::assertSame('[a-z]+', $exception->requirement);
+        }
     }
 
     /**

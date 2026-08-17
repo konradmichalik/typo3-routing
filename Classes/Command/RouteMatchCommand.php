@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Command;
 
-use KonradMichalik\Typo3Routing\Routing\RouteMatcher;
+use KonradMichalik\Typo3Routing\Routing\{RequirementMismatchException, RouteMatcher};
 use Override;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -65,6 +65,13 @@ final class RouteMatchCommand extends Command
         try {
             // The dispatcher's matcher, so the simulation reflects its trailing-slash tolerance too.
             $match = $this->matcher->match($path, $context);
+        } catch (RequirementMismatchException $exception) {
+            // Ordered before the plain miss it extends: a route was found, so "no route matches" would
+            // send the reader looking for the wrong bug.
+            $io->warning(sprintf('Path "%s" matches route "%s", but the value "%s" for parameter "%s" does not satisfy its requirement "%s".', $path, $exception->routeName, $exception->value, $exception->parameter, $exception->requirement));
+            $io->note('The route opted into caseInsensitive, which covers the path\'s literal segments only. Placeholder values and their requirements stay case-sensitive.');
+
+            return Command::FAILURE;
         } catch (ResourceNotFoundException) {
             $io->error(sprintf('No route matches "%s %s" (scheme %s, host %s).', $context->getMethod(), $path, $context->getScheme(), $context->getHost()));
 

@@ -115,6 +115,9 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$compiledRoutes', (new CompiledUrlMatcherDumper($collection))->getCompiledRoutes());
         // The dispatcher's path gate is derived from the routes themselves, so it needs no configuration.
         $registry->setArgument('$staticPrefixes', RouteRegistry::staticPrefixes($collection));
+        // Compiled separately: the gate has to open for these in every casing, and the case-insensitive
+        // compilation itself carries no usable prefix.
+        $registry->setArgument('$caseInsensitivePrefixes', RouteRegistry::staticPrefixes(RouteRegistry::buildCollection(RouteRegistry::caseInsensitiveRoutes($collected->routes))));
     }
 
     /**
@@ -270,6 +273,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->assertNoReservedDefaultKeys($defaults, $serviceId, $method, $name);
 
         $methods = array_map(strtoupper(...), $route->methods);
+        // Null on both levels means "not set", which is the case-sensitive default.
+        $caseInsensitive = $route->caseInsensitive ?? $classRoute?->caseInsensitive;
         $collected->routes[$name] = [
             'path' => $path,
             'methods' => $methods,
@@ -281,6 +286,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'schemes' => $route->schemes,
             'host' => $route->host,
             'description' => $route->description ?? $classRoute?->description,
+            'caseInsensitive' => $caseInsensitive ?? false,
         ];
         $collected->arguments[$name] = $arguments;
 

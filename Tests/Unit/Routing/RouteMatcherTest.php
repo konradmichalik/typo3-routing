@@ -120,6 +120,78 @@ final class RouteMatcherTest extends TestCase
         self::assertSame('count', $matcher->match('/api/count/', $this->context())['_route']);
     }
 
+    #[Test]
+    public function matchesAnOptedInRouteRegardlessOfCase(): void
+    {
+        $match = $this->matcher()->match('/API/Loose', $this->context());
+
+        self::assertSame('loose', $match['_route']);
+    }
+
+    #[Test]
+    public function theCaseInsensitiveFallbackStillToleratesATrailingSlash(): void
+    {
+        $match = $this->matcher()->match('/API/Loose/', $this->context());
+
+        self::assertSame('loose', $match['_route']);
+    }
+
+    #[Test]
+    public function aRouteThatDidNotOptInStaysCaseSensitive(): void
+    {
+        $this->expectException(ResourceNotFoundException::class);
+
+        $this->matcher()->match('/API/Count', $this->context());
+    }
+
+    #[Test]
+    public function placeholderValuesKeepTheirCaseAfterACaseInsensitiveMatch(): void
+    {
+        $match = $this->matcher()->match('/API/Loose/abc', $this->context());
+
+        self::assertSame('looseItem', $match['_route']);
+        self::assertSame('abc', $match['code']);
+    }
+
+    /**
+     * The "i" modifier applies to the whole compiled regex, so the fallback would otherwise let a value
+     * through that the declared requirement rejects.
+     */
+    #[Test]
+    public function aPlaceholderRequirementIsStillEnforcedAfterACaseInsensitiveMatch(): void
+    {
+        $this->expectException(ResourceNotFoundException::class);
+
+        $this->matcher()->match('/API/Loose/ABC', $this->context());
+    }
+
+    /**
+     * Without a single opted-in route there is no fallback matcher at all, and the original miss has to
+     * surface unchanged — this is the default installation.
+     */
+    #[Test]
+    public function aRegistryWithoutAnyOptedInRouteReportsTheOriginalMiss(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn('1');
+
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+
+        $this->expectException(ResourceNotFoundException::class);
+
+        $matcher->match('/API/Count', $this->context());
+    }
+
+    #[Test]
+    public function aWrongMethodOnACaseInsensitiveMatchIsMethodNotAllowed(): void
+    {
+        $this->expectException(MethodNotAllowedException::class);
+
+        $this->matcher()->match('/API/Loose', $this->context('DELETE'));
+    }
+
     private function matcher(string $trailingSlash = '1'): RouteMatcher
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -138,12 +210,14 @@ final class RouteMatcherTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []],
             'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
+            'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
+            'looseItem' => ['path' => '/api/loose/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::looseItem', 'env' => null, 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

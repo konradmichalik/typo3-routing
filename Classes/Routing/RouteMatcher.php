@@ -14,11 +14,15 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Routing;
 
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
+use Symfony\Component\Routing\Matcher\UrlMatcherInterface;
 use Symfony\Component\Routing\RequestContext;
 use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 
 use function in_array;
+use function is_string;
+use function preg_match;
+use function sprintf;
 
 /**
  * RouteMatcher.
@@ -43,15 +47,41 @@ final readonly class RouteMatcher
      * for the tolerance. A MethodNotAllowedException is never retried: it means the path itself did
      * match, so its list of allowed methods is the correct answer.
      *
+     * Both tolerances are ordered strictly after the strict attempt: exact path, trailing-slash variant,
+     * then the same pair again against the case-insensitive matcher — which only exists at all once a
+     * route opted in via #[Route(caseInsensitive: true)].
+     *
      * @return array<string, mixed> the matched route attributes
      *
-     * @throws ResourceNotFoundException no route matches either variant of the path
+     * @throws ResourceNotFoundException no route matches any tolerated variant of the path
      * @throws MethodNotAllowedException the path matches, the request method does not
      */
     public function match(string $path, RequestContext $context): array
     {
-        $matcher = $this->registry->getMatcher($context);
+        try {
+            return $this->matchTolerantly($this->registry->getMatcher($context), $path);
+        } catch (ResourceNotFoundException $exception) {
+            $caseInsensitiveMatcher = $this->registry->getCaseInsensitiveMatcher($context);
 
+            if (null === $caseInsensitiveMatcher) {
+                throw $exception;
+            }
+
+            $match = $this->matchTolerantly($caseInsensitiveMatcher, $path);
+            $this->assertRequirementsHold($match);
+
+            return $match;
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws ResourceNotFoundException
+     * @throws MethodNotAllowedException
+     */
+    private function matchTolerantly(UrlMatcherInterface $matcher, string $path): array
+    {
         try {
             return $matcher->match($path);
         } catch (ResourceNotFoundException $exception) {
@@ -62,6 +92,36 @@ final readonly class RouteMatcher
             }
 
             return $matcher->match($variant);
+        }
+    }
+
+    /**
+     * CaseInsensitiveRouteCompiler's "i" modifier covers the whole compiled regex, placeholder
+     * requirements included, so a match from that matcher may satisfy a requirement only in the wrong
+     * case. Re-checking each matched placeholder against its declared pattern restores the exact
+     * semantics: the tolerance is meant for the path's literal segments, never for the constraints.
+     *
+     * @param array<string, mixed> $match
+     *
+     * @throws ResourceNotFoundException
+     */
+    private function assertRequirementsHold(array $match): void
+    {
+        /** @var array<string, string> $requirements */
+        $requirements = $match['_requirements'] ?? [];
+
+        foreach ($requirements as $name => $requirement) {
+            $value = $match[$name] ?? null;
+
+            // A requirement of '' means "presence only" and constrains nothing; anything that is not a
+            // matched string (absent, or a non-string default) was never subject to the path regex.
+            if ('' === $requirement || !is_string($value)) {
+                continue;
+            }
+
+            if (1 !== preg_match('{^(?:'.$requirement.')$}sD', $value)) {
+                throw new ResourceNotFoundException(sprintf('Value "%s" does not match the requirement for parameter "%s".', $value, $name), 1750000031);
+            }
         }
     }
 

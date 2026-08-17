@@ -136,6 +136,72 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function optedInRoutesGetAMatcherThatIgnoresCase(): void
+    {
+        $matcher = $this->caseInsensitiveRegistry()->getCaseInsensitiveMatcher($this->getContext());
+
+        self::assertNotNull($matcher);
+        self::assertSame('fixture_loose', $matcher->match('/API/Loose')['_route']);
+    }
+
+    #[Test]
+    public function theCaseInsensitiveMatcherKeepsPlaceholderValuesUntouched(): void
+    {
+        $matcher = $this->caseInsensitiveRegistry()->getCaseInsensitiveMatcher($this->getContext());
+
+        self::assertNotNull($matcher);
+        self::assertSame('MySlug', $matcher->match('/API/Loose/MySlug')['slug']);
+    }
+
+    #[Test]
+    public function theCaseInsensitiveMatcherHoldsOnlyTheOptedInRoutes(): void
+    {
+        $matcher = $this->caseInsensitiveRegistry()->getCaseInsensitiveMatcher($this->getContext());
+
+        self::assertNotNull($matcher);
+        $this->expectException(ResourceNotFoundException::class);
+
+        $matcher->match('/api/strict');
+    }
+
+    #[Test]
+    public function aRegistryWithoutAnyOptedInRouteHasNoCaseInsensitiveMatcher(): void
+    {
+        self::assertNull($this->createRegistry()->getCaseInsensitiveMatcher($this->getContext()));
+    }
+
+    /**
+     * The collection is memoised, so a second request must be served from it rather than rebuilt.
+     */
+    #[Test]
+    public function servesTheCaseInsensitiveMatcherOnEveryCall(): void
+    {
+        $registry = $this->caseInsensitiveRegistry();
+
+        $first = $registry->getCaseInsensitiveMatcher($this->getContext());
+        $second = $registry->getCaseInsensitiveMatcher($this->getContext());
+
+        self::assertNotNull($first);
+        self::assertNotNull($second);
+        self::assertSame('fixture_loose', $first->match('/API/Loose')['_route']);
+        self::assertSame('fixture_loose', $second->match('/api/LOOSE')['_route']);
+    }
+
+    #[Test]
+    public function derivesTheCaseInsensitivePrefixesFromTheOptedInRoutesOnly(): void
+    {
+        self::assertSame(['/api/loose'], $this->caseInsensitiveRegistry()->getCaseInsensitivePrefixes());
+    }
+
+    #[Test]
+    public function exposesTheCaseInsensitivePrefixesBakedInAtCompileTime(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), caseInsensitivePrefixes: ['/baked/']);
+
+        self::assertSame(['/baked/'], $registry->getCaseInsensitivePrefixes());
+    }
+
+    #[Test]
     public function matcherResolvesAKnownPath(): void
     {
         $context = new RequestContext();
@@ -442,6 +508,26 @@ final class RouteRegistryTest extends TestCase
         $this->expectExceptionCode(1750000021);
 
         $registry->getAuthenticatorLocator();
+    }
+
+    private function caseInsensitiveRegistry(): RouteRegistry
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool}> $routes */
+        $routes = [
+            'fixture_strict' => ['path' => '/api/strict', 'methods' => ['GET'], 'controller' => 'ctrl::strict', 'env' => null, 'requirements' => []],
+            'fixture_loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
+            'fixture_loose_item' => ['path' => '/api/loose/{slug}', 'methods' => ['GET'], 'controller' => 'ctrl::looseItem', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
+        ];
+
+        return new RouteRegistry($routes, new ServiceLocator([]));
+    }
+
+    private function getContext(): RequestContext
+    {
+        $context = new RequestContext();
+        $context->setMethod('GET');
+
+        return $context;
     }
 
     private function createRegistry(): RouteRegistry

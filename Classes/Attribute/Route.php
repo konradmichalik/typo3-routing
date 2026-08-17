@@ -33,15 +33,16 @@ final readonly class Route
      * `methods` is ignored — the method default ['GET'] is indistinguishable from "not set", so HTTP
      * methods are never inherited. At most one #[Route] is allowed on the class.
      *
-     * @param list<string>          $methods      Allowed HTTP methods (upper-case). Ignored at class level.
-     * @param string|null           $name         Explicit route name; auto-derived from service id + method when null. At class level: name prefix.
-     * @param string|null           $env          Top-level application context this route is bound to (e.g. "Development"); null = always active. At class level: default for methods without their own env.
-     * @param array<string, string> $requirements Constraints by parameter name → regex. A name matching a path placeholder ({id}) is enforced by the matcher (404). Any other name is a required query/body parameter validated at dispatch (400; '' = presence only). E.g. ['id' => '\d+', 'q' => '']. Named patterns from Symfony\Component\Routing\Requirement\Requirement may be used as values, e.g. ['id' => Requirement::DIGITS]. At class level: merged under method requirements.
-     * @param int                   $priority     Match priority; higher values are matched first. Use to disambiguate a static path from an overlapping placeholder path. Default 0
-     * @param array<string, mixed>  $defaults     Default values for path placeholders. A trailing placeholder with a default becomes optional (`/blog/{page}` + ['page' => 1] also matches `/blog`, yielding page=1) and is omitted from generated URLs when it equals the default. Keys starting with "_" are reserved (used internally) and rejected at build time. At class level: merged under method defaults (the method wins per key).
-     * @param list<string>          $schemes      Allowed URI schemes (e.g. ['https']); empty = any scheme. A request whose scheme doesn't match yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
-     * @param string|null           $host         Restrict the route to a specific hostname (e.g. 'api.example.com'); null = any host. A request from a different host yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
-     * @param string|null           $description  Human-readable summary of what the endpoint does, surfaced in `routing:debug` and the OpenAPI export. At class level: fallback used by methods that do not set their own.
+     * @param list<string>          $methods         Allowed HTTP methods (upper-case). Ignored at class level.
+     * @param string|null           $name            Explicit route name; auto-derived from service id + method when null. At class level: name prefix.
+     * @param string|null           $env             Top-level application context this route is bound to (e.g. "Development"); null = always active. At class level: default for methods without their own env.
+     * @param array<string, string> $requirements    Constraints by parameter name → regex. A name matching a path placeholder ({id}) is enforced by the matcher (404). Any other name is a required query/body parameter validated at dispatch (400; '' = presence only). E.g. ['id' => '\d+', 'q' => '']. Named patterns from Symfony\Component\Routing\Requirement\Requirement may be used as values, e.g. ['id' => Requirement::DIGITS]. At class level: merged under method requirements.
+     * @param int                   $priority        Match priority; higher values are matched first. Use to disambiguate a static path from an overlapping placeholder path. Default 0
+     * @param array<string, mixed>  $defaults        Default values for path placeholders. A trailing placeholder with a default becomes optional (`/blog/{page}` + ['page' => 1] also matches `/blog`, yielding page=1) and is omitted from generated URLs when it equals the default. Keys starting with "_" are reserved (used internally) and rejected at build time. At class level: merged under method defaults (the method wins per key).
+     * @param list<string>          $schemes         Allowed URI schemes (e.g. ['https']); empty = any scheme. A request whose scheme doesn't match yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
+     * @param string|null           $host            Restrict the route to a specific hostname (e.g. 'api.example.com'); null = any host. A request from a different host yields the same 404 as a path mismatch. Not inherited from a class-level #[Route] (same rule as `methods`).
+     * @param string|null           $description     Human-readable summary of what the endpoint does, surfaced in `routing:debug` and the OpenAPI export. At class level: fallback used by methods that do not set their own.
+     * @param bool|null             $caseInsensitive Match the path's literal segments regardless of case, so /api/Example also answers /API/EXAMPLE. Placeholder VALUES keep their original case and their `requirements` stay case-sensitive. Only consulted after the exact path already failed, so nothing else pays for it. null = not set, inheriting the class-level value (default: case-sensitive). At class level: default for methods without their own.
      */
     public function __construct(
         public string $path,
@@ -54,5 +55,6 @@ final readonly class Route
         public array $schemes = [],
         public ?string $host = null,
         public ?string $description = null,
+        public ?bool $caseInsensitive = null,
     ) {}
 }

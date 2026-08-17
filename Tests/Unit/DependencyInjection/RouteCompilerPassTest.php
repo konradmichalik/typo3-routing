@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -111,6 +111,39 @@ final class RouteCompilerPassTest extends TestCase
         self::assertSame(['format' => 'html', 'page' => 1], $routes['v1_items_show']['defaults'] ?? null);
         // No own description: falls back to the class-level description.
         self::assertSame('Course catalogue endpoints.', $routes['v1_items_show']['description'] ?? null);
+    }
+
+    #[Test]
+    public function inheritsTheCaseInsensitiveOptInFromTheClassLevelRoute(): void
+    {
+        $routes = $this->discover($this->buildContainer(['loose' => CaseInsensitiveController::class]));
+
+        self::assertTrue($routes['loose_inherited']['caseInsensitive'] ?? null);
+    }
+
+    #[Test]
+    public function aMethodCanOptOutOfAClassLevelCaseInsensitiveOptIn(): void
+    {
+        $routes = $this->discover($this->buildContainer(['loose' => CaseInsensitiveController::class]));
+
+        self::assertFalse($routes['loose_strict']['caseInsensitive'] ?? null);
+    }
+
+    #[Test]
+    public function routesWithoutTheOptInStayCaseSensitive(): void
+    {
+        $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
+
+        self::assertFalse($routes['fixture_count']['caseInsensitive'] ?? null);
+    }
+
+    #[Test]
+    public function bakesTheCaseInsensitivePrefixesIntoTheRegistry(): void
+    {
+        $container = $this->buildContainer(['loose' => CaseInsensitiveController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        self::assertSame(['/api/loose/inherited'], $container->getDefinition(RouteRegistry::class)->getArgument('$caseInsensitivePrefixes'));
     }
 
     #[Test]
@@ -651,7 +684,7 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}>
      */
     private function discover(ContainerBuilder $container): array
     {

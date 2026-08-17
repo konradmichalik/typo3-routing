@@ -79,6 +79,37 @@ final class RouteDispatcherTest extends TestCase
     }
 
     /**
+     * The derived gate is the only thing in front of the matcher here, so this proves both halves: the
+     * gate opens for the differently-cased path, and the matcher's fallback then dispatches it.
+     */
+    #[Test]
+    public function dispatchesAnOptedInRouteThroughTheDerivedGateRegardlessOfCase(): void
+    {
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('', $this->registry());
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/API/Loose'),
+            $this->handler(new Response('php://temp', 418)),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"count":3}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function aDifferentlyCasedPathOfARouteThatDidNotOptInStillFallsThroughToThePage(): void
+    {
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('', $this->registry());
+
+        $response = $dispatcher->process(
+            $this->request('GET', 'https://example.com/API/Count'),
+            $this->handler(new Response('php://temp', 418)),
+        );
+
+        self::assertSame(418, $response->getStatusCode());
+    }
+
+    /**
      * The inverse direction has to clear the path gate first, and that gate is derived from the declared
      * paths — so a path declared *with* a trailing slash must contribute its slashless prefix as well.
      * Nothing is claimed exclusively here, so the derived gate is the only thing standing in front of
@@ -850,7 +881,7 @@ final class RouteDispatcherTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'vaCount' => ['path' => '/va/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
@@ -870,6 +901,7 @@ final class RouteDispatcherTest extends TestCase
             'problem' => ['path' => '/api/problem', 'methods' => ['GET'], 'controller' => 'ctrl::problem', 'env' => null, 'requirements' => []],
             'corsOverride' => ['path' => '/api/cors-override', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -908,6 +940,7 @@ final class RouteDispatcherTest extends TestCase
             'problem' => [],
             'corsOverride' => [],
             'slashed' => [],
+            'loose' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

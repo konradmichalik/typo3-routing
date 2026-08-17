@@ -72,6 +72,16 @@ final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
             }
         }
 
+        // The hand-rolled counterpart of #[Route(caseInsensitive: true)]: one strcasecmp, so the exact
+        // and the differently-cased request cost the same here. That asymmetry against the routing side
+        // is the point of the comparison, not a flaw in it.
+        //
+        // Appended last on purpose: inserting it earlier would shift the four scenarios above by one
+        // string comparison and break comparability with the recorded baseline figures.
+        if (0 === strcasecmp($path, '/api/bench/plain/ci')) {
+            return new JsonResponse(['ok' => true]);
+        }
+
         return $handler->handle($request);
     }
 }

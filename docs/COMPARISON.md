@@ -9,3 +9,5 @@ There are several ways to answer a frontend HTTP request in TYPO3. This extensio
 | [**`eID` scripts**](https://docs.typo3.org/m/typo3/reference-coreapi/main/en-us/ApiOverview/RequestLifeCycle/Bootstrapping.html) | Lightweight FE endpoints | Procedural entry points, no DI/typed arguments, manual routing and input handling |
 | [**Extbase plugin / `typeNum`**](https://docs.typo3.org/m/typo3/reference-typoscript/main/en-us/TopLevelObjects/Page/Index.html) | Content-bound output | Heavyweight for a JSON endpoint; tied to a page and the rendering chain |
 | **`typo3_routing`** | Attribute-declared FE endpoints | `#[Route]` on a service method — DI, typed arguments, URL generation, opt-in cache & rate limit |
+
+On raw speed, the hand-wired middleware wins: dispatching a matched attribute route costs about 0.6 ms more than an equivalent middleware doing the matching by hand, which is a few percent of a minimal JSON request. Requests that are not routes at all pay under a microsecond. [Performance](PERFORMANCE.md) has the figures, what was measured, and how to reproduce it.

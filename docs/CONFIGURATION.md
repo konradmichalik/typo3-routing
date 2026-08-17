@@ -26,6 +26,8 @@ Two things stay untouched by it:
 - **The declared form stays canonical.** Generated URLs (`{routing:uri()}`, `RouteUrlGenerator`) keep exactly the form you wrote, and so do the route exports that report it — `routing:debug` and the OpenAPI document.
 - **`405` beats the retry.** A path that matches a route with the wrong HTTP method answers `405` with its `Allow` header, whether or not the trailing slash matched what was declared.
 
+Case is a separate matter and has no global switch: a route opts into it individually with `#[Route(caseInsensitive: true)]`, see [Case-insensitive paths](USAGE.md#case-insensitive-paths).
+
 ## Exclusive path prefixes
 
 Separate from the gate, you can reserve path spaces **exclusively** for attribute routes. Inside them a path matching no route returns a JSON `404` instead of falling through to page rendering. Configure it via **Settings → Extension Configuration → typo3_routing**:

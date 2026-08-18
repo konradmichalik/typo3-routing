@@ -202,6 +202,35 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function derivesTheClassExclusivePrefixesFromTheOptedInRoutesOnly(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, classExclusivePrefix?: string|null}> $routes */
+        $routes = [
+            'exclusive_known' => ['path' => '/api/exclusive/known', 'methods' => ['GET'], 'controller' => 'ctrl::known', 'env' => null, 'requirements' => [], 'classExclusivePrefix' => '/api/exclusive'],
+            'exclusive_other' => ['path' => '/api/exclusive/other', 'methods' => ['GET'], 'controller' => 'ctrl::other', 'env' => null, 'requirements' => [], 'classExclusivePrefix' => '/api/exclusive'],
+            'plain' => ['path' => '/api/plain', 'methods' => ['GET'], 'controller' => 'ctrl::plain', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        // Two routes sharing the same class prefix contribute it once; the unrelated route contributes nothing.
+        self::assertSame(['/api/exclusive'], $registry->getClassExclusivePrefixes());
+    }
+
+    #[Test]
+    public function exposesTheClassExclusivePrefixesBakedInAtCompileTime(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), classExclusivePrefixes: ['/baked/']);
+
+        self::assertSame(['/baked/'], $registry->getClassExclusivePrefixes());
+    }
+
+    #[Test]
+    public function derivesNoClassExclusivePrefixesWithoutAnyOptedInRoute(): void
+    {
+        self::assertSame([], $this->createRegistry()->getClassExclusivePrefixes());
+    }
+
+    #[Test]
     public function matcherResolvesAKnownPath(): void
     {
         $context = new RequestContext();

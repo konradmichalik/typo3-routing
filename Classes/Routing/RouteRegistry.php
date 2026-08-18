@@ -85,7 +85,7 @@ final class RouteRegistry
      * collection (URL generation, matcher fallback) and the compiler pass, which dumps the same
      * collection into the compiled matcher format at container build time.
      *
-     * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/background/extending.md
      *
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>}> $routes
      */
@@ -132,7 +132,7 @@ final class RouteRegistry
      * static prefix is the literal UTF-8 the route declared. Without this, a non-ASCII route would
      * compile and match, yet never reach the matcher at all.
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      *
      * @return list<string>
      */
@@ -161,7 +161,7 @@ final class RouteRegistry
      * (a plain UrlGenerator built over this collection follows them transitively) while staying
      * invisible to getRoutes() — routing:debug and the OpenAPI export never see them as routes.
      *
-     * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/background/extending.md
      */
     public function getRouteCollection(): RouteCollection
     {
@@ -182,7 +182,7 @@ final class RouteRegistry
      * re-compile every route's regex on each request. The fallback covers registries constructed
      * without compiled routes (tests, manual wiring).
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      */
     public function getMatcher(RequestContext $context): UrlMatcherInterface
     {
@@ -197,7 +197,7 @@ final class RouteRegistry
      * The routes that opted into case-insensitive matching via #[Route(caseInsensitive: true)].
      * Shared by the compiler pass (baking their prefixes) and the registry's own lazy fallback.
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      *
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>}> $routes
      *
@@ -217,7 +217,7 @@ final class RouteRegistry
      * through an exact-match table that no regex modifier can reach, so the dumped matcher could never
      * honour CaseInsensitiveRouteCompiler.
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      */
     public function getCaseInsensitiveMatcher(RequestContext $context): ?UrlMatcherInterface
     {
@@ -233,7 +233,7 @@ final class RouteRegistry
      *
      * Baked in at container build time; the fallback mirrors getStaticPrefixes().
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      *
      * @return list<string>
      */
@@ -252,7 +252,7 @@ final class RouteRegistry
      * than recomputed per route — unlike static/case-insensitive prefixes, this one is never derived from
      * a route's own path (a method's composed path is always more specific than its class's own prefix).
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      *
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, classExclusivePrefix?: string|null}> $routes
      *
@@ -270,7 +270,7 @@ final class RouteRegistry
     }
 
     /**
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      *
      * @return list<string>
      */
@@ -284,7 +284,7 @@ final class RouteRegistry
     }
 
     /**
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      */
     public function getControllerLocator(): ContainerInterface
     {
@@ -292,7 +292,7 @@ final class RouteRegistry
     }
 
     /**
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      */
     public function getAuthenticatorLocator(): ContainerInterface
     {
@@ -446,7 +446,7 @@ final class RouteRegistry
      * fallback mirrors getMatcher() and covers registries constructed without compiled data (tests,
      * manual wiring), which would otherwise end up behind a gate that lets nothing through.
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      *
      * @return list<string>
      */

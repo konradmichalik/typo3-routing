@@ -108,7 +108,7 @@ Four details are part of the contract rather than incidental:
 - **An Extbase domain object describes its UID, not the object.** Such an argument is resolved by looking the record up by UID, and `ControllerArgumentResolver::toEntity()` accepts nothing but an integer — so `integer` is what a client has to send. Note this is a **change from earlier `0.x` releases**, which described these arguments as `{"type": "string"}`; an OpenAPI document regenerated after upgrading will differ for every entity-typed argument.
 - **Only backed enums are expected.** The extension's own compile step rejects a pure enum outright, so one cannot reach this mapper through a registered route. An external caller passing one gets `{"type": "string", "enum": []}` rather than an exception.
 
-`JsonSchemaMapper` gained a second `@api` method in **`1.1.0`**: `objectSchemaForClass(string $class): array`. Where `schemaForType()` maps a single argument's type, `objectSchemaForClass()` maps a whole DTO class — its public properties (plain or promoted constructor properties alike) become an object schema's `properties`, used by [`#[Returns]`](HOW-IT-WORKS.md#declaring-a-response-schema) to describe a route's response body:
+`JsonSchemaMapper` gained a second `@api` method in **`1.1.0`**: `objectSchemaForClass(string $class): array`. Where `schemaForType()` maps a single argument's type, `objectSchemaForClass()` maps a whole DTO class — its public properties (plain or promoted constructor properties alike) become an object schema's `properties`, used by [`#[Returns]`](../operating/openapi.md#declaring-a-response-schema) to describe a route's response body:
 
 ```php
 $schema = $this->schemas->objectSchemaForClass(CourseDto::class);

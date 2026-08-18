@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 
-use KonradMichalik\Ttt\Http\Requests;
+use KonradMichalik\Ttt\Http\{RequestBuilder, Requests};
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -140,6 +140,36 @@ final class ResponseCacheManagerTest extends TestCase
         $siteB = $this->subject->buildKey('r', Requests::get('https://b.example.com/api/x')->build(), []);
 
         self::assertNotSame($siteA, $siteB);
+    }
+
+    #[Test]
+    public function buildKeySharesTheEntryBetweenHeadAndGet(): void
+    {
+        $get = $this->subject->buildKey('r', Requests::get('https://example.com/api/x')->build(), []);
+        $head = $this->subject->buildKey('r', (new RequestBuilder('HEAD', 'https://example.com/api/x'))->build(), []);
+
+        self::assertSame($get, $head);
+    }
+
+    #[Test]
+    public function withCacheStatusAddsTheHeaderForACacheableHeadRoute(): void
+    {
+        $cacheConfig = ['lifetime' => 3600, 'tags' => [], 'ignoreParams' => []];
+        $response = $this->subject->withCacheStatus(
+            new Response('php://temp', 200),
+            $cacheConfig,
+            (new RequestBuilder('HEAD', 'https://example.com/api/x'))->build(),
+            'HIT',
+        );
+
+        self::assertSame('HIT', $response->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function cacheableMethodCanonicalisesHeadToGet(): void
+    {
+        self::assertSame('GET', $this->subject->cacheableMethod((new RequestBuilder('HEAD', 'https://example.com/api/x'))->build()));
+        self::assertSame('POST', $this->subject->cacheableMethod(Requests::post('https://example.com/api/x')->build()));
     }
 
     /**

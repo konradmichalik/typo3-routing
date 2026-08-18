@@ -57,6 +57,7 @@ The attribute is repeatable. Its parameters:
 | `host`         | `?string`               | `null`    | Restrict the route to a specific hostname (e.g. `'api.example.com'`); null = any host. See below. |
 | `description`  | `?string`               | `null`    | Human-readable summary of what the endpoint does; surfaced in `routing:debug` and the OpenAPI export. See below. |
 | `caseInsensitive` | `?bool`              | `null`    | Match the path's and host's literal segments regardless of case. See below. |
+| `exclusive`    | `?bool`                 | `null`    | Claim the class's own route prefix exclusively: an unmatched path under it becomes a 404 instead of falling through to a page. Class-level only — a method-level value is a build-time error. See [Exclusive path prefixes](CONFIGURATION.md#exclusive-path-prefixes). |
 
 ## Priority
 
@@ -203,6 +204,7 @@ How the class-level values combine with each method:
 | `methods`      | **Ignored** at class level — the method default (`['GET']`) is indistinguishable from "unset". |
 | `description`  | Used as the **default** for methods that do not set their own `description`; a method `description` wins. |
 | `caseInsensitive` | Used as the **default** for methods that do not set their own value; a method can opt back out with `false`. |
+| `exclusive`    | **Class-level only** — a value on a method-level `#[Route]` is a build-time error.             |
 
 ### Sharing routes through an abstract base controller
 

@@ -108,6 +108,16 @@ Four details are part of the contract rather than incidental:
 - **An Extbase domain object describes its UID, not the object.** Such an argument is resolved by looking the record up by UID, and `ControllerArgumentResolver::toEntity()` accepts nothing but an integer — so `integer` is what a client has to send. Note this is a **change from earlier `0.x` releases**, which described these arguments as `{"type": "string"}`; an OpenAPI document regenerated after upgrading will differ for every entity-typed argument.
 - **Only backed enums are expected.** The extension's own compile step rejects a pure enum outright, so one cannot reach this mapper through a registered route. An external caller passing one gets `{"type": "string", "enum": []}` rather than an exception.
 
+`JsonSchemaMapper` gained a second `@api` method in **`1.1.0`**: `objectSchemaForClass(string $class): array`. Where `schemaForType()` maps a single argument's type, `objectSchemaForClass()` maps a whole DTO class — its public properties (plain or promoted constructor properties alike) become an object schema's `properties`, used by [`#[Returns]`](HOW-IT-WORKS.md#declaring-a-response-schema) to describe a route's response body:
+
+```php
+$schema = $this->schemas->objectSchemaForClass(CourseDto::class);
+// {"type": "object", "properties": {"id": {"type": "integer"}, "title": {"type": "string"}, …}, "required": ["id", "title"]}
+```
+
+- **A property's own type is mapped through the same rules as `schemaForType()`** — a backed enum or Extbase domain object property is never treated as a nested DTO, so the two methods never disagree about them. Any other class-typed property is mapped recursively via `objectSchemaForClass()` itself.
+- **`required` lists every non-nullable property without a default.** A nullable property, or one with a default value (including a promoted constructor parameter's default), is omitted from `required`; the key itself is left out of the schema entirely when nothing qualifies, rather than emitted as `"required": []`.
+
 ## Reference consumer: the OpenAPI export
 
 [`Classes/OpenApi/OpenApiGenerator.php`](../Classes/OpenApi/OpenApiGenerator.php) (internal) is the extension's own reference consumer of this API — it builds an OpenAPI 3.1 document purely from `RouteRegistry::getRoutes()`, `getArguments()`, `getAuthenticators()`, `getRequestTokenScope()`, `getCacheConfig()`, and `getRateLimit()`, with no access to anything `@internal`. Reading it end to end is the fastest way to see the metadata API used for something non-trivial: parameter/request-body construction from argument specs, security scheme mapping from authenticators, and error-response generation from which modifiers are present.

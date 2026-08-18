@@ -13,11 +13,18 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\OpenApi;
 
+use ReflectionClass;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
+use ReflectionNamedType;
+use ReflectionParameter;
+use ReflectionProperty;
 use TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface;
 use UnitEnum;
 
+use function array_filter;
+use function array_values;
+use function class_exists;
 use function is_a;
 use function preg_match;
 
@@ -68,6 +75,88 @@ final readonly class JsonSchemaMapper
         }
 
         return $schema;
+    }
+
+    /**
+     * Maps a DTO class's public properties (plain or promoted constructor properties — reflection sees
+     * both alike) to an OpenAPI object schema, for `#[Returns(SomeDto::class)]`. A property typed as
+     * another class is mapped the same way, recursively, unless it is a backed enum or an Extbase
+     * domain object — those go through schemaForType() so the two mappers never disagree about them.
+     * A non-nullable property without a default is `required`.
+     *
+     * @param class-string $class
+     *
+     * @return array<string, mixed>
+     */
+    public function objectSchemaForClass(string $class): array
+    {
+        $properties = [];
+        $required = [];
+
+        foreach ($this->publicProperties($class) as $property) {
+            $name = $property->getName();
+            $type = $property->getType();
+            $typeName = $type instanceof ReflectionNamedType ? $type->getName() : null;
+
+            $properties[$name] = $this->propertySchema($typeName);
+
+            $nullable = null === $type || $type->allowsNull();
+            $hasDefault = $property->isPromoted() ? $this->promotedParameterHasDefault($property) : $property->hasDefaultValue();
+            if (!$nullable && !$hasDefault) {
+                $required[] = $name;
+            }
+        }
+
+        $schema = ['type' => 'object', 'properties' => $properties];
+        if ([] !== $required) {
+            $schema['required'] = $required;
+        }
+
+        return $schema;
+    }
+
+    /**
+     * A named type that is neither a backed enum nor an Extbase domain object but does resolve to a
+     * class is treated as a nested DTO and mapped recursively; everything else defers to
+     * schemaForType(), so the two mappers never diverge on a scalar, enum, or entity property.
+     *
+     * @return array<string, mixed>
+     */
+    private function propertySchema(?string $typeName): array
+    {
+        if (null !== $typeName
+            && !is_a($typeName, UnitEnum::class, true)
+            && !is_a($typeName, DomainObjectInterface::class, true)
+            && class_exists($typeName)
+        ) {
+            return $this->objectSchemaForClass($typeName);
+        }
+
+        return $this->schemaForType($typeName);
+    }
+
+    /**
+     * @param class-string $class
+     *
+     * @return list<ReflectionProperty>
+     */
+    private function publicProperties(string $class): array
+    {
+        $properties = (new ReflectionClass($class))->getProperties(ReflectionProperty::IS_PUBLIC);
+
+        return array_values(array_filter($properties, static fn (ReflectionProperty $property): bool => !$property->isStatic()));
+    }
+
+    /**
+     * A promoted property has no `hasDefaultValue()` of its own — the default lives on the constructor
+     * parameter it promotes, which always exists for a property reflection reports as promoted.
+     */
+    private function promotedParameterHasDefault(ReflectionProperty $property): bool
+    {
+        $parameters = $property->getDeclaringClass()->getConstructor()?->getParameters() ?? [];
+        $matching = array_values(array_filter($parameters, static fn (ReflectionParameter $parameter): bool => $parameter->getName() === $property->getName()));
+
+        return [] !== $matching && $matching[0]->isDefaultValueAvailable();
     }
 
     /**

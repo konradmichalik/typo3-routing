@@ -79,4 +79,7 @@ final class CollectedRoutes
 
         $this->classExclusivePrefixes[] = $prefix;
     }
+
+    /** @var array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>> */
+    public array $returns = [];
 }

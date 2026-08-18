@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, RateLimit, RequireRequestToken, Returns, Route};
 use KonradMichalik\Typo3Routing\Authentication\RouteAuthenticatorInterface;
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
@@ -68,6 +68,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         RequireRequestToken::class => '#[RequireRequestToken]',
         Cors::class => '#[Cors]',
         DeprecatedRoute::class => '#[DeprecatedRoute]',
+        Returns::class => '#[Returns]',
     ];
 
     public function __construct(
@@ -78,6 +79,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
         private ClassExclusiveResolver $classExclusiveResolver = new ClassExclusiveResolver(),
         private DeprecationResolver $deprecationResolver = new DeprecationResolver(),
+        private ReturnsResolver $returnsResolver = new ReturnsResolver(),
     ) {}
 
     #[Override]
@@ -120,6 +122,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$authenticators', $collected->authenticators);
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
         $registry->setArgument('$corsConfigs', $collected->corsConfigs);
+        $registry->setArgument('$returns', $collected->returns);
         // Routes contributing nothing are dropped rather than baked as empty arrays.
         $registry->setArgument('$paramDescriptions', array_filter($collected->paramDescriptions));
         $registry->setArgument('$optionalInputs', array_filter($collected->optionalInputs));
@@ -342,6 +345,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->applyRequestToken($requestToken, $methods, $name, $serviceId, $method, $collected);
         $this->corsResolver->apply($cors, $name, $serviceId, $method->getName(), $collected);
         $this->deprecationResolver->apply($deprecation, $name, $serviceId, $method->getName(), $collected);
+        $this->returnsResolver->apply($method, $serviceId, $name, $collected);
     }
 
     /**

@@ -17,7 +17,7 @@ use KonradMichalik\Ttt\Assertion\JsonAssertions;
 use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Http\{HttpProblemException, RouteUrlGenerator, SiteBasePathResolver};
-use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator};
+use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator, ResponsesBuilder};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -58,7 +58,7 @@ final class SwaggerUiControllerTest extends TestCase
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured'));
-        $controller = new SwaggerUiController(new OpenApiGenerator($this->registry(), new JsonSchemaMapper()), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
+        $controller = new SwaggerUiController($this->generator(), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
 
         $this->expectException(HttpProblemException::class);
 
@@ -131,12 +131,19 @@ final class SwaggerUiControllerTest extends TestCase
             static fn (string $extension, string $key): string => 'swaggerUi' === $key ? $swaggerUiFlag : '/api/',
         );
 
-        return new SwaggerUiController(new OpenApiGenerator($this->registry(), new JsonSchemaMapper()), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
+        return new SwaggerUiController($this->generator(), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
     }
 
     private function urlGenerator(): RouteUrlGenerator
     {
         return new RouteUrlGenerator($this->registry(), new SiteBasePathResolver());
+    }
+
+    private function generator(): OpenApiGenerator
+    {
+        $schemas = new JsonSchemaMapper();
+
+        return new OpenApiGenerator($this->registry(), $schemas, new ResponsesBuilder($schemas));
     }
 
     private function request(): ServerRequest

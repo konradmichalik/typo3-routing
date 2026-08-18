@@ -56,7 +56,7 @@ The attribute is repeatable. Its parameters:
 | `schemes`      | `list<string>`          | `[]`      | Allowed URI schemes (e.g. `['https']`); empty = any scheme. See below.  |
 | `host`         | `?string`               | `null`    | Restrict the route to a specific hostname (e.g. `'api.example.com'`); null = any host. See below. |
 | `description`  | `?string`               | `null`    | Human-readable summary of what the endpoint does; surfaced in `routing:debug` and the OpenAPI export. See below. |
-| `caseInsensitive` | `?bool`              | `null`    | Match the path's literal segments regardless of case. See below. |
+| `caseInsensitive` | `?bool`              | `null`    | Match the path's and host's literal segments regardless of case. See below. |
 
 ## Priority
 
@@ -167,6 +167,8 @@ Three things this deliberately does **not** do:
 Generated URLs (`{routing:uri(...)}`, `RouteUrlGenerator`) always use the declared casing.
 
 Nothing is opted in by default, and the extra matching pass runs only after the exact path has already failed, so routes that do not use it are unaffected.
+
+The same opt-in applies to [`host`](#host)'s literal labels: a route combining `caseInsensitive: true` with a `host` constraint also accepts mixed-case host input. Host placeholders and their `requirements` are unaffected, same as for path placeholders above.
 
 ## Class-level prefix (route groups)
 

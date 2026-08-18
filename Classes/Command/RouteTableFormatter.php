@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Command;
 
+use function gmdate;
 use function implode;
 use function mb_strlen;
 use function mb_substr;
@@ -97,6 +98,23 @@ final class RouteTableFormatter
     public static function anyOrList(array $values): string
     {
         return [] === $values ? 'ANY' : implode(', ', $values);
+    }
+
+    /**
+     * @param array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null $deprecation
+     */
+    public static function deprecation(?array $deprecation): string
+    {
+        if (null === $deprecation) {
+            return '-';
+        }
+
+        return sprintf(
+            'since: %s%s%s',
+            gmdate('Y-m-d', $deprecation['since']),
+            null === $deprecation['sunset'] ? '' : ', sunset: '.gmdate('Y-m-d', $deprecation['sunset']),
+            null === $deprecation['successor'] ? '' : ', successor: '.$deprecation['successor'],
+        );
     }
 
     /**

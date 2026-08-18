@@ -491,6 +491,25 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesDeprecationPerRouteName(): void
+    {
+        $registry = new RouteRegistry(
+            [],
+            new ServiceLocator([]),
+            deprecations: ['v1' => ['since' => 1000, 'sunset' => 2000, 'successor' => 'v2', 'documentation' => 'https://example.com']],
+        );
+
+        $deprecation = $registry->getDeprecation('v1');
+
+        self::assertNotNull($deprecation);
+        self::assertSame(1000, $deprecation['since']);
+        self::assertSame(2000, $deprecation['sunset']);
+        self::assertSame('v2', $deprecation['successor']);
+        self::assertSame('https://example.com', $deprecation['documentation']);
+        self::assertNull($registry->getDeprecation('v2'));
+    }
+
+    #[Test]
     public function exposesArgumentSpecsPerRouteName(): void
     {
         $spec = ['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null];

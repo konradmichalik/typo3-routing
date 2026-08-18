@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, RoutelessExclusiveController, SiteLanguageScopedController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, RoutelessExclusiveController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -472,6 +472,92 @@ final class RouteCompilerPassTest extends TestCase
         $routes = $this->discover($this->buildContainer(['products' => PrefixedEmptyMethodPathController::class]));
 
         self::assertSame('/api/products', $routes['products_list']['path']);
+    }
+
+    #[Test]
+    public function bakesDeprecationMetadataIntoTheRegistry(): void
+    {
+        $container = $this->buildContainer([
+            'deprecated' => DeprecatedRouteController::class,
+            'successor' => SuccessorRouteController::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}> $deprecations */
+        $deprecations = $container->getDefinition(RouteRegistry::class)->getArgument('$deprecations');
+
+        self::assertSame('v2_items', $deprecations['v1_items']['successor']);
+        self::assertSame('https://example.com/migrate', $deprecations['v1_items']['documentation']);
+        self::assertNotNull($deprecations['v1_items']['sunset']);
+    }
+
+    #[Test]
+    public function methodLevelDeprecationOverridesTheClassLevelOneEntirely(): void
+    {
+        $container = $this->buildContainer([
+            'deprecated' => DeprecatedRouteController::class,
+            'successor' => SuccessorRouteController::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}> $deprecations */
+        $deprecations = $container->getDefinition(RouteRegistry::class)->getArgument('$deprecations');
+
+        // The method's own #[DeprecatedRoute] carries none of the class-level successor/documentation.
+        self::assertNull($deprecations['v1_minimal']['successor']);
+        self::assertNull($deprecations['v1_minimal']['documentation']);
+    }
+
+    #[Test]
+    public function aRouteWithoutTheAttributeHasNoDeprecationEntry(): void
+    {
+        $container = $this->buildContainer(['successor' => SuccessorRouteController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, mixed> $routes */
+        $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
+        /** @var array<string, mixed> $deprecations */
+        $deprecations = $container->getDefinition(RouteRegistry::class)->getArgument('$deprecations');
+
+        self::assertArrayHasKey('v2_items', $routes);
+        self::assertArrayNotHasKey('v2_items', $deprecations);
+    }
+
+    #[Test]
+    public function throwsWhenDeprecationSunsetPrecedesSince(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000032);
+
+        $this->discover($this->buildContainer(['backwards' => DeprecationSunsetBeforeSinceController::class]));
+    }
+
+    #[Test]
+    public function throwsOnAnUnparseableDeprecationDate(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000033);
+
+        $this->discover($this->buildContainer(['bogus' => UnparseableDeprecationDateController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenTheDeprecationSuccessorIsNotARegisteredRoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000034);
+
+        $this->discover($this->buildContainer(['orphan' => UnknownDeprecationSuccessorController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenDeprecatedRouteIsUsedWithoutARoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000013);
+        $this->expectExceptionMessageMatches('/#\[DeprecatedRoute\].*without a #\[Route\]/');
+
+        $this->discover($this->buildContainer(['orphaned' => OrphanedDeprecatedRouteController::class]));
     }
 
     #[Test]

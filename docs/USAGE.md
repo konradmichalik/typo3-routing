@@ -32,6 +32,7 @@ A controller method declares **only the parameters it needs** — there is no fi
 - [Host](#host)
   - [Wildcards and multiple hosts](#wildcards-and-multiple-hosts)
 - [Description](#description)
+- [Deprecating a route](#deprecating-a-route)
 - [Case-insensitive paths](#case-insensitive-paths)
 - [Class-level prefix (route groups)](#class-level-prefix-route-groups)
 - [Requirements](#requirements)
@@ -143,6 +144,36 @@ public function show(int $id): ResponseInterface { /* … */ }
 ```
 
 It shows up in `routing:debug` (truncated in the table, full in `--json` and the detail view) and in the OpenAPI export (see [OpenAPI](HOW-IT-WORKS.md#openapi-export)): a description with more than one sentence has its first sentence split off as the operation `summary`, the full text stays the `description`.
+
+## Deprecating a route
+
+`#[DeprecatedRoute]` is a separate, non-repeatable attribute — not a `#[Route]` parameter — so it stays optional and out of the way for routes that never need it:
+
+```php
+#[Route(path: '/api/v1/courses', name: 'courses_v1')]
+#[DeprecatedRoute(since: '2026-03-01', sunset: '2026-12-31', successor: 'courses_v2', documentation: 'https://example.com/migrate-to-v2')]
+public function indexV1(): ResponseInterface { /* … */ }
+```
+
+| Parameter       | Type          | Default | Description |
+|-----------------|---------------|---------|--------------|
+| `since`         | `string`      | –       | When the route became deprecated. Any format `DateTimeImmutable` accepts (e.g. `'2026-03-01'`); rejected at build time if unparseable. |
+| `sunset`        | `?string`     | `null`  | When the route stops being supported, same format as `since`. Must not precede `since` — rejected at build time, naming the route. |
+| `successor`     | `?string`     | `null`  | Route name replacing this one, resolved through `RouteUrlGenerator`. An unknown route name fails the build. |
+| `documentation` | `?string`     | `null`  | URL with migration guidance. |
+
+Every response the route produces — success, a cached hit, a conditional `304`, or any `4xx` further down the gauntlet — carries:
+
+| Header | Format | Note |
+|--------|--------|------|
+| `Deprecation` | `@1740787200` | [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) section 2 — an Item Structured Field Date, `@` plus a Unix timestamp. **Never** an HTTP-date; early drafts of the RFC used one, and that is the standard implementation mistake. |
+| `Sunset` | `Thu, 31 Dec 2026 23:59:59 GMT` | [RFC 8594](https://www.rfc-editor.org/rfc/rfc8594) section 3 — an HTTP-date, a different format for historical reasons. Omitted when `sunset` is not given. |
+| `Link: …; rel="successor-version"` | — | Present when `successor` is given. |
+| `Link: …; rel="deprecation"` | — | Present when `documentation` is given. Both `Link` values ride in the same header when both are given. |
+
+The same declaration also sets `deprecated: true` on the OpenAPI operation, and shows in `routing:debug` (detail view and `--json`; `--deprecated` filters the table to only these routes).
+
+At class level, `#[DeprecatedRoute]` applies to every method route without its own — same rule as [`#[Cors]`](CONFIGURATION.md#per-route-overrides-with-cors) and `description` above; a method's own attribute wins entirely rather than merging field by field. There is no `410 Gone` after `sunset` passes: [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) is explicit that deprecation is a hint, and turning an endpoint off has to stay a deliberate, separate act.
 
 ## Case-insensitive paths
 

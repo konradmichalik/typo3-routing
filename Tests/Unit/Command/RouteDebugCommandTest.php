@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Command;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use KonradMichalik\Typo3Routing\Command\RouteDebugCommand;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -60,6 +62,79 @@ final class RouteDebugCommandTest extends TestCase
         self::assertSame([], $data[0]['requirements']);
         self::assertSame('Development', $data[1]['env']);
         self::assertSame(['id' => '\d+'], $data[1]['requirements']);
+    }
+
+    #[Test]
+    public function detailShowsTheDeprecationStateWithSunsetAndSuccessor(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['example_v1' => ['path' => '/api/example/v1', 'methods' => ['GET'], 'controller' => 'ctrl::v1', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), deprecations: [
+            'example_v1' => [
+                'since' => (new DateTimeImmutable('2026-01-01', new DateTimeZone('UTC')))->getTimestamp(),
+                'sunset' => (new DateTimeImmutable('2026-12-31', new DateTimeZone('UTC')))->getTimestamp(),
+                'successor' => 'example_v2',
+                'documentation' => null,
+            ],
+        ]);
+        $tester = $this->tester($registry);
+
+        $tester->execute(['name' => 'example_v1']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('2026-01-01', $display);
+        self::assertStringContainsString('2026-12-31', $display);
+        self::assertStringContainsString('example_v2', $display);
+    }
+
+    #[Test]
+    public function detailFallsBackForARouteWithoutADeprecation(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_count']);
+
+        self::assertMatchesRegularExpression('/Deprecated\s+-/', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function includesTheDeprecationInJsonOutput(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['example_v1' => ['path' => '/api/example/v1', 'methods' => ['GET'], 'controller' => 'ctrl::v1', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), deprecations: [
+            'example_v1' => ['since' => 1234, 'sunset' => null, 'successor' => null, 'documentation' => null],
+        ]);
+        $tester = $this->tester($registry);
+
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, deprecated: array{since: int}}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertSame(1234, $data[0]['deprecated']['since']);
+    }
+
+    #[Test]
+    public function filtersToOnlyDeprecatedRoutes(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'example_v1' => ['path' => '/api/example/v1', 'methods' => ['GET'], 'controller' => 'ctrl::v1', 'env' => null, 'requirements' => []],
+            'example_v2' => ['path' => '/api/example/v2', 'methods' => ['GET'], 'controller' => 'ctrl::v2', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), deprecations: [
+            'example_v1' => ['since' => 1, 'sunset' => null, 'successor' => null, 'documentation' => null],
+        ]);
+        $tester = $this->tester($registry);
+
+        $tester->execute(['--deprecated' => true, '--json' => true]);
+
+        /** @var list<array{name: string}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertCount(1, $data);
+        self::assertSame('example_v1', $data[0]['name']);
     }
 
     #[Test]

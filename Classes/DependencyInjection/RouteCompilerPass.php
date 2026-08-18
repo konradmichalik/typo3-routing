@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, RateLimit, RequireRequestToken, Route};
 use KonradMichalik\Typo3Routing\Authentication\RouteAuthenticatorInterface;
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
@@ -67,6 +67,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         Authenticate::class => '#[Authenticate]',
         RequireRequestToken::class => '#[RequireRequestToken]',
         Cors::class => '#[Cors]',
+        DeprecatedRoute::class => '#[DeprecatedRoute]',
     ];
 
     public function __construct(
@@ -76,6 +77,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private CompilerWarnings $compilerWarnings = new CompilerWarnings(),
         private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
         private ClassExclusiveResolver $classExclusiveResolver = new ClassExclusiveResolver(),
+        private DeprecationResolver $deprecationResolver = new DeprecationResolver(),
     ) {}
 
     #[Override]
@@ -105,8 +107,11 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             }
         }
 
+        $this->deprecationResolver->assertSuccessorsExist($collected);
+
         $registry = $container->getDefinition(RouteRegistry::class);
         $registry->setArgument('$routes', $collected->routes);
+        $registry->setArgument('$deprecations', $collected->deprecations);
         $registry->setArgument('$controllerLocator', ServiceLocatorTagPass::register($container, $controllerReferences));
         $registry->setArgument('$authenticatorLocator', ServiceLocatorTagPass::register($container, $collected->authenticatorReferences));
         $registry->setArgument('$cacheConfigs', $collected->cacheConfigs);
@@ -174,6 +179,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $classCors = $this->corsResolver->resolveClass($reflection);
         $classExclusivePrefix = $this->classExclusiveResolver->resolvePrefix($classRoute, $serviceId);
         $collected->recordClassExclusivePrefix($classExclusivePrefix);
+        $classDeprecation = $this->deprecationResolver->resolveClass($reflection);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -181,7 +187,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix) || $found;
+            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix, $classDeprecation) || $found;
         }
 
         return ['hasRoute' => $found, 'hasExclusiveClaim' => null !== $classExclusivePrefix];
@@ -206,7 +212,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         return $attributes[0]->newInstance();
     }
 
-    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix): bool
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix, ?DeprecatedRoute $classDeprecation): bool
     {
         $overriddenRouteMethod = $this->compilerWarnings->findOverriddenRouteMethod($method, Route::class);
         $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
@@ -224,9 +230,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $requestToken = $this->resolveRequestToken($method);
         $cors = $this->corsResolver->resolveMethod($method, $classCors);
         $this->compilerWarnings->warnIfAModifierWasDropped($overriddenRouteMethod, $method, $serviceId, self::MODIFIER_ATTRIBUTES);
+        $deprecation = $this->deprecationResolver->resolveMethod($method, $classDeprecation);
 
         foreach ($routeAttributes as $attribute) {
-            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $collected, $classRoute, $classExclusivePrefix);
+            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $deprecation, $collected, $classRoute, $classExclusivePrefix);
         }
 
         return true;
@@ -257,7 +264,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
-    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, ?DeprecatedRoute $deprecation, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
     {
         $this->classExclusiveResolver->assertNotOnMethod($route, $method, $serviceId);
 
@@ -334,6 +341,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->applyCache($cache, $auth, $name, $serviceId, $method, $collected);
         $this->applyRequestToken($requestToken, $methods, $name, $serviceId, $method, $collected);
         $this->corsResolver->apply($cors, $name, $serviceId, $method->getName(), $collected);
+        $this->deprecationResolver->apply($deprecation, $name, $serviceId, $method->getName(), $collected);
     }
 
     /**

@@ -15,7 +15,7 @@ namespace KonradMichalik\RoutingTest\Controller;
 
 use KonradMichalik\RoutingTest\Domain\Model\Item;
 use KonradMichalik\RoutingTest\Enum\Status;
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, Param, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, Param, RateLimit, RequireRequestToken, Route};
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
@@ -86,6 +86,14 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['q' => $q]);
     }
 
+    #[Route(path: '/api/example/deprecated-search', name: 'example_deprecated_search', requirements: ['q' => '\d+'])]
+    #[DeprecatedRoute(since: '2026-01-01')]
+    public function deprecatedSearch(int $q): JsonResponse
+    {
+        // Deprecated without a cache: proves the headers ride on a plain 400 too.
+        return new JsonResponse(['q' => $q]);
+    }
+
     #[Route(path: '/api/example/range', name: 'example_range')]
     public function range(int $from, int $to = 10, ?string $label = null): JsonResponse
     {
@@ -133,6 +141,14 @@ final class ExampleController implements RouteControllerInterface
     public function cached(): JsonResponse
     {
         // A fresh token each call — identical across requests proves a cache hit.
+        return new JsonResponse(['token' => bin2hex(random_bytes(8))]);
+    }
+
+    #[Route(path: '/api/example/deprecated', name: 'example_deprecated')]
+    #[Cache(lifetime: 3600, tags: ['pages'])]
+    #[DeprecatedRoute(since: '2026-01-01', sunset: '2026-12-31', successor: 'example_count', documentation: 'https://example.com/migrate')]
+    public function deprecated(): JsonResponse
+    {
         return new JsonResponse(['token' => bin2hex(random_bytes(8))]);
     }
 

@@ -19,7 +19,7 @@ use KonradMichalik\Ttt\Attribute\WithEnvironment;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, RouteUrlGenerator, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, DeprecationHeaders, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry, SiteLanguageScope};
@@ -587,7 +587,7 @@ final class RouteDispatcherTest extends TestCase
         $context = new Context();
         $cors = new CorsHandler($extensionConfiguration);
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
-        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $this->deprecationHeaders($registry), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -978,6 +978,62 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function stampsDeprecationHeadersOnASuccessResponse(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame('@1700000000', $response->getHeaderLine('Deprecation'));
+        self::assertSame(gmdate('D, d M Y H:i:s', 1800000000).' GMT', $response->getHeaderLine('Sunset'));
+        self::assertSame('</api/count>; rel="successor-version"', $response->getHeaderLine('Link'));
+    }
+
+    #[Test]
+    public function stampsDeprecationHeadersOnACacheHit(): void
+    {
+        $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+        $hit = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame('HIT', $hit->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('@1700000000', $hit->getHeaderLine('Deprecation'));
+    }
+
+    #[Test]
+    public function stampsDeprecationHeadersOnAConditionalNotModifiedResponse(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+        $etag = $first->getHeaderLine('ETag');
+
+        $notModified = $this->dispatch(
+            $this->request('GET', 'https://example.com/api/cached')->withHeader('If-None-Match', $etag),
+        );
+
+        self::assertSame(304, $notModified->getStatusCode());
+        self::assertSame('@1700000000', $notModified->getHeaderLine('Deprecation'));
+    }
+
+    #[Test]
+    public function stampsDeprecationHeadersOnA4xxResponse(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/guarded'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertSame('@1700000000', $response->getHeaderLine('Deprecation'));
+        // "guarded" declares no sunset/successor — neither header is emitted.
+        self::assertSame('', $response->getHeaderLine('Sunset'));
+        self::assertSame('', $response->getHeaderLine('Link'));
+    }
+
+    #[Test]
+    public function omitsDeprecationHeadersForARouteWithoutTheAttribute(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
+
+        self::assertSame('', $response->getHeaderLine('Deprecation'));
+        self::assertSame('', $response->getHeaderLine('Sunset'));
+        self::assertSame('', $response->getHeaderLine('Link'));
+    }
+
+    #[Test]
     public function omitsTheCacheStatusHeaderForRoutesWithoutCache(): void
     {
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/count'));
@@ -1118,12 +1174,17 @@ final class RouteDispatcherTest extends TestCase
 
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
 
-        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $extensionConfiguration);
+        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $this->deprecationHeaders($registry), $extensionConfiguration);
     }
 
     private function siteLanguageScope(): SiteLanguageScope
     {
         return new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
+    }
+
+    private function deprecationHeaders(RouteRegistry $registry): DeprecationHeaders
+    {
+        return new DeprecationHeaders($registry, new RouteUrlGenerator($registry, new SiteBasePathResolver()));
     }
 
     private function registry(): RouteRegistry
@@ -1225,6 +1286,12 @@ final class RouteDispatcherTest extends TestCase
             'corsOverride' => ['allowedOrigins' => ['https://partner.example.org'], 'allowedHeaders' => 'Content-Type, Authorization', 'allowCredentials' => false, 'exposeHeaders' => '', 'maxAge' => 120],
         ];
 
+        /** @var array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}> $deprecations */
+        $deprecations = [
+            'cached' => ['since' => 1700000000, 'sunset' => 1800000000, 'successor' => 'count', 'documentation' => null],
+            'guarded' => ['since' => 1700000000, 'sunset' => null, 'successor' => null, 'documentation' => null],
+        ];
+
         $locator = new ServiceLocator([
             'ctrl' => static fn (): ExampleController => new ExampleController(),
             'entityCtrl' => static fn (): EntityController => new EntityController(),
@@ -1234,7 +1301,7 @@ final class RouteDispatcherTest extends TestCase
             DenyAuthenticator::class => static fn (): DenyAuthenticator => new DenyAuthenticator(),
         ]);
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, corsConfigs: $corsConfigs);
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, corsConfigs: $corsConfigs, deprecations: $deprecations);
     }
 
     private function frontendUserContext(int $uid): Context

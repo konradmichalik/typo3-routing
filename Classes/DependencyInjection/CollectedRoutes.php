@@ -24,7 +24,7 @@ use Symfony\Component\DependencyInjection\Reference;
  */
 final class CollectedRoutes
 {
-    /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>}> */
+    /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>, deprecation?: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}}> */
     public array $routes = [];
 
     /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> */
@@ -76,4 +76,7 @@ final class CollectedRoutes
 
         $this->classExclusivePrefixes[] = $prefix;
     }
+
+    /** @var array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}> */
+    public array $deprecations = [];
 }

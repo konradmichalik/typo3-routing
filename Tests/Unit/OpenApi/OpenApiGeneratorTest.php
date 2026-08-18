@@ -50,6 +50,26 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function marksADeprecatedRouteAsDeprecatedInTheOperation(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['x' => ['path' => '/api/x', 'methods' => ['GET'], 'controller' => 'ctrl::x', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), deprecations: ['x' => ['since' => 1, 'sunset' => null, 'successor' => null, 'documentation' => null]]);
+
+        $document = (new OpenApiGenerator($registry, new JsonSchemaMapper()))->generate('My API', '2.0.0', '/api/');
+
+        self::assertTrue($document['paths']['/api/x']['get']['deprecated']);
+    }
+
+    #[Test]
+    public function omitsTheDeprecatedFlagForARouteWithoutTheAttribute(): void
+    {
+        $document = $this->generate();
+
+        self::assertArrayNotHasKey('deprecated', $document['paths']['/api/v1/items/{id}']['get']);
+    }
+
+    #[Test]
     public function mapsPathAndQueryParametersWithTypeAndEnumSchema(): void
     {
         $operation = $this->generate()['paths']['/api/v1/items/{id}']['get'];

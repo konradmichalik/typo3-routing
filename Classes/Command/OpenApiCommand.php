@@ -60,7 +60,7 @@ final class OpenApiCommand extends Command
             $this->stringOption($input, 'server', ''),
         );
 
-        $flags = \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES;
+        $flags = \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE;
         if (true === $input->getOption('pretty')) {
             $flags |= \JSON_PRETTY_PRINT;
         }

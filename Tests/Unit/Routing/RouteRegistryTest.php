@@ -106,6 +106,85 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function setsTheUtf8OptionForANonAsciiPath(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('umlaut');
+
+        self::assertNotNull($route);
+        self::assertStringEndsWith('u', $route->compile()->getRegex());
+    }
+
+    #[Test]
+    public function doesNotSetTheUtf8OptionForAPurelyAsciiRoute(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'ascii' => ['path' => '/api/x', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('ascii');
+
+        self::assertNotNull($route);
+        self::assertStringEndsNotWith('u', $route->compile()->getRegex());
+    }
+
+    #[Test]
+    public function setsTheUtf8OptionForAUnicodeAwareRequirementOnAnAsciiPath(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'tagged' => ['path' => '/api/tags/{name}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => ['name' => '\p{L}+']],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('tagged');
+
+        self::assertNotNull($route);
+        self::assertStringEndsWith('u', $route->compile()->getRegex());
+    }
+
+    #[Test]
+    public function aNonAsciiRouteMatchesThePercentEncodedPathARealRequestArrivesAs(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        // Both matchers rawurldecode() internally, so the percent-encoded form the gate must let
+        // through (see staticPrefixes below) reaches a working match once "utf8" is set.
+        self::assertSame('umlaut', $registry->getMatcher($this->getContext())->match('/api/%C3%BCber-uns')['_route']);
+    }
+
+    #[Test]
+    public function staticPrefixesIncludeThePercentEncodedFormOfANonAsciiPrefix(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+
+        $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
+
+        self::assertSame(['/api/über-uns', '/api/%C3%BCber-uns'], $prefixes);
+    }
+
+    #[Test]
+    public function staticPrefixesEncodedFormAlsoContributesItsSlashlessVariant(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über/', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+
+        $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
+
+        self::assertSame(['/api/über/', '/api/über', '/api/%C3%BCber/', '/api/%C3%BCber'], $prefixes);
+    }
+
+    #[Test]
     public function exposesTheStaticPrefixesBakedInAtCompileTime(): void
     {
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */

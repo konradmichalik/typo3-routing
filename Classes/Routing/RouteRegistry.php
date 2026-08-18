@@ -22,6 +22,11 @@ use function array_filter;
 use function array_map;
 use function array_unique;
 use function array_values;
+use function bin2hex;
+use function preg_match;
+use function preg_replace_callback;
+use function rtrim;
+use function strtoupper;
 
 /**
  * RouteRegistry.
@@ -98,7 +103,7 @@ final class RouteRegistry
                     '_languages' => $route['languages'] ?? [],
                 ],
                 $route['requirements'],
-                [],
+                self::needsUtf8($route) ? ['utf8' => true] : [],
                 $route['host'] ?? '',
                 $route['schemes'] ?? [],
                 $route['methods'],
@@ -119,6 +124,11 @@ final class RouteRegistry
      * decide. The root prefix `/` is left alone: trimming it would leave the empty string, and it
      * already matches every path anyway.
      *
+     * A non-ASCII prefix contributes its percent-encoded form too: `SiteBasePathResolver` hands the
+     * gate the raw, percent-encoded request path (TYPO3's `Uri` never decodes it), while the compiled
+     * static prefix is the literal UTF-8 the route declared. Without this, a non-ASCII route would
+     * compile and match, yet never reach the matcher at all.
+     *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
      *
      * @return list<string>
@@ -128,11 +138,15 @@ final class RouteRegistry
         $prefixes = [];
         foreach ($collection->all() as $route) {
             $prefix = $route->compile()->getStaticPrefix();
-            $prefixes[] = $prefix;
+            foreach (self::withSlashlessVariant($prefix) as $variant) {
+                $prefixes[] = $variant;
+            }
 
-            $slashless = rtrim($prefix, '/');
-            if ('' !== $slashless) {
-                $prefixes[] = $slashless;
+            $encoded = self::percentEncodeNonAscii($prefix);
+            if ($encoded !== $prefix) {
+                foreach (self::withSlashlessVariant($encoded) as $variant) {
+                    $prefixes[] = $variant;
+                }
             }
         }
 
@@ -403,6 +417,72 @@ final class RouteRegistry
         }
 
         return self::staticPrefixes($this->getRouteCollection());
+    }
+
+    /**
+     * Symfony's route compiler refuses a non-ASCII path or requirement pattern outright unless the
+     * "utf8" option is set (it adds the `u` regex modifier). Derived rather than demanded: this
+     * extension has no legacy YAML/XML routes to stay compatible with, the reason Symfony itself
+     * defaults it off. Never set unconditionally — the `u` modifier makes a request path containing
+     * invalid UTF-8 fail the regex instead of simply not matching.
+     *
+     * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool} $route
+     */
+    private static function needsUtf8(array $route): bool
+    {
+        if (self::containsNonAscii($route['path'])) {
+            return true;
+        }
+
+        foreach ($route['requirements'] as $pattern) {
+            if (self::containsNonAscii($pattern) || self::hasUnicodeRegexConstruct($pattern)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function containsNonAscii(string $value): bool
+    {
+        return 1 === preg_match('/[\x80-\xFF]/', $value);
+    }
+
+    /**
+     * `\p{...}`, `\X` and `\x{...}` require PCRE's Unicode mode even in an otherwise all-ASCII pattern.
+     */
+    private static function hasUnicodeRegexConstruct(string $pattern): bool
+    {
+        return 1 === preg_match('/\\\\p\{|\\\\X|\\\\x\{/', $pattern);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function withSlashlessVariant(string $prefix): array
+    {
+        $variants = [$prefix];
+
+        $slashless = rtrim($prefix, '/');
+        if ('' !== $slashless) {
+            $variants[] = $slashless;
+        }
+
+        return $variants;
+    }
+
+    /**
+     * Percent-encodes only the non-ASCII bytes of a path, leaving `/` and every ASCII character
+     * untouched — matching how a PSR-7 `Uri` encodes a UTF-8 path (`rawurlencode()` would also encode
+     * the segment separators, which a prefix cannot afford to lose).
+     */
+    private static function percentEncodeNonAscii(string $value): string
+    {
+        return preg_replace_callback(
+            '/[\x80-\xFF]/',
+            static fn (array $match): string => '%'.strtoupper(bin2hex($match[0])),
+            $value,
+        ) ?? $value;
     }
 
     private function getCaseInsensitiveCollection(): RouteCollection

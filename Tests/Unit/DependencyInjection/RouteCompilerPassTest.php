@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, ReturnsController, RoutelessExclusiveController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, ReturnsController, RoutelessExclusiveController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -438,6 +438,22 @@ final class RouteCompilerPassTest extends TestCase
         (new RouteCompilerPass())->process($container);
 
         self::assertSame([], $container->getDefinition(RouteRegistry::class)->getArgument('$staticPrefixes'));
+    }
+
+    #[Test]
+    public function compilesAControllerRouteWithANonAsciiPath(): void
+    {
+        $container = $this->buildContainer(['unicode' => UnicodePathController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var list<string> $prefixes */
+        $prefixes = $container->getDefinition(RouteRegistry::class)->getArgument('$staticPrefixes');
+
+        self::assertContains('/api/über-uns', $prefixes);
+        // The percent-encoded form is what a real request path arrives as (TYPO3's Uri never decodes
+        // it), baked with every "%" doubled — a bare "%C3%" would otherwise be resolved by the
+        // container's own parameter bag as a reference to a parameter named "C3".
+        self::assertContains('/api/%%C3%%BCber-uns', $prefixes);
     }
 
     #[Test]

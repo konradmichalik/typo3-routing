@@ -23,19 +23,19 @@ The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxR
 
 ## ✨ Features
 
-- [**Attribute routing**](docs/USAGE.md): declare an endpoint with `#[Route]` directly on a controller method
-- [**Route groups**](docs/USAGE.md#class-level-prefix-route-groups): a class-level `#[Route]` prefixes every method route, e.g. for API versioning
-- [**Typed arguments**](docs/ARGUMENTS.md): methods receive type-cast path/query/body values, no manual request reading
-- [**Zero-config discovery**](docs/HOW-IT-WORKS.md): routes are collected at container compile time, no extra cache
-- [**Measured overhead**](docs/PERFORMANCE.md): requests that cannot be a route are filtered out in under a microsecond; dispatching a matched one costs ~0.6 ms more than a hand-written middleware, a few percent of a minimal JSON endpoint
-- [**URL generation**](docs/URL-GENERATION.md): a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
-- [**Opt-in caching**](docs/CACHING.md): cache responses with `#[Cache]`, with tag-based invalidation
-- [**Opt-in rate limiting**](docs/RATE-LIMITING.md): throttle requests per client IP with `#[RateLimit]`
-- [**Opt-in authentication & CSRF**](docs/AUTHENTICATION.md): protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
-- [**CORS**](docs/CONFIGURATION.md#cors): opt-in cross-origin support with automatic preflight handling, configured globally or per route with `#[Cors]`
-- [**Debug command**](docs/HOW-IT-WORKS.md#debug-command): list every registered route as a table or JSON, including an `--unprotected` audit
-- [**OpenAPI export**](docs/HOW-IT-WORKS.md#openapi-export): generate an OpenAPI 3.1 document from your routes with `routing:openapi`
-- [**Swagger UI**](docs/HOW-IT-WORKS.md#swagger-ui-development-only): opt-in, development-only Swagger UI served over the same OpenAPI export
+- [**Attribute routing**](docs/routes/route-attribute.md): declare an endpoint with `#[Route]` directly on a controller method
+- [**Route groups**](docs/routes/route-groups.md): a class-level `#[Route]` prefixes every method route, e.g. for API versioning
+- [**Typed arguments**](docs/routes/arguments.md): methods receive type-cast path/query/body values, no manual request reading
+- [**Zero-config discovery**](docs/background/how-it-works.md): routes are collected at container compile time, no extra cache
+- [**Measured overhead**](docs/background/performance.md): requests that cannot be a route are filtered out in under a microsecond; dispatching a matched one costs ~0.6 ms more than a hand-written middleware, a few percent of a minimal JSON endpoint
+- [**URL generation**](docs/routes/url-generation.md): a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
+- [**Opt-in caching**](docs/features/caching.md): cache responses with `#[Cache]`, with tag-based invalidation
+- [**Opt-in rate limiting**](docs/features/rate-limiting.md): throttle requests per client IP with `#[RateLimit]`
+- [**Opt-in authentication & CSRF**](docs/features/authentication.md): protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
+- [**CORS**](docs/features/cors.md): opt-in cross-origin support with automatic preflight handling, configured globally or per route with `#[Cors]`
+- [**Debug command**](docs/operating/commands.md): list every registered route as a table or JSON, including an `--unprotected` audit
+- [**OpenAPI export**](docs/operating/openapi.md): generate an OpenAPI 3.1 document from your routes with `routing:openapi`
+- [**Swagger UI**](docs/operating/openapi.md#swagger-ui-development-only): opt-in, development-only Swagger UI served over the same OpenAPI export
 
 ## 🔥 Installation
 
@@ -98,22 +98,18 @@ public function show(int $id, int $page = 1): ResponseInterface
 }
 ```
 
-See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments.
+See [The `#[Route]` attribute](docs/routes/route-attribute.md) for the full reference and [Typed controller arguments](docs/routes/arguments.md) for how the signature is fed.
 
 ## 📚 Documentation
 
-| Topic | What's inside |
-|-------|---------------|
-| [How It Works](docs/HOW-IT-WORKS.md) | Compile-time discovery, runtime dispatch, and the `routing:debug` command |
-| [How It Compares](docs/COMPARISON.md) | When to reach for this vs. `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
-| [Usage](docs/USAGE.md) | The `#[Route]` attribute, `requirements`, and typed controller arguments |
-| [URL Generation](docs/URL-GENERATION.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator |
-| [Configuration](docs/CONFIGURATION.md) | Derived path gate, trailing slashes, exclusive path prefixes, environment-bound routes, middleware placement |
-| [Caching](docs/CACHING.md) | Opt-in response caching with `#[Cache]` and tag-based invalidation |
-| [Rate Limiting](docs/RATE-LIMITING.md) | Opt-in per-IP throttling with `#[RateLimit]` |
-| [Authentication & CSRF](docs/AUTHENTICATION.md) | Protecting routes with `#[Authenticate]`, request tokens, and deployment notes |
-| [Performance](docs/PERFORMANCE.md) | Measured dispatch overhead, what the path gate costs unrelated traffic, and how to reproduce both |
-| [Extending](docs/EXTENDING.md) | Building tooling on top of the route metadata (`RouteRegistry`), the `@api`/`@internal` surface, and the BC promise |
+Full documentation lives in [`docs/`](docs/README.md), grouped into four parts:
+
+| Part | What's inside |
+|------|---------------|
+| [Defining routes](docs/routes/README.md) | The `#[Route]` attribute, route groups, typed controller arguments, and URL generation — the only part you need to ship an endpoint |
+| [Route features](docs/features/README.md) | The opt-in attributes: `#[Authenticate]`, `#[Cache]`, `#[RateLimit]`, `#[Cors]`, and how they interact |
+| [Operating it](docs/operating/README.md) | Every extension setting, the `routing:debug` / `routing:match` commands, and the OpenAPI export |
+| [Background](docs/background/README.md) | How it compares to the alternatives, how it works underneath, measured performance, and the `@api` surface for tooling |
 
 > [!TIP]
 > Want to expose these routes to AI agents/MCP clients? <img src="https://github.com/konradmichalik/typo3-routing-mcp/raw/main/Resources/Public/Icons/Extension.png?raw=true" width="16" height="16" alt=""> [`typo3-routing-mcp`](https://github.com/konradmichalik/typo3-routing-mcp) adds a `#[McpTool]` attribute next to an existing `#[Route]` and serves it over Streamable HTTP.

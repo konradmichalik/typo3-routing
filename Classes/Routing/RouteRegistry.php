@@ -224,10 +224,13 @@ final class RouteRegistry
      */
     public static function classExclusivePrefixes(array $routes): array
     {
-        return array_values(array_unique(array_filter(array_map(
-            static fn (array $route): ?string => $route['classExclusivePrefix'] ?? null,
-            $routes,
-        ))));
+        return array_values(array_unique(array_filter(
+            array_map(
+                static fn (array $route): ?string => $route['classExclusivePrefix'] ?? null,
+                $routes,
+            ),
+            static fn (?string $prefix): bool => null !== $prefix,
+        )));
     }
 
     /**

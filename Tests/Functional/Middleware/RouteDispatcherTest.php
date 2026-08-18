@@ -386,6 +386,7 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
         self::assertSame(405, $response->getStatusCode());
         self::assertSame('POST', $response->getHeaderLine('Allow'));
+        self::assertSame('', (string) $response->getBody());
     }
 
     #[Test]

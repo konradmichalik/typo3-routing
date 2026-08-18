@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathNoPrefixController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathNoPrefixController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -697,6 +697,16 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionMessageMatches('/has no effect on a method route/');
 
         $this->discover($this->buildContainer(['method_exclusive' => MethodLevelExclusiveController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenAnExclusiveClassPathHasNoStaticPrefix(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionMessageMatches('/claim every unmatched path site-wide/');
+
+        $this->discover($this->buildContainer(['placeholder_exclusive' => PlaceholderExclusiveController::class]));
     }
 
     #[Test]

@@ -23,6 +23,7 @@ use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
+use Symfony\Component\Routing\Route as SymfonyRoute;
 
 use function array_intersect;
 use function array_map;
@@ -161,6 +162,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     {
         $classRoute = $this->resolveClassRoute($reflection, $serviceId);
         $classCors = $this->corsResolver->resolveClass($reflection);
+        $classExclusivePrefix = $this->resolveClassExclusivePrefix($classRoute, $serviceId);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -168,7 +170,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors) || $found;
+            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix) || $found;
         }
 
         return $found;
@@ -193,7 +195,26 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         return $attributes[0]->newInstance();
     }
 
-    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors): bool
+    /**
+     * The class's own static path prefix when it opted into #[Route(exclusive: true)], or null when it
+     * did not. Computed once per class and threaded through every one of its method routes, rather than
+     * recomputed from each method's own (longer, more specific) composed path.
+     */
+    private function resolveClassExclusivePrefix(?Route $classRoute, string $serviceId): ?string
+    {
+        if (!$classRoute instanceof Route || true !== $classRoute->exclusive) {
+            return null;
+        }
+
+        $prefix = (new SymfonyRoute($classRoute->path))->compile()->getStaticPrefix();
+        if ('' !== $prefix) {
+            return $prefix;
+        }
+
+        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s" would claim every unmatched path site-wide: its own path "%s" has no static prefix (it starts with a placeholder, or is empty). Give the class a literal leading path segment, or drop "exclusive".', $serviceId, $classRoute->path), 1750000033);
+    }
+
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix): bool
     {
         $overriddenRouteMethod = $this->compilerWarnings->findOverriddenRouteMethod($method, Route::class);
         $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
@@ -213,7 +234,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->compilerWarnings->warnIfAModifierWasDropped($overriddenRouteMethod, $method, $serviceId, self::MODIFIER_ATTRIBUTES);
 
         foreach ($routeAttributes as $attribute) {
-            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $collected, $classRoute);
+            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $collected, $classRoute, $classExclusivePrefix);
         }
 
         return true;
@@ -257,7 +278,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
-    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute): void
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
     {
         $this->assertNoMethodLevelExclusive($route, $method, $serviceId);
 

@@ -25,6 +25,7 @@ use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotF
 use Symfony\Component\Routing\RequestContext;
 use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Http\Stream;
 
 use function is_string;
 
@@ -108,8 +109,11 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         // Every attribute-route response gets a correlation id and, finally, the CORS headers stamped on
         // — using the matched route's own #[Cors] override when it declared one, else the global config.
         $response = RequestIdResolver::decorate($response, $request);
+        $response = $this->cors->decorate($response, $request, $corsConfig);
 
-        return $this->cors->decorate($response, $request, $corsConfig);
+        // Applied once, here, so every response this middleware returns is covered — a matched dispatch,
+        // but also the early 404/405/400/401/403/429 responses that never reach dispatch() at all.
+        return $this->emptyBodyForHead($request, $response);
     }
 
     /**
@@ -246,11 +250,29 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         $response = $this->invoker->invoke($match, $request);
+        // The real body is stored (and returned) here; process() empties it for HEAD afterwards — a HEAD
+        // request must prime the same cache entry a subsequent GET reads, not an empty one.
         $response = $this->writeCache($cacheConfig, $routeName, $request, $response);
         $response = $this->cache->withCacheStatus($response, $cacheConfig, $request, 'MISS');
 
         // notModified is a no-op unless the response was cached (only then does it carry an ETag).
         return ConditionalGet::notModified($request, $response) ?? $response;
+    }
+
+    /**
+     * HEAD matches the same route a GET would (Symfony canonicalises it during matching), so it must
+     * carry the headers a GET response would, with the body dropped — not a body TYPO3 discards later.
+     * Neither a GET nor a HEAD response here carries Content-Length, so the two stay consistent.
+     * Called once, centrally, in process() — so every response path this middleware returns is covered,
+     * not only a matched dispatch.
+     */
+    private function emptyBodyForHead(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        if ('HEAD' !== $request->getMethod()) {
+            return $response;
+        }
+
+        return $response->withBody(new Stream('php://temp', 'rw'));
     }
 
     /**
@@ -260,7 +282,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function readCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request): ?ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $request->getMethod() || $this->cacheBypass->skipsRead($request)) {
+        if (null === $cacheConfig || 'GET' !== $this->cache->cacheableMethod($request) || $this->cacheBypass->skipsRead($request)) {
             return null;
         }
 
@@ -276,7 +298,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function writeCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $request->getMethod() || 200 !== $response->getStatusCode() || $this->cacheBypass->skipsWrite($request)) {
+        if (null === $cacheConfig || 'GET' !== $this->cache->cacheableMethod($request) || 200 !== $response->getStatusCode() || $this->cacheBypass->skipsWrite($request)) {
             return $response;
         }
 

@@ -104,14 +104,14 @@ final class ResponseCacheManager
 
     /**
      * Reports whether a cacheable GET route served a stored response or computed one fresh. Absent for
-     * routes that never opted into #[Cache] (or a non-GET method) — the header's mere presence tells a
-     * client whether caching applies to this route at all.
+     * routes that never opted into #[Cache] (or a non-GET/HEAD method) — the header's mere presence
+     * tells a client whether caching applies to this route at all.
      *
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
      */
     public function withCacheStatus(ResponseInterface $response, ?array $cacheConfig, ServerRequestInterface $request, string $status): ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $request->getMethod()) {
+        if (null === $cacheConfig || 'GET' !== $this->cacheableMethod($request)) {
             return $response;
         }
 
@@ -137,12 +137,21 @@ final class ResponseCacheManager
 
         return 'route_'.hash('sha256', implode('|', [
             $routeName,
-            $request->getMethod(),
+            $this->cacheableMethod($request),
             $request->getUri()->getHost(),
             $request->getUri()->getPath(),
             http_build_query($query),
             (string) $languageId,
         ]));
+    }
+
+    /**
+     * Symfony's matcher canonicalises HEAD to GET, so a HEAD request must key off and gate on the same
+     * method GET does, rather than never reading or writing a cache entry at all.
+     */
+    public function cacheableMethod(ServerRequestInterface $request): string
+    {
+        return 'HEAD' === $request->getMethod() ? 'GET' : $request->getMethod();
     }
 
     private function cache(): FrontendInterface

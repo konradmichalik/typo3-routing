@@ -331,6 +331,86 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function headSharesTheCacheEntryAGetRequestWrote(): void
+    {
+        $get = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $head = $this->process($this->request('HEAD', 'https://example.com/api/example/cached'));
+
+        self::assertSame('MISS', $get->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $head->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function headWritesTheCacheEntryAFollowingGetThenReads(): void
+    {
+        $head = $this->process($this->request('HEAD', 'https://example.com/api/example/cached'));
+        $get = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+
+        self::assertSame('MISS', $head->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $get->getHeaderLine('X-TYPO3-API-Cache'));
+        // The entry HEAD primed serves the subsequent GET's full body, not an empty one.
+        self::assertNotSame('', (string) $get->getBody());
+    }
+
+    #[Test]
+    public function headResponseHasAnEmptyBodyRegardlessOfCacheState(): void
+    {
+        $miss = $this->process($this->request('HEAD', 'https://example.com/api/example/cached'));
+        $hit = $this->process($this->request('HEAD', 'https://example.com/api/example/cached'));
+
+        self::assertSame('', (string) $miss->getBody());
+        self::assertSame('', (string) $hit->getBody());
+        self::assertSame('', $miss->getHeaderLine('Content-Length'));
+        self::assertSame('', $hit->getHeaderLine('Content-Length'));
+    }
+
+    #[Test]
+    public function headWithMatchingIfNoneMatchYieldsNotModifiedWithNoBody(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $etag = $first->getHeaderLine('ETag');
+
+        $second = $this->process(
+            $this->request('HEAD', 'https://example.com/api/example/cached')->withHeader('If-None-Match', $etag),
+        );
+
+        self::assertSame(304, $second->getStatusCode());
+        self::assertSame($etag, $second->getHeaderLine('ETag'));
+        self::assertSame('', (string) $second->getBody());
+    }
+
+    #[Test]
+    public function headOnARouteNotDeclaringGetStillYieldsMethodNotAllowedWithAllowHeader(): void
+    {
+        $response = $this->process($this->request('HEAD', 'https://example.com/api/example/submit'));
+
+        self::assertSame(405, $response->getStatusCode());
+        self::assertSame('POST', $response->getHeaderLine('Allow'));
+        self::assertSame('', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function headResponseCarriesTheSameCorrelationAndRateLimitHeadersAsGet(): void
+    {
+        $response = $this->process($this->request('HEAD', 'https://example.com/api/example/limited'));
+
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+        self::assertSame('1', $response->getHeaderLine('X-RateLimit-Limit'));
+        self::assertSame('0', $response->getHeaderLine('X-RateLimit-Remaining'));
+    }
+
+    #[Test]
+    public function headResponseCarriesTheSameCorsHeaderAsGet(): void
+    {
+        $response = $this->process(
+            $this->request('HEAD', 'https://example.com/api/example/cors-override')
+                ->withHeader('Origin', 'https://partner.example.org'),
+        );
+
+        self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
+    }
+
+    #[Test]
     public function stampsACorrelationIdOnEveryResponse(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/count'));

@@ -16,7 +16,7 @@ On the machine these figures come from, a warm end-to-end request to a minimal J
 | use `caseInsensitive` and request a different casing | ~+0.1 ms, and only on requests that would otherwise be a 404 |
 | leave a feature unused (`#[Cache]`, `#[RateLimit]`, `#[Authenticate]`, `#[Cors]`) | nothing |
 
-The most useful fact for capacity planning is in the second and third rows: **the overhead is a fixed cost per matched request, not a cost per argument or per registered route.** A route with no arguments, one with a path placeholder and one with a query parameter all measure the same.
+The most useful fact for capacity planning is in the second and third rows: **for this route set, the overhead is a fixed cost per matched request, not a cost per argument.** Matching cost still scales with the route collection, see [Caveats](#caveats). A route with no arguments, one with a path placeholder and one with a query parameter all measure the same.
 
 ## The cost of a matched request
 

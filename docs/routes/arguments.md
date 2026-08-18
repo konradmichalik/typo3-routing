@@ -26,18 +26,9 @@ public function show(int $id, int $page = 1, ?string $sort = null, ServerRequest
 ```
 
 > [!NOTE]
-> [`requirements`](USAGE.md#requirements) validates the *format* (regex) of inputs and runs first; typed parameters handle the *type* mapping. Use them together: a placeholder constrained by `requirements: ['id' => '\d+']` plus an `int $id` parameter gives you a guaranteed, type-safe value.
+> [`requirements`](route-attribute.md#requirements) validates the *format* (regex) of inputs and runs first; typed parameters handle the *type* mapping. Use them together: a placeholder constrained by `requirements: ['id' => '\d+']` plus an `int $id` parameter gives you a guaranteed, type-safe value.
 >
 > Unsupported parameter shapes (union/intersection types, non-request objects, pure non-backed enums) are rejected at compile time with a clear `LogicException`, so misuse surfaces during container build, not at runtime.
-
-## Contents
-
-- [Backed enums](#backed-enums)
-- [Entity resolution](#entity-resolution)
-- [Variadics](#variadics)
-- [Overriding the source with `#[Param]`](#overriding-the-source-with-param)
-  - [Declaring the constraint at the parameter](#declaring-the-constraint-at-the-parameter)
-  - [Documenting the parameter](#documenting-the-parameter)
 
 ## Backed enums
 
@@ -73,7 +64,7 @@ A malformed identifier (not an integer) yields a **400**, same as an invalid `in
 > `getObjectByIdentifier()` respects Extbase's enable-fields (a hidden/deleted record resolves as **404**), but does not restrict by storage page or apply a workspace overlay — a record on any page/pid is resolvable by uid.
 
 > [!WARNING]
-> Entity binding resolves **any** valid identifier — it is a lookup, not an authorization check. A client can request `/api/news/{news}` for any uid, so a route exposing user- or tenant-scoped records must enforce access itself: guard it with [`#[Authenticate]`](AUTHENTICATION.md) and verify ownership in the controller. Treat the resolved object like any untrusted `id` parameter (an IDOR risk if left unchecked).
+> Entity binding resolves **any** valid identifier — it is a lookup, not an authorization check. A client can request `/api/news/{news}` for any uid, so a route exposing user- or tenant-scoped records must enforce access itself: guard it with [`#[Authenticate]`](../features/authentication.md) and verify ownership in the controller. Treat the resolved object like any untrusted `id` parameter (an IDOR risk if left unchecked).
 
 ## Variadics
 
@@ -89,14 +80,14 @@ public function filter(int ...$ids): ResponseInterface
 
 ## Overriding the source with `#[Param]`
 
-By default the lookup key is the parameter name and the source is auto-derived. The [`#[Param]`](../Classes/Attribute/Param.php) attribute overrides these, and can state the parameter's constraint next to the parameter itself:
+By default the lookup key is the parameter name and the source is auto-derived. The [`#[Param]`](../../Classes/Attribute/Param.php) attribute overrides these, and can state the parameter's constraint next to the parameter itself:
 
 | Argument      | Description                                                            |
 |---------------|------------------------------------------------------------------------|
 | `name`        | Read a different input/path key than the parameter name.               |
 | `source`      | Pin the source: `path`, `query`, `body` (form or JSON), or `input` (query + body). |
-| `requirement` | Regex the value must satisfy, equivalent to a [`requirements`](USAGE.md#requirements) entry on the `#[Route]`. |
-| `description` | Human-readable summary of the parameter, surfaced in the [OpenAPI export](HOW-IT-WORKS.md#openapi-export). |
+| `requirement` | Regex the value must satisfy, equivalent to a [`requirements`](route-attribute.md#requirements) entry on the `#[Route]`. |
+| `description` | Human-readable summary of the parameter, surfaced in the [OpenAPI export](../operating/openapi.md). |
 
 ```php
 use KonradMichalik\Typo3Routing\Attribute\Param;

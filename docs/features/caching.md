@@ -26,7 +26,7 @@ public function list(int $page = 1): ResponseInterface
 - Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, path, query string (minus `ignoreParams`) and language, so host/query/language variants are cached separately — in a multi-site install two sites never share a cache entry.
 - Invalidation rides on the TYPO3 caching framework: changing a record of a tagged table flushes the matching entries immediately; `lifetime` is the fallback. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).
 
-- Routes carrying an [`#[Authenticate]`](AUTHENTICATION.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.
+- Routes carrying an [`#[Authenticate]`](authentication.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.
 
 > [!WARNING]
 > This safeguard only triggers on `#[Authenticate]`. A **public** `#[Cache]` route whose controller inspects the frontend-user context itself (e.g. via the `frontend.user` aspect) shares one cache entry across all visitors — the first user's personalized response would be served to everyone. Don't combine `#[Cache]` with identity-dependent output; protect such routes with `#[Authenticate]` (which disables the cache) instead.

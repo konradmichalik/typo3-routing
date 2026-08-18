@@ -1,4 +1,4 @@
-# Rate Limiting
+# Rate limiting
 
 Add the optional `#[RateLimit]` attribute next to a `#[Route]` to throttle requests per client IP:
 

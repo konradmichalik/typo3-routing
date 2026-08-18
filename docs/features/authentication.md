@@ -5,7 +5,7 @@
 
 ## `#[Authenticate]`
 
-`#[Authenticate]` names a [`RouteAuthenticatorInterface`](../Classes/Authentication/RouteAuthenticatorInterface.php) implementation that decides whether a request may reach the controller. Authentication is *code behind an interface* — the attribute only selects which authenticator applies and passes options through.
+`#[Authenticate]` names a [`RouteAuthenticatorInterface`](../../Classes/Authentication/RouteAuthenticatorInterface.php) implementation that decides whether a request may reach the controller. Authentication is *code behind an interface* — the attribute only selects which authenticator applies and passes options through.
 
 ```php
 use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Route};
@@ -56,7 +56,7 @@ Passes when a frontend user is logged in (`Context` `frontend.user` aspect). Opt
 Passes when a backend user is logged in (`Context` `backend.user` aspect) — useful for admin/diagnostic endpoints on the frontend.
 
 > [!NOTE]
-> `FrontendUserAuthenticator` / `BackendUserAuthenticator` only work when the dispatcher runs **after** the corresponding TYPO3 auth middleware. The default middleware placement already guarantees this (see [Configuration](CONFIGURATION.md)). A Bearer-only setup needs neither.
+> `FrontendUserAuthenticator` / `BackendUserAuthenticator` only work when the dispatcher runs **after** the corresponding TYPO3 auth middleware. The default middleware placement already guarantees this (see [Middleware placement](../operating/configuration.md#middleware-placement)). A Bearer-only setup needs neither.
 
 ### Custom authenticators
 

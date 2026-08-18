@@ -1,4 +1,4 @@
-# URL Generation
+# URL generation
 
 Use the `routing` Fluid ViewHelper to generate URLs — no need to hardcode the path as a PHP constant and a separate JS string:
 
@@ -31,7 +31,7 @@ Need several URLs in JavaScript at once? `routing:uris` renders a JSON map of th
 Generated URLs automatically include the current site/language base, so they are reachable as-is.
 
 > [!TIP]
-> In PHP, inject [`RouteUrlGenerator`](../Classes/Http/RouteUrlGenerator.php) and call `generate($request, $routeName, $parameters)`.
+> In PHP, inject [`RouteUrlGenerator`](../../Classes/Http/RouteUrlGenerator.php) and call `generate($request, $routeName, $parameters)`.
 
 ```php
 use KonradMichalik\Typo3Routing\Http\RouteUrlGenerator;

@@ -302,6 +302,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $tags = $route->tags ?? $classRoute?->tags;
         // Null on both levels means "not set", which is "answer directly, no redirect".
         $canonical = $route->canonical ?? $classRoute?->canonical;
+        $sites = $route->sites ?? $classRoute?->sites;
+        $languages = $route->languages ?? $classRoute?->languages;
         $collected->routes[$name] = [
             'path' => $path,
             'methods' => $methods,
@@ -317,6 +319,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'tags' => $tags ?? [],
             'classExclusivePrefix' => $classExclusivePrefix,
             'canonical' => $canonical ?? false,
+            'sites' => $sites ?? [],
+            'languages' => $languages ?? [],
         ];
         $collected->arguments[$name] = $arguments;
 

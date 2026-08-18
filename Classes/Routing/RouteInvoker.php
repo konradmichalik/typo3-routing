@@ -45,6 +45,7 @@ final readonly class RouteInvoker
         private ControllerInvoker $invoker,
         private AccessGuard $accessGuard,
         private RouteUrlGenerator $urlGenerator,
+        private SiteLanguageScope $siteLanguageScope,
     ) {}
 
     /**
@@ -72,6 +73,14 @@ final readonly class RouteInvoker
         // 1. Env filter: an env-bound route is invisible outside its application context, here as much
         //    as over HTTP — a consumer must not reach a route a browser could not.
         if (!$this->invoker->isVisibleInCurrentContext($route['env'])) {
+            return JsonErrorResponse::create(404, 'Not Found');
+        }
+
+        // 1b. Site/language scope, mirroring the dispatcher: the calling request's own site/language
+        //     attributes decide reachability here too — a consumer must not reach a route a browser
+        //     on the "wrong" site or language could not.
+        if (!$this->siteLanguageScope->isVisibleForSite($route['sites'] ?? null, $request)
+            || !$this->siteLanguageScope->isVisibleForLanguage($route['languages'] ?? null, $request)) {
             return JsonErrorResponse::create(404, 'Not Found');
         }
 
@@ -161,10 +170,10 @@ final readonly class RouteInvoker
      * for them. The body stream is always a fresh one — reusing the caller's would hand its payload
      * to a body-sourced argument that this invocation left empty.
      *
-     * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool} $route
-     * @param array<string, mixed>                                                                                                                                                                                                                                                                                         $input
-     * @param list<string>                                                                                                                                                                                                                                                                                                 $placeholders
-     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>                                                                                                                                                                                               $specs
+     * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool, sites?: list<string>, languages?: list<int>} $route
+     * @param array<string, mixed>                                                                                                                                                                                                                                                                                                                                       $input
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                               $placeholders
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>                                                                                                                                                                                                                                             $specs
      */
     private function syntheticRequest(ServerRequestInterface $request, array $route, string $path, array $input, array $placeholders, array $specs): ServerRequestInterface
     {

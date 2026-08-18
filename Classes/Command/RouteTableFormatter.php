@@ -92,6 +92,14 @@ final class RouteTableFormatter
     }
 
     /**
+     * @param list<string>|list<int> $values
+     */
+    public static function anyOrList(array $values): string
+    {
+        return [] === $values ? 'ANY' : implode(', ', $values);
+    }
+
+    /**
      * Keeps the table readable by truncating long descriptions; the full text is always available
      * via `routing:debug <name>` (detail view) or `--json`.
      */

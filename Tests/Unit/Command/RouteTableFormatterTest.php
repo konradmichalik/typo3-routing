@@ -68,6 +68,19 @@ final class RouteTableFormatterTest extends TestCase
     }
 
     #[Test]
+    public function formatsAnyOrListAsAnyWhenEmpty(): void
+    {
+        self::assertSame('ANY', RouteTableFormatter::anyOrList([]));
+    }
+
+    #[Test]
+    public function formatsAnyOrListAsACommaJoinedListWhenNotEmpty(): void
+    {
+        self::assertSame('main, intranet', RouteTableFormatter::anyOrList(['main', 'intranet']));
+        self::assertSame('0, 1', RouteTableFormatter::anyOrList([0, 1]));
+    }
+
+    #[Test]
     public function buildsATableRowInColumnOrder(): void
     {
         $row = [

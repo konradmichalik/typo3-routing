@@ -252,6 +252,40 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function detailRendersSitesAndLanguagesWithFallbacks(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_scoped']);
+        $scoped = $tester->getDisplay();
+        self::assertStringContainsString('Sites', $scoped);
+        self::assertStringContainsString('main', $scoped);
+        self::assertStringContainsString('Languages', $scoped);
+
+        $tester->execute(['name' => 'example_count']);
+        $unscoped = $tester->getDisplay();
+        self::assertMatchesRegularExpression('/Sites\s+ANY/', $unscoped);
+        self::assertMatchesRegularExpression('/Languages\s+ANY/', $unscoped);
+    }
+
+    #[Test]
+    public function jsonOutputCarriesSitesAndLanguages(): void
+    {
+        $tester = $this->tester($this->registry());
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, sites: list<string>, languages: list<int>}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+        $sites = array_column($data, 'sites', 'name');
+        $languages = array_column($data, 'languages', 'name');
+
+        self::assertSame(['main'], $sites['example_scoped']);
+        self::assertSame([0], $languages['example_scoped']);
+        self::assertSame([], $sites['example_count']);
+        self::assertSame([], $languages['example_count']);
+    }
+
+    #[Test]
     public function truncatesLongDescriptionsInTableOutputButNotInJsonOrDetail(): void
     {
         $tester = $this->tester($this->registry());
@@ -425,7 +459,7 @@ final class RouteDebugCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool, sites?: list<string>, languages?: list<int>}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
@@ -434,6 +468,7 @@ final class RouteDebugCommandTest extends TestCase
             'example_loose' => ['path' => '/api/example/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'example_tagged' => ['path' => '/api/example/tagged', 'methods' => ['GET'], 'controller' => 'ctrl::tagged', 'env' => null, 'requirements' => [], 'tags' => ['Tagged']],
             'example_canonical' => ['path' => '/api/example/canonical', 'methods' => ['GET'], 'controller' => 'ctrl::canonical', 'env' => null, 'requirements' => [], 'canonical' => true],
+            'example_scoped' => ['path' => '/api/example/scoped', 'methods' => ['GET'], 'controller' => 'ctrl::scoped', 'env' => null, 'requirements' => [], 'sites' => ['main'], 'languages' => [0]],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */

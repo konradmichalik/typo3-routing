@@ -182,4 +182,28 @@ final class ExampleController implements RouteControllerInterface
     {
         return new JsonResponse(['id' => $id]);
     }
+
+    #[Route(path: '/api/example/scoped-site', name: 'example_scoped_site', sites: ['main'])]
+    public function scopedSite(): JsonResponse
+    {
+        return new JsonResponse(['ok' => true]);
+    }
+
+    #[Route(path: '/api/example/scoped-site-other', name: 'example_scoped_site_other', sites: ['other-site'])]
+    public function scopedSiteOther(): JsonResponse
+    {
+        return new JsonResponse(['ok' => true]);
+    }
+
+    #[Route(path: '/api/example/scoped-language', name: 'example_scoped_language', languages: [0])]
+    public function scopedLanguage(): JsonResponse
+    {
+        return new JsonResponse(['ok' => true]);
+    }
+
+    #[Route(path: '/api/example/scoped-language-other', name: 'example_scoped_language_other', languages: [1])]
+    public function scopedLanguageOther(): JsonResponse
+    {
+        return new JsonResponse(['ok' => true]);
+    }
 }

@@ -169,6 +169,55 @@ final class RouteMatchCommandTest extends TestCase
         self::assertStringContainsString('Matched route "example_secure"', $matched->getDisplay());
     }
 
+    #[Test]
+    public function notesASiteAndLanguageScopedRouteWhenUnsimulated(): void
+    {
+        $tester = $this->tester();
+
+        $tester->execute(['path' => '/api/example/scoped']);
+        $display = $tester->getDisplay();
+
+        self::assertStringContainsString('Sites', $display);
+        self::assertStringContainsString('main', $display);
+        self::assertStringContainsString('Languages', $display);
+        self::assertStringContainsString('only reachable', $display);
+    }
+
+    #[Test]
+    public function acceptsASimulatedSiteAndLanguageThatSatisfyTheScope(): void
+    {
+        $tester = $this->tester();
+
+        $exitCode = $tester->execute(['path' => '/api/example/scoped', '--site' => 'main', '--language' => '0']);
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('Matched route "example_scoped"', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function rejectsASimulatedSiteOutsideTheScope(): void
+    {
+        $tester = $this->tester();
+
+        $exitCode = $tester->execute(['path' => '/api/example/scoped', '--site' => 'intranet']);
+        $display = $this->flattened($tester->getDisplay());
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('simulated site "intranet" is not in its allowed sites', $display);
+    }
+
+    #[Test]
+    public function rejectsASimulatedLanguageOutsideTheScope(): void
+    {
+        $tester = $this->tester();
+
+        $exitCode = $tester->execute(['path' => '/api/example/scoped', '--language' => '1']);
+        $display = $this->flattened($tester->getDisplay());
+
+        self::assertSame(1, $exitCode);
+        self::assertStringContainsString('simulated language 1 is not in its allowed languages', $display);
+    }
+
     /**
      * SymfonyStyle wraps its blocks at the terminal width, which differs between a local run and CI, so
      * a message long enough to be worth asserting on is split at an unpredictable point. Dropping the
@@ -189,13 +238,14 @@ final class RouteMatchCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, caseInsensitive?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, caseInsensitive?: bool, sites?: list<string>, languages?: list<int>}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
             'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'host' => 'api.example.com'],
             'example_item' => ['path' => '/api/example/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
             'example_code' => ['path' => '/api/example/code/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::code', 'env' => null, 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
+            'example_scoped' => ['path' => '/api/example/scoped', 'methods' => ['GET'], 'controller' => 'ctrl::scoped', 'env' => null, 'requirements' => [], 'sites' => ['main'], 'languages' => [0]],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

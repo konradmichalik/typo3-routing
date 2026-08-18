@@ -22,7 +22,7 @@ use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
-use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry, SiteLanguageScope};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
@@ -36,7 +36,9 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Context\{Context, UserAspect};
 use TYPO3\CMS\Core\Http\{NormalizedParams, Response, ServerRequest, Stream};
+use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
@@ -544,6 +546,38 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function dispatchesARouteScopedToTheRequestsSite(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/scoped-site'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function hidesARouteScopedToADifferentSite(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/scoped-site-other'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function dispatchesARouteScopedToTheRequestsLanguage(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/scoped-language'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function hidesARouteScopedToADifferentLanguage(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/scoped-language-other'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
     public function fallsBackToDefaultPrefixWhenExtensionConfigurationThrows(): void
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -553,7 +587,7 @@ final class RouteDispatcherTest extends TestCase
         $context = new Context();
         $cors = new CorsHandler($extensionConfiguration);
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
-        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -1084,12 +1118,17 @@ final class RouteDispatcherTest extends TestCase
 
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
 
-        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $extensionConfiguration);
+        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $extensionConfiguration);
+    }
+
+    private function siteLanguageScope(): SiteLanguageScope
+    {
+        return new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
     }
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, sites?: list<string>, languages?: list<int>}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'vaCount' => ['path' => '/va/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
@@ -1115,6 +1154,10 @@ final class RouteDispatcherTest extends TestCase
             'canonical' => ['path' => '/api/canonical', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'canonical' => true],
             'canonicalItem' => ['path' => '/api/canonical-item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+'], 'canonical' => true],
             'canonicalLoose' => ['path' => '/api/canonical-loose', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'caseInsensitive' => true, 'canonical' => true],
+            'scopedSite' => ['path' => '/api/scoped-site', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'sites' => ['main']],
+            'scopedSiteOther' => ['path' => '/api/scoped-site-other', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'sites' => ['other-site']],
+            'scopedLanguage' => ['path' => '/api/scoped-language', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'languages' => [0]],
+            'scopedLanguageOther' => ['path' => '/api/scoped-language-other', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'languages' => [1]],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -1162,6 +1205,10 @@ final class RouteDispatcherTest extends TestCase
             'canonical' => [],
             'canonicalItem' => [$id],
             'canonicalLoose' => [],
+            'scopedSite' => [],
+            'scopedSiteOther' => [],
+            'scopedLanguage' => [],
+            'scopedLanguageOther' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

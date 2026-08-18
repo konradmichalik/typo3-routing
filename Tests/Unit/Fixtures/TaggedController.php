@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * This file is part of the "typo3_routing" TYPO3 CMS extension.
+ *
+ * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures;
+
+use KonradMichalik\Typo3Routing\Attribute\Route;
+use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Core\Http\JsonResponse;
+
+/**
+ * TaggedController.
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+#[Route(path: '/api/tagged', name: 'tagged_', tags: ['Tagged'])]
+final class TaggedController implements RouteControllerInterface
+{
+    // Inherits the class-level tags.
+    #[Route(path: '/inherited', name: 'inherited')]
+    public function inherited(ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse(['inherited' => true]);
+    }
+
+    // Overrides with its own tags.
+    #[Route(path: '/overridden', name: 'overridden', tags: ['Overridden'])]
+    public function overridden(ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse(['overridden' => true]);
+    }
+}

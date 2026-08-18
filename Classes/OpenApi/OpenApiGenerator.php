@@ -100,8 +100,8 @@ final readonly class OpenApiGenerator
     }
 
     /**
-     * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, description?: string|null} $route
-     * @param array<string, array<string, string>>                                                                                                             $usedSchemes
+     * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, description?: string|null, tags?: list<string>} $route
+     * @param array<string, array<string, string>>                                                                                                                                  $usedSchemes
      *
      * @return array<string, mixed>
      */
@@ -134,7 +134,7 @@ final readonly class OpenApiGenerator
 
         $operation = [
             'operationId' => $name,
-            'tags' => [$serviceId],
+            'tags' => $this->tags($route, $serviceId),
         ];
 
         if (null !== $routeDescription) {
@@ -162,6 +162,21 @@ final readonly class OpenApiGenerator
         $operation['responses'] = $this->responses($name, $route, [] !== $parameters || [] !== $bodyProperties);
 
         return $operation;
+    }
+
+    /**
+     * The route's own #[Route(tags:)], or the controller's service id when none was set — today's
+     * unchanged default.
+     *
+     * @param array{tags?: list<string>} $route
+     *
+     * @return list<string>
+     */
+    private function tags(array $route, string $serviceId): array
+    {
+        $tags = $route['tags'] ?? [];
+
+        return [] === $tags ? [$serviceId] : $tags;
     }
 
     /**

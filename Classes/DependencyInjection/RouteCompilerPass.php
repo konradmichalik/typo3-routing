@@ -284,6 +284,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $methods = array_map(strtoupper(...), $route->methods);
         // Null on both levels means "not set", which is the case-sensitive default.
         $caseInsensitive = $route->caseInsensitive ?? $classRoute?->caseInsensitive;
+        $tags = $route->tags ?? $classRoute?->tags;
         $collected->routes[$name] = [
             'path' => $path,
             'methods' => $methods,
@@ -296,6 +297,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'host' => $route->host,
             'description' => $route->description ?? $classRoute?->description,
             'caseInsensitive' => $caseInsensitive ?? false,
+            'tags' => $tags ?? [],
         ];
         $collected->arguments[$name] = $arguments;
 

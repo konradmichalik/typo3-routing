@@ -74,6 +74,29 @@ final readonly class ControllerInvoker
     }
 
     /**
+     * A malformed/wrong-shaped JSON body, or a body sent under a content type this extension cannot
+     * read, on a route that actually reads from the body. Checked before requirement and argument
+     * resolution so the response names the real cause instead of a derived "missing parameter" — a
+     * route that never reads from the body is unaffected by its content type entirely.
+     *
+     * @param array<string, mixed> $match
+     */
+    public function firstRequestBodyError(array $match, ServerRequestInterface $request): ?ResponseInterface
+    {
+        if (!$this->bindsBody((string) ($match['_route'] ?? ''))) {
+            return null;
+        }
+
+        if (RequestBody::isUnsupportedMediaType($request)) {
+            return JsonErrorResponse::create(415, 'Unsupported request body content type', ['Accept-Post' => 'application/json']);
+        }
+
+        $detail = RequestBody::decodeErrorDetail($request);
+
+        return null !== $detail ? JsonErrorResponse::create(400, $detail) : null;
+    }
+
+    /**
      * Validates `requirements` whose name is not a matched path placeholder against the query and parsed
      * body: a missing parameter or a value violating the regex yields a 400.
      *
@@ -148,5 +171,21 @@ final readonly class ControllerInvoker
     private function inputViolatesPattern(string $pattern, mixed $value): bool
     {
         return '' !== $pattern && (!is_string($value) || 1 !== preg_match('#^(?:'.$pattern.')$#', $value));
+    }
+
+    /**
+     * Whether any of the route's controller arguments can resolve from the body: explicitly (`body`),
+     * merged with the query (`input`), or spread from it (`variadic`) — as opposed to `path`, `query`,
+     * or the request itself, none of which a request body's content type could ever affect.
+     */
+    private function bindsBody(string $routeName): bool
+    {
+        foreach ($this->registry->getArguments($routeName) as $spec) {
+            if (in_array($spec['source'], ['body', 'input', 'variadic'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -159,6 +159,97 @@ final class RequestBodyTest extends TestCase
         self::assertSame(['n' => 2], RequestBody::toArray($this->jsonRequest('POST', '{"n":2}')));
     }
 
+    #[Test]
+    public function decodeErrorDetailIsNullForAValidObjectBody(): void
+    {
+        self::assertNull(RequestBody::decodeErrorDetail($this->jsonRequest('POST', '{"n":1}')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailIsNullForAnEmptyBody(): void
+    {
+        self::assertNull(RequestBody::decodeErrorDetail($this->jsonRequest('POST', '')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailIsNullForALiteralJsonNull(): void
+    {
+        self::assertNull(RequestBody::decodeErrorDetail($this->jsonRequest('POST', 'null')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailIsNullWhenContentTypeIsNotJson(): void
+    {
+        self::assertNull(RequestBody::decodeErrorDetail($this->jsonRequest('POST', 'not json', 'text/plain')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailNamesMalformedJsonAsTheCause(): void
+    {
+        self::assertSame('Malformed JSON request body', RequestBody::decodeErrorDetail($this->jsonRequest('POST', '{"n":')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailRejectsAScalarBody(): void
+    {
+        self::assertSame('JSON request body must be a JSON object', RequestBody::decodeErrorDetail($this->jsonRequest('POST', '"just a string"')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailRejectsANonEmptyJsonArray(): void
+    {
+        self::assertSame('JSON request body must be a JSON object', RequestBody::decodeErrorDetail($this->jsonRequest('POST', '[1,2,3]')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailAcceptsAnEmptyJsonArrayAsAnEmptyObject(): void
+    {
+        self::assertNull(RequestBody::decodeErrorDetail($this->jsonRequest('POST', '[]')));
+    }
+
+    #[Test]
+    public function decodeErrorDetailMemoizesAlongsideToArray(): void
+    {
+        $request = $this->jsonRequest('POST', '{"n":');
+
+        self::assertSame([], RequestBody::toArray($request));
+        self::assertSame('Malformed JSON request body', RequestBody::decodeErrorDetail($request));
+    }
+
+    #[Test]
+    public function isNotUnsupportedMediaTypeForJson(): void
+    {
+        self::assertFalse(RequestBody::isUnsupportedMediaType($this->jsonRequest('POST', '{"n":1}')));
+    }
+
+    #[Test]
+    #[DataProvider('formEncodedContentTypes')]
+    public function isNotUnsupportedMediaTypeForFormEncoding(string $contentType): void
+    {
+        self::assertFalse(RequestBody::isUnsupportedMediaType($this->jsonRequest('POST', 'n=1', $contentType)));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function formEncodedContentTypes(): iterable
+    {
+        yield 'urlencoded' => ['application/x-www-form-urlencoded'];
+        yield 'multipart' => ['multipart/form-data; boundary=---x'];
+    }
+
+    #[Test]
+    public function isUnsupportedMediaTypeForANonEmptyBodyUnderAnUnreadableContentType(): void
+    {
+        self::assertTrue(RequestBody::isUnsupportedMediaType($this->jsonRequest('POST', 'plain text', 'text/plain')));
+    }
+
+    #[Test]
+    public function isNotUnsupportedMediaTypeForAnEmptyBodyRegardlessOfContentType(): void
+    {
+        self::assertFalse(RequestBody::isUnsupportedMediaType($this->jsonRequest('POST', '', 'text/plain')));
+    }
+
     private function jsonRequest(string $method, string $body, string $contentType = 'application/json'): ServerRequest
     {
         $stream = new Stream('php://temp', 'wb+');

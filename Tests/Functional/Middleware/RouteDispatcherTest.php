@@ -514,6 +514,67 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function returnsBadRequestNamingTheBodyAsTheCauseForMalformedJson(): void
+    {
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/json', '{"title":'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Malformed JSON request body"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsBadRequestWhenTheJsonBodyDecodesToAScalar(): void
+    {
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/json', '"just a string"'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"JSON request body must be a JSON object"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsUnsupportedMediaTypeForANonEmptyBodyUnderAnUnreadableContentType(): void
+    {
+        $response = $this->process(
+            $this->rawBodyRequest('POST', 'https://example.com/api/example/json', 'title=hello', 'text/plain'),
+        );
+
+        self::assertSame(415, $response->getStatusCode());
+        self::assertSame('application/json', $response->getHeaderLine('Accept-Post'));
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Unsupported Media Type","status":415,"detail":"Unsupported request body content type"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function acceptsAFormEncodedBodyOnABodyBindingRoute(): void
+    {
+        $response = $this->process(
+            $this->rawBodyRequest('POST', 'https://example.com/api/example/json', 'title=hello&priority=5', 'application/x-www-form-urlencoded')
+                ->withParsedBody(['title' => 'hello', 'priority' => '5']),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"title":"hello","priority":5}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function isUnaffectedByTheContentTypeWhenTheRouteBindsNoBodyArguments(): void
+    {
+        $response = $this->process(
+            $this->rawBodyRequest('GET', 'https://example.com/api/example/count', 'irrelevant', 'text/plain'),
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function succeedsWithAnEmptyBodyWhenEveryBodyArgumentIsOptional(): void
+    {
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/optional-json', ''));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"priority":0}', (string) $response->getBody());
+    }
+
+    #[Test]
     public function attachesAnETagToCachedGetResponses(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
@@ -608,13 +669,18 @@ final class RouteDispatcherTest extends FunctionalTestCase
 
     private function jsonRequest(string $method, string $url, string $body): ServerRequest
     {
+        return $this->rawBodyRequest($method, $url, $body, 'application/json');
+    }
+
+    private function rawBodyRequest(string $method, string $url, string $body, string $contentType): ServerRequest
+    {
         $stream = new Stream('php://temp', 'wb+');
         $stream->write($body);
         $stream->rewind();
 
         return $this->request($method, $url)
             ->withBody($stream)
-            ->withHeader('Content-Type', 'application/json');
+            ->withHeader('Content-Type', $contentType);
     }
 
     private function handler(ResponseInterface $response): RequestHandlerInterface

@@ -143,6 +143,13 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['title' => $title, 'priority' => $priority]);
     }
 
+    #[Route(path: '/api/example/optional-json', methods: ['POST'], name: 'example_optional_json')]
+    public function optionalJson(int $priority = 0): JsonResponse
+    {
+        // Every body argument is optional: an absent or empty body must still succeed.
+        return new JsonResponse(['priority' => $priority]);
+    }
+
     #[Route(path: '/api/example/restricted', name: 'example_restricted', schemes: ['https'], host: 'example.com')]
     public function restricted(): JsonResponse
     {

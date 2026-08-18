@@ -73,6 +73,32 @@ final class ClassExclusiveResolverTest extends TestCase
     }
 
     #[Test]
+    public function throwsWhenTheOptedInClassPathIsEmpty(): void
+    {
+        $resolver = new ClassExclusiveResolver();
+        $classRoute = new Route(path: '', exclusive: true);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionMessageMatches('/claim every unmatched path site-wide/');
+
+        $resolver->resolvePrefix($classRoute, 'service_id');
+    }
+
+    #[Test]
+    public function throwsWhenTheOptedInClassPathIsJustRoot(): void
+    {
+        $resolver = new ClassExclusiveResolver();
+        $classRoute = new Route(path: '/', exclusive: true);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionMessageMatches('/claim every unmatched path site-wide/');
+
+        $resolver->resolvePrefix($classRoute, 'service_id');
+    }
+
+    #[Test]
     public function assertNotOnMethodIsANoOpWhenTheMethodRouteIsNotExclusive(): void
     {
         $this->expectNotToPerformAssertions();

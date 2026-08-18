@@ -41,11 +41,11 @@ final readonly class ClassExclusiveResolver
         }
 
         $prefix = (new SymfonyRoute($classRoute->path))->compile()->getStaticPrefix();
-        if ('' !== $prefix) {
-            return $prefix;
+        if ('' === $prefix || '/' === $prefix) {
+            throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s" would claim every unmatched path site-wide: its own path "%s" resolves to no more than the root prefix (it starts with a placeholder, is empty, or is just "/"). Give the class a literal, non-root leading path segment, or drop "exclusive".', $serviceId, $classRoute->path), 1750000033);
         }
 
-        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s" would claim every unmatched path site-wide: its own path "%s" has no static prefix (it starts with a placeholder, or is empty). Give the class a literal leading path segment, or drop "exclusive".', $serviceId, $classRoute->path), 1750000033);
+        return $prefix;
     }
 
     /**

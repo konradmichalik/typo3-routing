@@ -49,6 +49,8 @@ A path that matches a route's shape but the wrong HTTP method always gets a hard
 
 Reach for `exclusivePrefixes` when API clients should receive machine-readable errors for mistyped endpoints. Leave it empty when your routes coexist with ordinary pages.
 
+A single controller class can claim its own prefix the same way without touching extension configuration: `#[Route(path: '/api/reports', exclusive: true)]` on the class means every request under `/api/reports` that matches none of that class's own routes also gets the JSON `404` — scoped to that one class instead of a global setting. It only takes effect on the class-level `#[Route]`; setting it on a method route is a build-time error, and a class path with no static prefix (e.g. one starting with a placeholder) is rejected at build time too, since it would otherwise claim every unmatched path site-wide.
+
 ## CORS
 
 Browser clients on a different origin need CORS headers. CORS is **off by default** and applies globally to every matched attribute route once at least one origin is configured (via **Settings → Extension Configuration → typo3_routing**). Preflight `OPTIONS` requests are answered automatically with a `204`.

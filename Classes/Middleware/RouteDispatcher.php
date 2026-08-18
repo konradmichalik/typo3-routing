@@ -75,7 +75,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             // Extension not configured yet — then no path space is claimed exclusively.
         }
 
-        $this->exclusive = PathPrefixGate::fromCommaList($configured);
+        $this->exclusive = PathPrefixGate::fromCommaList($configured)
+            ->mergedWith(new PathPrefixGate($this->registry->getClassExclusivePrefixes()));
         // A claimed path space must reach the dispatcher even where it holds no route at all, so it is
         // merged into the gate rather than checked separately.
         $this->gate = (new PathPrefixGate($this->registry->getStaticPrefixes(), $this->registry->getCaseInsensitivePrefixes()))->mergedWith($this->exclusive);

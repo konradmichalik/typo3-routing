@@ -101,6 +101,13 @@ final class RouteTableFormatterTest extends TestCase
     }
 
     #[Test]
+    public function formatsLegacyPathsAsACommaJoinedListOrADash(): void
+    {
+        self::assertSame('-', RouteTableFormatter::legacyPaths([]));
+        self::assertSame('/api/old, /api/older', RouteTableFormatter::legacyPaths(['/api/old', '/api/older']));
+    }
+
+    #[Test]
     public function buildsATableRowInColumnOrder(): void
     {
         $row = [

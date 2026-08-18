@@ -118,6 +118,14 @@ final class RouteTableFormatter
     }
 
     /**
+     * @param list<string> $legacyPaths
+     */
+    public static function legacyPaths(array $legacyPaths): string
+    {
+        return [] === $legacyPaths ? '-' : implode(', ', $legacyPaths);
+    }
+
+    /**
      * Keeps the table readable by truncating long descriptions; the full text is always available
      * via `routing:debug <name>` (detail view) or `--json`.
      */

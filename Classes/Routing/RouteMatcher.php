@@ -43,12 +43,14 @@ final readonly class RouteMatcher
 
     /**
      * The retry only ever runs once the exact path has already failed, so ordinary requests pay nothing
-     * for the tolerance. A MethodNotAllowedException is never retried: it means the path itself did
-     * match, so its list of allowed methods is the correct answer.
+     * for the tolerance. A MethodNotAllowedException is never retried at any tier: it means A path
+     * already matched, so its list of allowed methods is the correct answer.
      *
-     * Both tolerances are ordered strictly after the strict attempt: exact path, trailing-slash variant,
-     * then the same pair again against the case-insensitive matcher — which only exists at all once a
-     * route opted in via #[Route(caseInsensitive: true)].
+     * Tiers run strictly after the strict attempt, each only once the previous one reported a plain
+     * miss: exact path, trailing-slash variant, the same pair against the case-insensitive matcher
+     * (#[Route(caseInsensitive: true)]), then the same pair again against the legacy-path matcher
+     * (#[Route(legacyPaths: [...])]) — which rewrites `_route` back to the owning route's real name, so
+     * every consumer downstream sees the same identity regardless of which path reached it.
      *
      * @return array<string, mixed> the matched route attributes
      *
@@ -60,19 +62,65 @@ final readonly class RouteMatcher
         try {
             return $this->matchTolerantly($this->registry->getMatcher($context), $path, alreadyVariant: false);
         } catch (ResourceNotFoundException $exception) {
-            $caseInsensitiveMatcher = $this->registry->getCaseInsensitiveMatcher($context);
+            return $this->matchCaseInsensitively($path, $context)
+                ?? $this->matchLegacyPath($path, $context)
+                ?? throw $exception;
+        }
+    }
 
-            if (null === $caseInsensitiveMatcher) {
-                throw $exception;
-            }
+    /**
+     * Null means: no route opted into #[Route(caseInsensitive: true)], or none of them matched — either
+     * way the caller falls through to the next tier. A MethodNotAllowedException or a requirement
+     * mismatch is not "no match": both propagate immediately, exactly as they would from the top-level
+     * primary attempt.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function matchCaseInsensitively(string $path, RequestContext $context): ?array
+    {
+        $matcher = $this->registry->getCaseInsensitiveMatcher($context);
+        if (null === $matcher) {
+            return null;
+        }
 
+        try {
             // Reaching this matcher at all means the exact-case path already failed against the
             // standard matcher, so any match here is a tolerated variant regardless of trailing slash.
-            $match = $this->matchTolerantly($caseInsensitiveMatcher, $path, alreadyVariant: true);
-            $this->assertRequirementsHold($match);
-
-            return $match;
+            $match = $this->matchTolerantly($matcher, $path, alreadyVariant: true);
+        } catch (ResourceNotFoundException) {
+            return null;
         }
+
+        $this->assertRequirementsHold($match);
+
+        return $match;
+    }
+
+    /**
+     * Null means: no route declared a legacy path, or none of them matched. A MethodNotAllowedException
+     * propagates immediately, matching every other tier.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function matchLegacyPath(string $path, RequestContext $context): ?array
+    {
+        $matcher = $this->registry->getLegacyMatcher($context);
+        if (null === $matcher) {
+            return null;
+        }
+
+        try {
+            $match = $this->matchTolerantly($matcher, $path, alreadyVariant: true);
+        } catch (ResourceNotFoundException) {
+            return null;
+        }
+
+        // `_legacyOf` rode in as an ordinary route default (see RouteRegistry::legacyRoutes()); rewrite
+        // `_route` to it so the dispatcher, rate limiting, caching and deprecation headers all resolve
+        // against the route this legacy path belongs to, not the internal synthetic entry name.
+        $match['_route'] = $match['_legacyOf'];
+
+        return $match;
     }
 
     /**

@@ -411,6 +411,50 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function detailRendersLegacyPathsWithAFallback(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_renamed']);
+        self::assertMatchesRegularExpression('/Legacy paths\s+\/api\/example\/old-name, \/api\/example\/older-name/', $tester->getDisplay());
+
+        $tester->execute(['name' => 'example_count']);
+        self::assertMatchesRegularExpression('/Legacy paths\s+-/', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function jsonOutputCarriesLegacyPaths(): void
+    {
+        $tester = $this->tester($this->registry());
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, legacyPaths: list<string>}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+        $legacyPaths = array_column($data, 'legacyPaths', 'name');
+
+        self::assertSame(['/api/example/old-name', '/api/example/older-name'], $legacyPaths['example_renamed']);
+        self::assertSame([], $legacyPaths['example_count']);
+    }
+
+    /**
+     * A legacy path never appears as a route in its own right: it lives only under the row of the route
+     * it belongs to.
+     */
+    #[Test]
+    public function neverListsALegacyPathAsItsOwnRoute(): void
+    {
+        $tester = $this->tester($this->registry());
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{path: string}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+        $paths = array_column($data, 'path');
+
+        self::assertNotContains('/api/example/old-name', $paths);
+        self::assertNotContains('/api/example/older-name', $paths);
+    }
+
+    #[Test]
     public function truncatesLongDescriptionsInTableOutputButNotInJsonOrDetail(): void
     {
         $tester = $this->tester($this->registry());
@@ -584,7 +628,7 @@ final class RouteDebugCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool, sites?: list<string>, languages?: list<int>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool, sites?: list<string>, languages?: list<int>, legacyPaths?: list<string>}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
@@ -594,6 +638,7 @@ final class RouteDebugCommandTest extends TestCase
             'example_tagged' => ['path' => '/api/example/tagged', 'methods' => ['GET'], 'controller' => 'ctrl::tagged', 'env' => null, 'requirements' => [], 'tags' => ['Tagged']],
             'example_canonical' => ['path' => '/api/example/canonical', 'methods' => ['GET'], 'controller' => 'ctrl::canonical', 'env' => null, 'requirements' => [], 'canonical' => true],
             'example_scoped' => ['path' => '/api/example/scoped', 'methods' => ['GET'], 'controller' => 'ctrl::scoped', 'env' => null, 'requirements' => [], 'sites' => ['main'], 'languages' => [0]],
+            'example_renamed' => ['path' => '/api/example/renamed', 'methods' => ['GET'], 'controller' => 'ctrl::renamed', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/example/old-name', '/api/example/older-name']],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */

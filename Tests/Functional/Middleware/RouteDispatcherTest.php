@@ -212,6 +212,33 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function redirectsALegacyPathToTheDeclaredPathByDefault(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/old-name'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/example/renamed', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function anAliasedLegacyPathAnswersDirectlyWithoutARedirect(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/old-aliased'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertFalse($response->hasHeader('Location'));
+        self::assertJsonStringEqualsJsonString('{"aliased":true}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function doesNotRedirectTheDeclaredPathOfARouteWithALegacyPath(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/renamed'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
     public function routeOwnCorsAttributeAppliesWithoutAnyGlobalCorsConfiguration(): void
     {
         // This test instance has no cors.* extension configuration at all — the global policy is off.

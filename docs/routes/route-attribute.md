@@ -24,6 +24,8 @@ public function show(int $id): ResponseInterface { /* … */ }
 | `canonical`    | `?bool`                 | `null`    | Redirect a request that only matched a tolerated variant of this path (trailing slash, or case) to the declared path with a `308`. See [Redirecting instead of tolerating](#redirecting-instead-of-tolerating). |
 | `sites`        | `?list<string>`         | `null`    | Site identifiers this route is reachable from; out of scope answers a 404. See [Site- and language-bound routes](#site--and-language-bound-routes). |
 | `languages`    | `?list<int>`            | `null`    | Language ids this route is reachable in; out of scope answers a 404. See [Site- and language-bound routes](#site--and-language-bound-routes). |
+| `legacyPaths`  | `list<string>`          | `[]`      | Old paths (e.g. from before a rename) that still reach this same route. See [Legacy paths for renamed routes](#legacy-paths-for-renamed-routes). |
+| `legacyAlias`  | `bool`                  | `false`   | When true, every path in `legacyPaths` answers directly instead of redirecting. See [Legacy paths for renamed routes](#legacy-paths-for-renamed-routes). |
 
 Each parameter that needs more than a table row has its own section below. What is *not* on this page: how the controller method's signature is fed from the request — type coercion, enums, entity binding, variadics and `#[Param]` — which is [Typed controller arguments](arguments.md).
 
@@ -183,6 +185,31 @@ Answering both forms directly is right for API clients, who should not pay a sec
 ```
 
 `308` rather than `301` or `302`, because it preserves the request method and body — a tolerated `POST` is never silently downgraded to `GET`. A route with placeholders redirects to the concrete resolved path, never to the `{id}` template, and the query string carries over unchanged. `405` still wins over the redirect: a path that matches with the wrong method answers `405` regardless of which variant it was. Nullable and class-level inheritance work exactly like `caseInsensitive`. Not opting in (the default) keeps today's behaviour: both forms answered directly, no redirect.
+
+## Legacy paths for renamed routes
+
+Renaming a route's path breaks any client that hardcoded the old one. `#[Route(legacyPaths:)]` keeps the old path reachable through the same route:
+
+```php
+#[Route(path: '/api/courses', name: 'courses_index', legacyPaths: ['/api/course-search/count'])]
+```
+
+By default a legacy path `308`s to the declared path — the same mechanism and the same reasoning as `canonical` above, but the decision is governed by its own `legacyAlias` flag, independent of whether the route separately opted into `canonical`:
+
+```text
+/api/courses                     →  served directly
+/api/course-search/count         →  308 → /api/courses
+```
+
+For a client that cannot follow redirects, `legacyAlias: true` answers every legacy path directly instead:
+
+```php
+#[Route(path: '/api/courses', name: 'courses_index', legacyPaths: ['/api/course-search/count'], legacyAlias: true)]
+```
+
+A legacy path is never canonical: it is invisible to `routing:debug`'s route list and the OpenAPI export (both list only the declared path; `routing:debug <name>` shows the legacy paths in the detail view of the route that owns them), and URL generation (`{routing:uri()}`, `RouteUrlGenerator`) never produces one. It costs nothing for a route that declares none — matching only tries the legacy paths once every other tier has already failed, mirroring the case-insensitive fallback. `405` beats the redirect exactly as it does for a tolerated variant, and a legacy path may not collide with any declared route path or with another route's legacy path — either fails the container build. A site/language-scoped route stays out of scope through its legacy path too. Combined with [`#[DeprecatedRoute]`](#deprecating-a-route), a request that reaches the route through its old path carries the same `Deprecation`/`Sunset` headers as any other request to that route, since the dispatcher resolves both to the same route identity.
+
+Legacy paths do not inherit the owning route's [`caseInsensitive`](#case-insensitive-paths) tolerance — they match exactly as declared, and are not inherited from a class-level `#[Route]` (same rule as `methods`).
 
 ## Site- and language-bound routes
 

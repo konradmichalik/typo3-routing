@@ -40,24 +40,26 @@ final class RouteRegistry
 {
     private ?RouteCollection $collection = null;
     private ?RouteCollection $caseInsensitiveCollection = null;
+    private ?RouteCollection $legacyCollection = null;
 
     /**
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>, deprecation?: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}}> $routes
-     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                                                                                                                                                                                                                                                                                                                 $cacheConfigs
-     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                                                                                                                                                                                                                                                                                                   $rateLimits
-     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                                                                                                                                                                                                                                                                                                       $arguments
-     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                                                                                                                                                                                                                                                                          $authenticators
-     * @param array<string, string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               $requestTokenScopes
-     * @param array<mixed>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $compiledRoutes
-     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                                                                                                                                                                                                                                                                              $corsConfigs
-     * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $staticPrefixes
-     * @param array<string, array<string, string>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                $paramDescriptions
-     * @param array<string, list<string>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         $optionalInputs
-     * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $caseInsensitivePrefixes
-     * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $classExclusivePrefixes
-     * @param array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}>                                                                                                                                                                                                                                                                                                                                                                                                              $deprecations
-     * @param array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>>                                                                                                                                                                                                                                                                                                                                                                                                      $returns
-     * @param array<string, string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               $aliases
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>, deprecation?: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}, legacyPaths?: list<string>, legacyAlias?: bool}> $routes
+     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                                                                                                                                                                                                                                                                                                                     $cacheConfigs
+     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                                                                                                                                                                                                                                                                                                       $rateLimits
+     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                                                                                                                                                                                                                                                                                                           $arguments
+     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                                                                                                                                                                                                                                                                              $authenticators
+     * @param array<string, string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   $requestTokenScopes
+     * @param array<mixed>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            $compiledRoutes
+     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                                                                                                                                                                                                                                                                                  $corsConfigs
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            $staticPrefixes
+     * @param array<string, array<string, string>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    $paramDescriptions
+     * @param array<string, list<string>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             $optionalInputs
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            $caseInsensitivePrefixes
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            $classExclusivePrefixes
+     * @param array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}>                                                                                                                                                                                                                                                                                                                                                                                                                  $deprecations
+     * @param array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>>                                                                                                                                                                                                                                                                                                                                                                                                          $returns
+     * @param array<string, string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   $aliases
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            $legacyPrefixes
      */
     public function __construct(
         private readonly array $routes,
@@ -78,6 +80,7 @@ final class RouteRegistry
         private readonly array $deprecations = [],
         private readonly array $returns = [],
         private readonly array $aliases = [],
+        private readonly array $legacyPrefixes = [],
     ) {}
 
     /**
@@ -284,6 +287,87 @@ final class RouteRegistry
     }
 
     /**
+     * Synthetic route entries for every #[Route(legacyPaths:)] declaration, one per legacy path, keyed
+     * by a name that can never collide with a real route name (`_`-prefixed, unlike every real name
+     * derived by the compiler). Each entry is an exact copy of its owning route except for `path`, plus
+     * an internal `_legacyOf` default naming that owner — `RouteMatcher` reads it (carried through into
+     * the match array like `_controller`/`_env`) to rewrite `_route` back to the real name after a
+     * match, so the dispatcher, rate limiting, caching, and #[DeprecatedRoute] headers all key off the
+     * same route identity regardless of which path reached it. `sites`/`languages` are copied too, for
+     * the same reason: a site/language-scoped route must stay out of scope through its legacy path as
+     * well, not just its declared one.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     *
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, canonical?: bool, sites?: list<string>, languages?: list<int>, legacyPaths?: list<string>, legacyAlias?: bool}> $routes
+     *
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, sites: list<string>, languages: list<int>}>
+     */
+    public static function legacyRoutes(array $routes): array
+    {
+        $legacy = [];
+        foreach ($routes as $name => $route) {
+            foreach ($route['legacyPaths'] ?? [] as $index => $legacyPath) {
+                $legacy['_legacy_'.$name.'_'.$index] = [
+                    'path' => $legacyPath,
+                    'methods' => $route['methods'],
+                    'controller' => $route['controller'],
+                    'env' => $route['env'],
+                    'requirements' => $route['requirements'],
+                    'priority' => $route['priority'] ?? 0,
+                    'defaults' => [...($route['defaults'] ?? []), '_legacyOf' => $name],
+                    'schemes' => $route['schemes'] ?? [],
+                    'host' => $route['host'] ?? null,
+                    'sites' => $route['sites'] ?? [],
+                    'languages' => $route['languages'] ?? [],
+                ];
+            }
+        }
+
+        return $legacy;
+    }
+
+    /**
+     * A second matcher over every legacy path, or null when no route declared one — which is the
+     * default, so the whole feature costs nothing until it is used. RouteMatcher consults it only after
+     * the primary matcher (and, where applicable, the case-insensitive one) has already failed.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     */
+    public function getLegacyMatcher(RequestContext $context): ?UrlMatcherInterface
+    {
+        $collection = $this->getLegacyCollection();
+
+        return 0 === $collection->count() ? null : new UrlMatcher($collection, $context);
+    }
+
+    /**
+     * The legacy paths' static prefixes, so the dispatcher's path gate lets them through in the first
+     * place. Baked in at container build time; the fallback mirrors getCaseInsensitivePrefixes().
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     *
+     * @return list<string>
+     */
+    public function getLegacyPrefixes(): array
+    {
+        if ([] !== $this->legacyPrefixes || [] === $this->routes) {
+            return $this->legacyPrefixes;
+        }
+
+        return self::staticPrefixes(self::buildCollection(self::legacyRoutes($this->routes)));
+    }
+
+    /**
+     * Whether this route's legacy paths answer directly instead of redirecting to the declared path.
+     * False by default (redirect).
+     */
+    public function isLegacyAlias(string $routeName): bool
+    {
+        return $this->routes[$routeName]['legacyAlias'] ?? false;
+    }
+
+    /**
      * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      */
     public function getControllerLocator(): ContainerInterface
@@ -398,7 +482,7 @@ final class RouteRegistry
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>, legacyPaths?: list<string>, legacyAlias?: bool}>
      */
     public function getRoutes(): array
     {
@@ -422,7 +506,7 @@ final class RouteRegistry
      * re-validating a requirement after a case-insensitive match, so the revalidation regex agrees with
      * the Unicode mode the route was actually compiled with.
      *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      */
     public function routeNeedsUtf8(string $routeName): bool
     {
@@ -542,5 +626,10 @@ final class RouteRegistry
         }
 
         return $this->caseInsensitiveCollection = $collection;
+    }
+
+    private function getLegacyCollection(): RouteCollection
+    {
+        return $this->legacyCollection ??= self::buildCollection(self::legacyRoutes($this->routes));
     }
 }

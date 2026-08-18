@@ -230,6 +230,60 @@ final class RouteMatcherTest extends TestCase
         self::assertSame('café', $match['name']);
     }
 
+    #[Test]
+    public function aLegacyPathMatchesAndRewritesItsRouteNameToTheOwner(): void
+    {
+        $match = $this->matcher()->match('/api/legacy-count', $this->context());
+
+        self::assertSame('count', $match['_route']);
+        self::assertSame('count', $match['_legacyOf']);
+        self::assertTrue($match['_canonicalVariant']);
+    }
+
+    #[Test]
+    public function aLegacyPathToleratesATrailingSlashToo(): void
+    {
+        $match = $this->matcher()->match('/api/legacy-count/', $this->context());
+
+        self::assertSame('count', $match['_route']);
+    }
+
+    #[Test]
+    public function aLegacyPathSurvivesPlaceholders(): void
+    {
+        $match = $this->matcher()->match('/api/legacy-item/42', $this->context());
+
+        self::assertSame('item', $match['_route']);
+        self::assertSame('42', $match['id']);
+    }
+
+    #[Test]
+    public function aWrongMethodOnALegacyPathIsMethodNotAllowed(): void
+    {
+        $this->expectException(MethodNotAllowedException::class);
+
+        $this->matcher()->match('/api/legacy-submit', $this->context('GET'));
+    }
+
+    /**
+     * Without a single legacy path there is no fallback matcher at all, and the original miss has to
+     * surface unchanged — this is the default installation.
+     */
+    #[Test]
+    public function aRegistryWithoutAnyLegacyPathReportsTheOriginalMiss(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn('1');
+
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+
+        $this->expectException(ResourceNotFoundException::class);
+
+        $matcher->match('/api/legacy-count', $this->context());
+    }
+
     private function matcher(string $trailingSlash = '1'): RouteMatcher
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -248,12 +302,12 @@ final class RouteMatcherTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, legacyPaths?: list<string>}> $routes */
         $routes = [
-            'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/legacy-count']],
             'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
-            'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []],
-            'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
+            'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/legacy-submit']],
+            'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+'], 'legacyPaths' => ['/api/legacy-item/{id}']],
             'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'looseItem' => ['path' => '/api/loose/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::looseItem', 'env' => null, 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
             'looseUnicode' => ['path' => '/api/loose-unicode/{name}', 'methods' => ['GET'], 'controller' => 'ctrl::looseUnicode', 'env' => null, 'requirements' => ['name' => '\p{L}+'], 'caseInsensitive' => true],

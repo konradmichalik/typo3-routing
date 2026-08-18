@@ -253,4 +253,16 @@ final class ExampleController implements RouteControllerInterface
         // \X (extended grapheme cluster) is another construct that needs the derived "utf8" option.
         return new JsonResponse(['cluster' => $cluster]);
     }
+
+    #[Route(path: '/api/example/renamed', name: 'example_renamed', legacyPaths: ['/api/example/old-name'])]
+    public function renamed(): JsonResponse
+    {
+        return new JsonResponse(['renamed' => true]);
+    }
+
+    #[Route(path: '/api/example/aliased-legacy', name: 'example_aliased_legacy', legacyPaths: ['/api/example/old-aliased'], legacyAlias: true)]
+    public function aliasedLegacy(): JsonResponse
+    {
+        return new JsonResponse(['aliased' => true]);
+    }
 }

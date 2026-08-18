@@ -85,8 +85,9 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $this->exclusive = PathPrefixGate::fromCommaList($configured)
             ->mergedWith(new PathPrefixGate($this->registry->getClassExclusivePrefixes()));
         // A claimed path space must reach the dispatcher even where it holds no route at all, so it is
-        // merged into the gate rather than checked separately.
-        $this->gate = (new PathPrefixGate($this->registry->getStaticPrefixes(), $this->registry->getCaseInsensitivePrefixes()))->mergedWith($this->exclusive);
+        // merged into the gate rather than checked separately. Legacy paths are exact literal strings,
+        // so they join the case-sensitive prefixes rather than the case-insensitive ones.
+        $this->gate = (new PathPrefixGate([...$this->registry->getStaticPrefixes(), ...$this->registry->getLegacyPrefixes()], $this->registry->getCaseInsensitivePrefixes()))->mergedWith($this->exclusive);
     }
 
     #[Override]
@@ -151,18 +152,29 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         // 3b. Site/language scope: a route not bound to the current site or language is invisible too.
-        //     Checked before the canonical redirect below for the same reason as the env filter above:
-        //     a redirect must never reveal a route invisible in the current context.
+        //     Checked before either redirect below for the same reason as the env filter above: a
+        //     redirect must never reveal a route invisible in the current context.
         if (!$this->siteLanguageScope->isVisibleForSite($match['_sites'] ?? null, $request)
             || !$this->siteLanguageScope->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
             return JsonErrorResponse::create(404, 'Not Found');
         }
 
-        // 3c. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
+        // 3c. Legacy path (opt-in): a request that reached this route through one of its old paths
+        //     either redirects (default) or is served directly (`legacyAlias: true`). Checked before the
+        //     canonical-variant redirect below: a legacy path's redirect behaviour is governed
+        //     exclusively by `legacyAlias`, never by whether the target route separately opted into
+        //     `canonical`.
+        $redirect = $this->legacyRedirect($match, $request);
+        if (null !== $redirect) {
+            return $redirect;
+        }
+
+        // 3d. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
         //     or case) answers 308 to its declared form instead of serving directly, so exactly one URL
         //     survives for caches and search indexing. Checked before the checks below so a client on
         //     the wrong URL is redirected instead of getting a body/requirement error for a request it
-        //     is about to resubmit anyway.
+        //     is about to resubmit anyway. Never reached for a legacy-path match — its own redirect
+        //     decision was already made above.
         $redirect = $this->canonicalRedirect($match, $request);
         if (null !== $redirect) {
             return $redirect;
@@ -201,18 +213,39 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
+     * Null unless this match came through one of the route's `#[Route(legacyPaths:)]` entries and it
+     * did not opt into `legacyAlias` (answer directly). Shares the redirect mechanics with
+     * canonicalRedirect(), but the decision is governed exclusively by `legacyAlias` — never by whether
+     * the target route separately opted into `canonical`.
+     *
+     * @param array<string, mixed> $match
+     */
+    private function legacyRedirect(array $match, ServerRequestInterface $request): ?ResponseInterface
+    {
+        $legacyOf = $match['_legacyOf'] ?? null;
+        if (null === $legacyOf) {
+            return null;
+        }
+
+        $routeName = (string) $legacyOf;
+        if ($this->registry->isLegacyAlias($routeName)) {
+            return null;
+        }
+
+        return $this->buildRedirect($routeName, $match, $request);
+    }
+
+    /**
      * Null unless the route opted into `#[Route(canonical: true)]` and this match came from a tolerated
-     * variant of its declared path (never for an exact match, and never for a 405 — that path already
-     * short-circuits in matchRoute()). The target is regenerated via RouteUrlGenerator rather than
-     * reusing the declared path verbatim, so a placeholder route redirects to the concrete path (with
-     * the site/language base applied) instead of the literal `{id}` template; the query string carries
-     * over unchanged. A fragment is never sent to the server, so there is nothing to preserve there.
+     * variant of its declared path (never for an exact match, never for a 405 — that path already
+     * short-circuits in matchRoute() — and never for a legacy-path match, whose own redirect decision is
+     * made in legacyRedirect() above).
      *
      * @param array<string, mixed> $match
      */
     private function canonicalRedirect(array $match, ServerRequestInterface $request): ?ResponseInterface
     {
-        if (true !== ($match['_canonicalVariant'] ?? false)) {
+        if (null !== ($match['_legacyOf'] ?? null) || true !== ($match['_canonicalVariant'] ?? false)) {
             return null;
         }
 
@@ -221,6 +254,19 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return null;
         }
 
+        return $this->buildRedirect($routeName, $match, $request);
+    }
+
+    /**
+     * The target is regenerated via RouteUrlGenerator rather than reusing the declared path verbatim, so
+     * a placeholder route redirects to the concrete path (with the site/language base applied) instead
+     * of the literal `{id}` template; the query string carries over unchanged. A fragment is never sent
+     * to the server, so there is nothing to preserve there.
+     *
+     * @param array<string, mixed> $match
+     */
+    private function buildRedirect(string $routeName, array $match, ServerRequestInterface $request): Response
+    {
         /** @var array<string, mixed> $parameters */
         $parameters = array_filter($match, static fn (string $key): bool => !str_starts_with($key, '_'), ARRAY_FILTER_USE_KEY);
         $location = $this->urlGenerator->generate($request, $routeName, $parameters);

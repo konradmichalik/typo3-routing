@@ -83,6 +83,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private ReturnsResolver $returnsResolver = new ReturnsResolver(),
         private RouteCompileGuard $compileGuard = new RouteCompileGuard(),
         private RouteAliasCollector $aliasCollector = new RouteAliasCollector(),
+        private LegacyPathValidator $legacyPathValidator = new LegacyPathValidator(),
     ) {}
 
     #[Override]
@@ -114,6 +115,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
         $this->deprecationResolver->assertSuccessorsExist($collected);
         $this->aliasCollector->assertNoCollisionWithRoutes($collected);
+        $this->legacyPathValidator->assertNoCollisions($collected);
 
         $registry = $container->getDefinition(RouteRegistry::class);
         $registry->setArgument('$routes', $collected->routes);
@@ -149,6 +151,9 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         // declares — recorded independently in $collected->classExclusivePrefixes (not derived from
         // $collected->routes), so a class with no method routes yet still keeps its claim.
         $registry->setArgument('$classExclusivePrefixes', array_values(array_unique($collected->classExclusivePrefixes)));
+        // A legacy path lives in its own collection (see RouteRegistry::legacyRoutes()), consulted only
+        // after the primary matcher already failed — so a route with no legacy paths pays nothing.
+        $registry->setArgument('$legacyPrefixes', array_map($escapePercent, RouteRegistry::staticPrefixes(RouteRegistry::buildCollection(RouteRegistry::legacyRoutes($collected->routes)))));
     }
 
     /**
@@ -341,6 +346,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'canonical' => $canonical ?? false,
             'sites' => $sites ?? [],
             'languages' => $languages ?? [],
+            'legacyPaths' => $route->legacyPaths,
+            'legacyAlias' => $route->legacyAlias,
         ];
         $collected->arguments[$name] = $arguments;
         $this->aliasCollector->apply($route->aliases, $namePrefix, $name, $serviceId, $method->getName(), $collected);

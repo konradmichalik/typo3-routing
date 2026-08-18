@@ -392,9 +392,22 @@ final class RouteDispatcherTest extends FunctionalTestCase
     #[Test]
     public function headResponseCarriesTheSameCorrelationAndRateLimitHeadersAsGet(): void
     {
-        $response = $this->process($this->request('HEAD', 'https://example.com/api/example/cached'));
+        $response = $this->process($this->request('HEAD', 'https://example.com/api/example/limited'));
 
         self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
+        self::assertSame('1', $response->getHeaderLine('X-RateLimit-Limit'));
+        self::assertSame('0', $response->getHeaderLine('X-RateLimit-Remaining'));
+    }
+
+    #[Test]
+    public function headResponseCarriesTheSameCorsHeaderAsGet(): void
+    {
+        $response = $this->process(
+            $this->request('HEAD', 'https://example.com/api/example/cors-override')
+                ->withHeader('Origin', 'https://partner.example.org'),
+        );
+
+        self::assertSame('https://partner.example.org', $response->getHeaderLine('Access-Control-Allow-Origin'));
     }
 
     #[Test]

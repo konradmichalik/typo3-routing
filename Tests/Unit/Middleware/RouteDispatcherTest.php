@@ -35,7 +35,7 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Context\{Context, UserAspect};
-use TYPO3\CMS\Core\Http\{NormalizedParams, Response, ServerRequest};
+use TYPO3\CMS\Core\Http\{NormalizedParams, Response, ServerRequest, Stream};
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
@@ -378,6 +378,32 @@ final class RouteDispatcherTest extends TestCase
         $request = $this->request('POST', 'https://example.com/api/posted')->withParsedBody(['n' => '7']);
 
         $response = $this->dispatch($request);
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function returnsBadRequestNamingTheBodyAsTheCauseForMalformedJson(): void
+    {
+        $response = $this->dispatch($this->jsonRequest('POST', 'https://example.com/api/json', '{"title":'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertStringContainsString('Malformed JSON request body', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsUnsupportedMediaTypeForANonEmptyBodyUnderAnUnreadableContentType(): void
+    {
+        $response = $this->dispatch($this->rawBodyRequest('POST', 'https://example.com/api/json', 'title=x', 'text/plain'));
+
+        self::assertSame(415, $response->getStatusCode());
+        self::assertSame('application/json', $response->getHeaderLine('Accept-Post'));
+    }
+
+    #[Test]
+    public function isUnaffectedByContentTypeWhenTheRouteBindsNoBodyArguments(): void
+    {
+        $response = $this->dispatch($this->rawBodyRequest('GET', 'https://example.com/api/count', 'irrelevant', 'text/plain'));
 
         self::assertSame(200, $response->getStatusCode());
     }
@@ -902,6 +928,7 @@ final class RouteDispatcherTest extends TestCase
             'corsOverride' => ['path' => '/api/cors-override', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
+            'json' => ['path' => '/api/json', 'methods' => ['POST'], 'controller' => 'ctrl::json', 'env' => null, 'requirements' => []],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -941,6 +968,10 @@ final class RouteDispatcherTest extends TestCase
             'corsOverride' => [],
             'slashed' => [],
             'loose' => [],
+            'json' => [
+                ['name' => 'title', 'type' => 'string', 'source' => 'input', 'nullable' => false, 'hasDefault' => false, 'default' => null],
+                ['name' => 'priority', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 0],
+            ],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
@@ -1007,6 +1038,22 @@ final class RouteDispatcherTest extends TestCase
             ->withAttribute('language', $site->getDefaultLanguage())
             ->withQueryParams($query) // @phpstan-ignore argument.type
             ->build();
+    }
+
+    private function jsonRequest(string $method, string $url, string $body): ServerRequest
+    {
+        return $this->rawBodyRequest($method, $url, $body, 'application/json');
+    }
+
+    private function rawBodyRequest(string $method, string $url, string $body, string $contentType): ServerRequest
+    {
+        $stream = new Stream('php://temp', 'wb+');
+        $stream->write($body);
+        $stream->rewind();
+
+        return $this->request($method, $url)
+            ->withBody($stream)
+            ->withHeader('Content-Type', $contentType);
     }
 
     private function handler(ResponseInterface $response): RequestHandlerInterface

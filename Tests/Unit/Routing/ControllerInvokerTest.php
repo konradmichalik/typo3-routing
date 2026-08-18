@@ -23,7 +23,7 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\EntityController;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
-use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Http\{ServerRequest, Stream};
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
@@ -180,6 +180,54 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function returnsNullWhenTheRouteBindsNoBodyArguments(): void
+    {
+        $error = $this->invoker()->firstRequestBodyError(
+            $this->match('count'),
+            $this->bodyRequest('not json at all', 'text/plain'),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function returnsNullForAValidJsonBodyOnABodyBindingRoute(): void
+    {
+        $error = $this->invoker()->firstRequestBodyError(
+            ['_route' => 'optional', '_requirements' => []],
+            $this->bodyRequest('{"page":2}', 'application/json'),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function namesMalformedJsonAsTheCauseOnABodyBindingRoute(): void
+    {
+        $response = $this->invoker()->firstRequestBodyError(
+            ['_route' => 'optional', '_requirements' => []],
+            $this->bodyRequest('{"page":', 'application/json'),
+        );
+
+        self::assertNotNull($response);
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonPath((string) $response->getBody(), 'detail', 'Malformed JSON request body');
+    }
+
+    #[Test]
+    public function returnsUnsupportedMediaTypeForAnUnreadableContentTypeOnABodyBindingRoute(): void
+    {
+        $response = $this->invoker()->firstRequestBodyError(
+            ['_route' => 'optional', '_requirements' => []],
+            $this->bodyRequest('page=2', 'text/plain'),
+        );
+
+        self::assertNotNull($response);
+        self::assertSame(415, $response->getStatusCode());
+        self::assertSame('application/json', $response->getHeaderLine('Accept-Post'));
+    }
+
+    #[Test]
     public function treatsARouteWithoutAnEnvAsVisibleEverywhere(): void
     {
         self::assertTrue($this->invoker()->isVisibleInCurrentContext(null));
@@ -252,5 +300,17 @@ final class ControllerInvokerTest extends TestCase
         return (new RequestBuilder('GET', 'https://example.com/api/count'))
             ->withQueryParams($query)
             ->build();
+    }
+
+    private function bodyRequest(string $body, string $contentType): ServerRequest
+    {
+        $stream = new Stream('php://temp', 'wb+');
+        $stream->write($body);
+        $stream->rewind();
+
+        return (new RequestBuilder('POST', 'https://example.com/api/count'))
+            ->build()
+            ->withBody($stream)
+            ->withHeader('Content-Type', $contentType);
     }
 }

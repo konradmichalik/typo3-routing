@@ -334,6 +334,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'description' => $route->description ?? $classRoute?->description,
             'caseInsensitive' => $caseInsensitive ?? false,
             'tags' => $tags ?? [],
+            'classExclusivePrefix' => $classExclusivePrefix,
         ];
         $collected->arguments[$name] = $arguments;
 

@@ -99,7 +99,7 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}>
+     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>}>
      */
     private function collectRows(): array
     {
@@ -131,6 +131,7 @@ final class RouteDebugCommand extends Command
                 'sites' => $route['sites'] ?? [],
                 'languages' => $route['languages'] ?? [],
                 'deprecated' => $this->registry->getDeprecation($name),
+                'aliases' => $this->registry->getAliasesFor($name),
             ];
         }
 
@@ -140,7 +141,7 @@ final class RouteDebugCommand extends Command
     /**
      * Active filters as label => predicate. The labels double as the human-readable summary.
      *
-     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}): bool>
+     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>}): bool>
      */
     private function activeFilters(InputInterface $input, ?string $name): array
     {
@@ -190,8 +191,8 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}                                $row
-     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}): bool> $filters
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>}                                $row
+     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>}): bool> $filters
      */
     private function matches(array $row, array $filters): bool
     {
@@ -205,7 +206,7 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null} $row
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>} $row
      */
     private function renderDetail(SymfonyStyle $io, array $row): void
     {
@@ -246,6 +247,7 @@ final class RouteDebugCommand extends Command
             ['Sites' => RouteTableFormatter::anyOrList($row['sites'])],
             ['Languages' => RouteTableFormatter::anyOrList($row['languages'])],
             ['Deprecated' => $deprecated],
+            ['Aliases' => [] === $row['aliases'] ? '-' : implode(', ', $row['aliases'])],
         );
     }
 

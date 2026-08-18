@@ -82,6 +82,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private DeprecationResolver $deprecationResolver = new DeprecationResolver(),
         private ReturnsResolver $returnsResolver = new ReturnsResolver(),
         private RouteCompileGuard $compileGuard = new RouteCompileGuard(),
+        private RouteAliasCollector $aliasCollector = new RouteAliasCollector(),
     ) {}
 
     #[Override]
@@ -112,10 +113,12 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         }
 
         $this->deprecationResolver->assertSuccessorsExist($collected);
+        $this->aliasCollector->assertNoCollisionWithRoutes($collected);
 
         $registry = $container->getDefinition(RouteRegistry::class);
         $registry->setArgument('$routes', $collected->routes);
         $registry->setArgument('$deprecations', $collected->deprecations);
+        $registry->setArgument('$aliases', $collected->aliases);
         $registry->setArgument('$controllerLocator', ServiceLocatorTagPass::register($container, $controllerReferences));
         $registry->setArgument('$authenticatorLocator', ServiceLocatorTagPass::register($container, $collected->authenticatorReferences));
         $registry->setArgument('$cacheConfigs', $collected->cacheConfigs);
@@ -340,6 +343,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'languages' => $languages ?? [],
         ];
         $collected->arguments[$name] = $arguments;
+        $this->aliasCollector->apply($route->aliases, $namePrefix, $name, $serviceId, $method->getName(), $collected);
 
         if (null !== $rateLimit) {
             $collected->rateLimits[$name] = $rateLimit;

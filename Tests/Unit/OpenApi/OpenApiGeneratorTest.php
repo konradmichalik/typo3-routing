@@ -73,6 +73,19 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function aRouteAliasNeverAppearsAsAPathOfItsOwn(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['x' => ['path' => '/api/x', 'methods' => ['GET'], 'controller' => 'ctrl::x', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), aliases: ['legacy_x' => 'x']);
+
+        $document = $this->generator($registry)->generate('My API', '2.0.0', '/api/');
+
+        self::assertArrayHasKey('/api/x', $document['paths']);
+        self::assertCount(1, $document['paths']);
+    }
+
+    #[Test]
     public function mapsPathAndQueryParametersWithTypeAndEnumSchema(): void
     {
         $operation = $this->generate()['paths']['/api/v1/items/{id}']['get'];

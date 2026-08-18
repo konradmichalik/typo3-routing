@@ -32,6 +32,7 @@ A controller method declares **only the parameters it needs** — there is no fi
 - [Host](#host)
   - [Wildcards and multiple hosts](#wildcards-and-multiple-hosts)
 - [Description](#description)
+- [Case-insensitive paths](#case-insensitive-paths)
 - [Class-level prefix (route groups)](#class-level-prefix-route-groups)
 - [Requirements](#requirements)
   - [Named requirement patterns](#named-requirement-patterns)
@@ -55,6 +56,7 @@ The attribute is repeatable. Its parameters:
 | `schemes`      | `list<string>`          | `[]`      | Allowed URI schemes (e.g. `['https']`); empty = any scheme. See below.  |
 | `host`         | `?string`               | `null`    | Restrict the route to a specific hostname (e.g. `'api.example.com'`); null = any host. See below. |
 | `description`  | `?string`               | `null`    | Human-readable summary of what the endpoint does; surfaced in `routing:debug` and the OpenAPI export. See below. |
+| `caseInsensitive` | `?bool`              | `null`    | Match the path's literal segments regardless of case. See below. |
 
 ## Priority
 
@@ -141,6 +143,31 @@ public function show(int $id): ResponseInterface { /* … */ }
 
 It shows up in `routing:debug` (truncated in the table, full in `--json` and the detail view) and in the OpenAPI export (see [OpenAPI](HOW-IT-WORKS.md#openapi-export)): a description with more than one sentence has its first sentence split off as the operation `summary`, the full text stays the `description`.
 
+## Case-insensitive paths
+
+URL paths are case-sensitive by [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-6.2.2.1), and that is the default here. A single route can opt out, for instance when a legacy client or a hand-typed URL varies the casing:
+
+```php
+#[Route(path: '/api/courses/{slug}', name: 'course_show', caseInsensitive: true)]
+public function show(string $slug): ResponseInterface { /* … */ }
+```
+
+```text
+/api/courses/Intro-To-Php  →  match, $slug = 'Intro-To-Php'
+/API/Courses/Intro-To-Php  →  match, $slug = 'Intro-To-Php'
+/ApI/CoUrSeS/Intro-To-Php  →  match, $slug = 'Intro-To-Php'
+```
+
+Three things this deliberately does **not** do:
+
+- **Placeholder values are never folded.** The tolerance covers the path's literal segments only, so `{slug}` reaches the controller exactly as it was sent. Lower-casing the whole path would silently corrupt identifiers.
+- **`requirements` stay case-sensitive.** `['slug' => '[a-z-]+']` still rejects `Intro-To-Php`, opted in or not. The tolerance is about finding the route, never about relaxing its constraints. Since the client just sees a `404`, [`routing:match`](HOW-IT-WORKS.md#match-simulation-command) reports this case separately instead of claiming no route matched.
+- **No redirect is issued.** Both forms answer directly, exactly as with [trailing slashes](CONFIGURATION.md#trailing-slashes). If you want one canonical URL for SEO reasons, do not use this and let the other casing 404.
+
+Generated URLs (`{routing:uri(...)}`, `RouteUrlGenerator`) always use the declared casing.
+
+Nothing is opted in by default, and the extra matching pass runs only after the exact path has already failed, so routes that do not use it are unaffected.
+
 ## Class-level prefix (route groups)
 
 Placing `#[Route]` on the **controller class** turns it into a prefix shared by every method route — handy for grouping related endpoints or versioning an API (`/api/v1`, `/api/v2`). At most one class-level `#[Route]` is allowed.
@@ -173,6 +200,7 @@ How the class-level values combine with each method:
 | `defaults`     | **Merged** with method defaults; the method wins per key.                                     |
 | `methods`      | **Ignored** at class level — the method default (`['GET']`) is indistinguishable from "unset". |
 | `description`  | Used as the **default** for methods that do not set their own `description`; a method `description` wins. |
+| `caseInsensitive` | Used as the **default** for methods that do not set their own value; a method can opt back out with `false`. |
 
 ## Requirements
 

@@ -83,4 +83,40 @@ final class PathPrefixGateTest extends TestCase
         self::assertTrue($gate->matches('/api/anything'));
         self::assertFalse($gate->matches('/va/other'));
     }
+
+    /**
+     * A case-insensitive route's prefix has to pass the gate in every casing, or the request never
+     * reaches the matcher that would tolerate it.
+     */
+    #[Test]
+    public function matchesADifferentlyCasedPathUnderACaseInsensitivePrefix(): void
+    {
+        $gate = new PathPrefixGate([], ['/api/']);
+
+        self::assertTrue($gate->matches('/api/count'));
+        self::assertTrue($gate->matches('/API/Count'));
+        self::assertFalse($gate->matches('/some/page'));
+    }
+
+    #[Test]
+    public function aCaseSensitivePrefixStillRejectsADifferentlyCasedPath(): void
+    {
+        self::assertFalse((new PathPrefixGate(['/api/']))->matches('/API/count'));
+    }
+
+    #[Test]
+    public function aCaseInsensitivePrefixIsNormalisedRegardlessOfHowItWasDeclared(): void
+    {
+        self::assertTrue((new PathPrefixGate([], ['/API/']))->matches('/api/count'));
+    }
+
+    #[Test]
+    public function mergingKeepsTheCaseInsensitivePrefixesOfBothSides(): void
+    {
+        $gate = (new PathPrefixGate([], ['/va/']))->mergedWith(new PathPrefixGate([], ['/api/']));
+
+        self::assertTrue($gate->matches('/VA/count'));
+        self::assertTrue($gate->matches('/API/count'));
+        self::assertFalse($gate->matches('/some/page'));
+    }
 }

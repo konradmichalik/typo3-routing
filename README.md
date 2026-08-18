@@ -27,6 +27,7 @@ The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxR
 - [**Route groups**](docs/USAGE.md#class-level-prefix-route-groups): a class-level `#[Route]` prefixes every method route, e.g. for API versioning
 - [**Typed arguments**](docs/ARGUMENTS.md): methods receive type-cast path/query/body values, no manual request reading
 - [**Zero-config discovery**](docs/HOW-IT-WORKS.md): routes are collected at container compile time, no extra cache
+- [**Measured overhead**](docs/PERFORMANCE.md): requests that cannot be a route are filtered out in under a microsecond; dispatching a matched one costs ~0.6 ms more than a hand-written middleware, a few percent of a minimal JSON endpoint
 - [**URL generation**](docs/URL-GENERATION.md): a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
 - [**Opt-in caching**](docs/CACHING.md): cache responses with `#[Cache]`, with tag-based invalidation
 - [**Opt-in rate limiting**](docs/RATE-LIMITING.md): throttle requests per client IP with `#[RateLimit]`
@@ -111,6 +112,7 @@ See [Usage](docs/USAGE.md) for the full `#[Route]` reference and typed arguments
 | [Caching](docs/CACHING.md) | Opt-in response caching with `#[Cache]` and tag-based invalidation |
 | [Rate Limiting](docs/RATE-LIMITING.md) | Opt-in per-IP throttling with `#[RateLimit]` |
 | [Authentication & CSRF](docs/AUTHENTICATION.md) | Protecting routes with `#[Authenticate]`, request tokens, and deployment notes |
+| [Performance](docs/PERFORMANCE.md) | Measured dispatch overhead, what the path gate costs unrelated traffic, and how to reproduce both |
 | [Extending](docs/EXTENDING.md) | Building tooling on top of the route metadata (`RouteRegistry`), the `@api`/`@internal` surface, and the BC promise |
 
 > [!TIP]

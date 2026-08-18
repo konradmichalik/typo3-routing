@@ -57,4 +57,14 @@ final class BenchmarkController implements RouteControllerInterface
         // Path placeholder resolved directly to a hydrated Extbase domain object by the routing layer.
         return new JsonResponse(['id' => $item->getUid(), 'title' => $item->getTitle()]);
     }
+
+    // Measured from two directions: requested in its declared casing it must cost the same as any
+    // other static route (the tolerance is a fallback, so an exact hit never reaches it), requested
+    // in a different casing it pays the whole fallback chain: failed compiled match, failed
+    // trailing-slash retry, then the non-compiled UrlMatcher over the opted-in collection.
+    #[Route(path: '/api/bench/routing/ci', name: 'bench_routing_ci', caseInsensitive: true)]
+    public function caseInsensitive(): JsonResponse
+    {
+        return new JsonResponse(['ok' => true]);
+    }
 }

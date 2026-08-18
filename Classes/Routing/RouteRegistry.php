@@ -18,6 +18,7 @@ use Psr\Container\ContainerInterface;
 use Symfony\Component\Routing\Matcher\{CompiledUrlMatcher, UrlMatcher, UrlMatcherInterface};
 use Symfony\Component\Routing\{RequestContext, Route as SymfonyRoute, RouteCollection};
 
+use function array_filter;
 use function array_unique;
 use function array_values;
 
@@ -31,19 +32,21 @@ use function array_values;
 final class RouteRegistry
 {
     private ?RouteCollection $collection = null;
+    private ?RouteCollection $caseInsensitiveCollection = null;
 
     /**
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes
-     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                                                          $cacheConfigs
-     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                                            $rateLimits
-     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                                                $arguments
-     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                   $authenticators
-     * @param array<string, string>                                                                                                                                                                                                                                        $requestTokenScopes
-     * @param array<mixed>                                                                                                                                                                                                                                                 $compiledRoutes
-     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                       $corsConfigs
-     * @param list<string>                                                                                                                                                                                                                                                 $staticPrefixes
-     * @param array<string, array<string, string>>                                                                                                                                                                                                                         $paramDescriptions
-     * @param array<string, list<string>>                                                                                                                                                                                                                                  $optionalInputs
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}> $routes
+     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                                                                                  $cacheConfigs
+     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                                                                    $rateLimits
+     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                                                                        $arguments
+     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                                           $authenticators
+     * @param array<string, string>                                                                                                                                                                                                                                                                $requestTokenScopes
+     * @param array<mixed>                                                                                                                                                                                                                                                                         $compiledRoutes
+     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                                               $corsConfigs
+     * @param list<string>                                                                                                                                                                                                                                                                         $staticPrefixes
+     * @param array<string, array<string, string>>                                                                                                                                                                                                                                                 $paramDescriptions
+     * @param array<string, list<string>>                                                                                                                                                                                                                                                          $optionalInputs
+     * @param list<string>                                                                                                                                                                                                                                                                         $caseInsensitivePrefixes
      */
     public function __construct(
         private readonly array $routes,
@@ -59,6 +62,7 @@ final class RouteRegistry
         private readonly array $staticPrefixes = [],
         private readonly array $paramDescriptions = [],
         private readonly array $optionalInputs = [],
+        private readonly array $caseInsensitivePrefixes = [],
     ) {}
 
     /**
@@ -68,7 +72,7 @@ final class RouteRegistry
      *
      * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/EXTENDING.md
      *
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}> $routes
      */
     public static function buildCollection(array $routes): RouteCollection
     {
@@ -148,6 +152,59 @@ final class RouteRegistry
         }
 
         return new UrlMatcher($this->getRouteCollection(), $context);
+    }
+
+    /**
+     * The routes that opted into case-insensitive matching via #[Route(caseInsensitive: true)].
+     * Shared by the compiler pass (baking their prefixes) and the registry's own lazy fallback.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     *
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}> $routes
+     *
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}>
+     */
+    public static function caseInsensitiveRoutes(array $routes): array
+    {
+        return array_filter($routes, static fn (array $route): bool => $route['caseInsensitive'] ?? false);
+    }
+
+    /**
+     * A second matcher over the opted-in routes alone, or null when no route opted in — which is the
+     * default, so the whole feature costs nothing until it is used. RouteMatcher consults it only after
+     * the primary matcher has already failed.
+     *
+     * The plain UrlMatcher is deliberate: CompiledUrlMatcherDumper resolves placeholder-free routes
+     * through an exact-match table that no regex modifier can reach, so the dumped matcher could never
+     * honour CaseInsensitiveRouteCompiler.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     */
+    public function getCaseInsensitiveMatcher(RequestContext $context): ?UrlMatcherInterface
+    {
+        $collection = $this->getCaseInsensitiveCollection();
+
+        return 0 === $collection->count() ? null : new UrlMatcher($collection, $context);
+    }
+
+    /**
+     * The opted-in routes' static prefixes, so the dispatcher's path gate lets their differently-cased
+     * requests through in the first place. Derived from the standard compilation, never from the
+     * case-insensitive one: that compiler empties the prefix, which would open the gate to every path.
+     *
+     * Baked in at container build time; the fallback mirrors getStaticPrefixes().
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     *
+     * @return list<string>
+     */
+    public function getCaseInsensitivePrefixes(): array
+    {
+        if ([] !== $this->caseInsensitivePrefixes || [] === $this->routes) {
+            return $this->caseInsensitivePrefixes;
+        }
+
+        return self::staticPrefixes(self::buildCollection(self::caseInsensitiveRoutes($this->routes)));
     }
 
     /**
@@ -245,7 +302,7 @@ final class RouteRegistry
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}>
      */
     public function getRoutes(): array
     {
@@ -269,5 +326,19 @@ final class RouteRegistry
         }
 
         return self::staticPrefixes($this->getRouteCollection());
+    }
+
+    private function getCaseInsensitiveCollection(): RouteCollection
+    {
+        if (null !== $this->caseInsensitiveCollection) {
+            return $this->caseInsensitiveCollection;
+        }
+
+        $collection = self::buildCollection(self::caseInsensitiveRoutes($this->routes));
+        foreach ($collection->all() as $route) {
+            $route->setOption('compiler_class', CaseInsensitiveRouteCompiler::class);
+        }
+
+        return $this->caseInsensitiveCollection = $collection;
     }
 }

@@ -38,7 +38,7 @@ Cached `200` GET responses automatically carry a strong `ETag` — a SHA-256 has
 
 A client that sends the value back in an `If-None-Match` header gets a body-less `304 Not Modified` when the body is unchanged, saving bandwidth:
 
-```
+```text
 GET /api/news                          →  200 OK        ETag: "9f2b…"
 GET /api/news   If-None-Match: "9f2b…" →  304 Not Modified
 ```

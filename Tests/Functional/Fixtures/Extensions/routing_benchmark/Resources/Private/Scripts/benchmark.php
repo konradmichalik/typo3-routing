@@ -50,6 +50,18 @@ $scenarios = [
         'routing' => '/api/bench/routing/entity/1',
         'plain' => '/api/bench/plain/entity/1',
     ],
+    // Two requests against one declaration. The exact-casing row answers "does the opt-in cost
+    // anything when it is not needed", the mixed-casing row answers "what does the tolerance cost
+    // when it fires". The plain side serves both from a single strcasecmp, so its two rows should
+    // come out equal and act as the control for that pair.
+    'caseInsensitive (exact)' => [
+        'routing' => '/api/bench/routing/ci',
+        'plain' => '/api/bench/plain/ci',
+    ],
+    'caseInsensitive (mixed)' => [
+        'routing' => '/API/Bench/Routing/CI',
+        'plain' => '/API/Bench/Plain/CI',
+    ],
 ];
 
 function request(string $url): void

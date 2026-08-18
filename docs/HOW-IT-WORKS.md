@@ -53,9 +53,23 @@ vendor/bin/typo3 routing:match /api/orders --method=POST --host=api.example.com
 
 A match prints the route name, controller, resolved path parameters and — for an [environment-bound route](CONFIGURATION.md) — a note that it is only reachable in that context (the matcher itself ignores `env`; the dispatcher enforces it at request time). A path that matches nothing exits non-zero with `No route matches`; a path that matches but rejects the method reports the allowed methods.
 
+One miss gets its own report, because `No route matches` would be misleading: a [case-insensitive route](USAGE.md#case-insensitive-paths) whose path was found but whose `requirements` then rejected a placeholder value.
+
+```text
+ [WARNING] Path "/API/Courses/Intro-To-Php" matches route "course_show", but the
+           value "Intro-To-Php" for parameter "slug" does not satisfy its
+           requirement "[a-z-]+".
+
+ ! [NOTE] The route opted into caseInsensitive, which covers the path's literal
+ !        segments only. Placeholder values and their requirements stay
+ !        case-sensitive.
+```
+
+At request time this stays an ordinary `404`: the distinction is a development aid, not something the client is told.
+
 The table lists every route with its path, methods, controller, environment binding, and requirements:
 
-```
+```text
  Attribute Routes
  ================
 

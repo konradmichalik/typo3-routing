@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * This file is part of the "typo3_routing" TYPO3 CMS extension.
+ *
+ * (c) 2026 Konrad Michalik <hej@konradmichalik.dev>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace KonradMichalik\Typo3Routing\DependencyInjection;
+
+use KonradMichalik\Typo3Routing\Attribute\Route;
+use LogicException;
+use ReflectionMethod;
+use Symfony\Component\Routing\Route as SymfonyRoute;
+
+use function sprintf;
+
+/**
+ * ClassExclusiveResolver.
+ *
+ * @internal
+ *
+ * @author Konrad Michalik <hej@konradmichalik.dev>
+ */
+final readonly class ClassExclusiveResolver
+{
+    /**
+     * The class's own static path prefix when it opted into #[Route(exclusive: true)], or null when it
+     * did not. Computed once per class and threaded through every one of its method routes, rather than
+     * recomputed from each method's own (longer, more specific) composed path.
+     */
+    public function resolvePrefix(?Route $classRoute, string $serviceId): ?string
+    {
+        if (!$classRoute instanceof Route || true !== $classRoute->exclusive) {
+            return null;
+        }
+
+        $prefix = (new SymfonyRoute($classRoute->path))->compile()->getStaticPrefix();
+        if ('' !== $prefix) {
+            return $prefix;
+        }
+
+        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s" would claim every unmatched path site-wide: its own path "%s" has no static prefix (it starts with a placeholder, or is empty). Give the class a literal leading path segment, or drop "exclusive".', $serviceId, $classRoute->path), 1750000033);
+    }
+
+    /**
+     * "exclusive" only makes sense as a claim over a shared class prefix; on a single method route there
+     * is no "rest of the prefix" left to turn into a 404, so it would silently do nothing.
+     */
+    public function assertNotOnMethod(Route $route, ReflectionMethod $method, string $serviceId): void
+    {
+        if (true !== $route->exclusive) {
+            return;
+        }
+
+        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s::%s()" has no effect on a method route; "exclusive" is a class-level-only setting. Move it to the class-level #[Route].', $serviceId, $method->getName()), 1750000032);
+    }
+}

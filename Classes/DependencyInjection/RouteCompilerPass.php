@@ -23,7 +23,6 @@ use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
-use Symfony\Component\Routing\Route as SymfonyRoute;
 
 use function array_intersect;
 use function array_map;
@@ -74,6 +73,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private ClassExistenceChecker $classExistenceChecker = new ClassExistenceChecker(),
         private CompilerWarnings $compilerWarnings = new CompilerWarnings(),
         private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
+        private ClassExclusiveResolver $classExclusiveResolver = new ClassExclusiveResolver(),
     ) {}
 
     #[Override]
@@ -164,7 +164,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     {
         $classRoute = $this->resolveClassRoute($reflection, $serviceId);
         $classCors = $this->corsResolver->resolveClass($reflection);
-        $classExclusivePrefix = $this->resolveClassExclusivePrefix($classRoute, $serviceId);
+        $classExclusivePrefix = $this->classExclusiveResolver->resolvePrefix($classRoute, $serviceId);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -195,25 +195,6 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         }
 
         return $attributes[0]->newInstance();
-    }
-
-    /**
-     * The class's own static path prefix when it opted into #[Route(exclusive: true)], or null when it
-     * did not. Computed once per class and threaded through every one of its method routes, rather than
-     * recomputed from each method's own (longer, more specific) composed path.
-     */
-    private function resolveClassExclusivePrefix(?Route $classRoute, string $serviceId): ?string
-    {
-        if (!$classRoute instanceof Route || true !== $classRoute->exclusive) {
-            return null;
-        }
-
-        $prefix = (new SymfonyRoute($classRoute->path))->compile()->getStaticPrefix();
-        if ('' !== $prefix) {
-            return $prefix;
-        }
-
-        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s" would claim every unmatched path site-wide: its own path "%s" has no static prefix (it starts with a placeholder, or is empty). Give the class a literal leading path segment, or drop "exclusive".', $serviceId, $classRoute->path), 1750000033);
     }
 
     private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix): bool
@@ -263,26 +244,13 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     }
 
     /**
-     * "exclusive" only makes sense as a claim over a shared class prefix; on a single method route there
-     * is no "rest of the prefix" left to turn into a 404, so it would silently do nothing.
-     */
-    private function assertNoMethodLevelExclusive(Route $route, ReflectionMethod $method, string $serviceId): void
-    {
-        if (true !== $route->exclusive) {
-            return;
-        }
-
-        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s::%s()" has no effect on a method route; "exclusive" is a class-level-only setting. Move it to the class-level #[Route].', $serviceId, $method->getName()), 1750000032);
-    }
-
-    /**
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cache
      * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
     private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
     {
-        $this->assertNoMethodLevelExclusive($route, $method, $serviceId);
+        $this->classExclusiveResolver->assertNotOnMethod($route, $method, $serviceId);
 
         // Class-level #[Route] prefixes the path/name, defaults the env and provides base requirements.
         $namePrefix = '';

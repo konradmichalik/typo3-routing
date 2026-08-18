@@ -123,6 +123,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         // Compiled separately: the gate has to open for these in every casing, and the case-insensitive
         // compilation itself carries no usable prefix.
         $registry->setArgument('$caseInsensitivePrefixes', RouteRegistry::staticPrefixes(RouteRegistry::buildCollection(RouteRegistry::caseInsensitiveRoutes($collected->routes))));
+        // A class's own exclusive claim, one entry per opted-in class regardless of how many routes it declares.
+        $registry->setArgument('$classExclusivePrefixes', RouteRegistry::classExclusivePrefixes($collected->routes));
     }
 
     /**

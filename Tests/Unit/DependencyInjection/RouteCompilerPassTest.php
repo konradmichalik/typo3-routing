@@ -172,6 +172,15 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesTheClassExclusivePrefixesIntoTheRegistry(): void
+    {
+        $container = $this->buildContainer(['exclusive' => ExclusiveController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        self::assertSame(['/api/exclusive'], $container->getDefinition(RouteRegistry::class)->getArgument('$classExclusivePrefixes'));
+    }
+
+    #[Test]
     public function hoistsParamRequirementAndPhpDefaultIntoTheRoute(): void
     {
         $routes = $this->discover($this->buildContainer(['param' => ParamContributionController::class]));

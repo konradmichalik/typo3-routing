@@ -75,6 +75,8 @@ final readonly class PathPrefixGate
      */
     public function matches(string $path): bool
     {
+        // $path arrives percent-encoded and is compared as such, deliberately — see "Encoded vs.
+        // decoded paths" in docs/HOW-IT-WORKS.md.
         foreach ($this->prefixes as $prefix) {
             if (str_starts_with($path, $prefix)) {
                 return true;

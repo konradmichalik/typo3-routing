@@ -4,6 +4,19 @@
 
 2. **Runtime** — [`RouteDispatcher`](../Classes/Middleware/RouteDispatcher.php) applies the [path gate](CONFIGURATION.md#path-gate) derived from the compiled routes, matches via `symfony/routing`, filters by environment, then resolves the controller method's typed arguments via [`ControllerArgumentResolver`](../Classes/Routing/ControllerArgumentResolver.php) and invokes it. `404`, `405` (with an `Allow` header), `400` (unresolvable/invalid argument), and controller-thrown `HttpProblemException` responses are emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details — `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}` (`detail` is omitted when it would only repeat the title); the success response format is entirely the controller's choice. Every response — success or error — also carries an `X-Request-ID` header: echoed back when the client sent one, otherwise generated, so a single id correlates a request across logs and proxies.
 
+## Encoded vs. decoded paths
+
+The request path travels through two encodings, and the boundary between them is deliberate, not incidental.
+
+**Encoded**, from `SiteBasePathResolver::stripSiteBase()` up to and including the [path gate](CONFIGURATION.md#path-gate): TYPO3's `Uri` always yields the percent-encoded path (`/api/über-uns` reads back as `/api/%C3%BCber-uns`), and `PathPrefixGate::matches()` compares against it with a plain `str_starts_with()` — deliberately: decoding in front of the gate would put extra work on the hot path of every ordinary page request, and would turn what is otherwise a pure "widening a filter is always safe" performance check into a separate security decision.
+
+**Decoded**, from the matcher inwards: both `UrlMatcher` and `CompiledUrlMatcher` call `rawurldecode()` on the path before matching it, so `RouteMatcher` hands back decoded placeholder values — a controller sees `hello world`, never `hello%20world`.
+
+Two consequences follow directly from where that boundary sits:
+
+- A route's **static prefix** is derived from its declared path, which is decoded — so a non-ASCII prefix cannot `str_starts_with()`-match the encoded request path on its own, and a route that needs to be reachable at all has to feed its encoded form into the gate too (see `RouteRegistry::staticPrefixes()`).
+- Anything that transforms the path **inside** `RouteMatcher` — case folding, a future Unicode normalisation, a canonical-redirect target — operates on the *encoded* string the matcher receives, not the decoded one. It must never hand a decoded string back into `match()`: the matcher decodes again, and `%252e%252e` comes back out as `..`. Any such transformation has to re-encode before matching, not just decode once.
+
 ## Debug command
 
 > [!TIP]

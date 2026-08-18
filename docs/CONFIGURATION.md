@@ -110,6 +110,22 @@ A route with `env: 'Development'` only exists while the top-level application co
 public function dump(ServerRequestInterface $request): ResponseInterface { /* … */ }
 ```
 
+## Site- and language-bound routes
+
+`sites` and `languages` scope a route to a subset of the installation the same way `env` scopes it to an application context: out of scope means the route behaves as if it does not exist (`404`), checked at match time against the request's `site`/`language` attributes.
+
+```php
+#[Route(path: '/api/shop/orders', name: 'shop_orders', sites: ['shop-de', 'shop-at'])]
+public function orders(): ResponseInterface { /* … */ }
+
+#[Route(path: '/api/example/localized', name: 'example_localized', languages: [0, 1])]
+public function localized(): ResponseInterface { /* … */ }
+```
+
+- **`sites`** takes site identifiers exactly as configured under `config/sites/<identifier>/config.yaml`. An identifier that names no configured site is not rejected at build time (site configuration cannot be read reliably while the container builds, and the check would go stale the moment a site is renamed) — it is reported once per distinct list, as a runtime warning, regardless of whether it happens to match the current request's site.
+- **`languages`** takes language ids as configured per site.
+- Both default to `null`, meaning every site/language; a class-level `#[Route]` sets the default for methods that do not set their own (same inheritance rule as `caseInsensitive`).
+
 ## Swagger UI (development only)
 
 The extension can serve a Swagger UI page over its own OpenAPI export — no extra setup beyond enabling a flag. Both routes are double-gated: they only exist in the `Development` [application context](#environment-bound-routes) **and** only when explicitly enabled (via **Settings → Extension Configuration → typo3_routing**); outside either condition they behave as if they don't exist (`404`), same as any other environment-bound route.

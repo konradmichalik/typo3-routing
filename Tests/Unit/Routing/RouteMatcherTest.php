@@ -36,6 +36,7 @@ final class RouteMatcherTest extends TestCase
         $match = $this->matcher()->match('/api/count', $this->context());
 
         self::assertSame('count', $match['_route']);
+        self::assertFalse($match['_canonicalVariant']);
     }
 
     #[Test]
@@ -44,6 +45,7 @@ final class RouteMatcherTest extends TestCase
         $match = $this->matcher()->match('/api/count/', $this->context());
 
         self::assertSame('count', $match['_route']);
+        self::assertTrue($match['_canonicalVariant']);
     }
 
     #[Test]
@@ -52,6 +54,7 @@ final class RouteMatcherTest extends TestCase
         $match = $this->matcher()->match('/api/slashed', $this->context());
 
         self::assertSame('slashed', $match['_route']);
+        self::assertTrue($match['_canonicalVariant']);
     }
 
     #[Test]
@@ -126,6 +129,8 @@ final class RouteMatcherTest extends TestCase
         $match = $this->matcher()->match('/API/Loose', $this->context());
 
         self::assertSame('loose', $match['_route']);
+        // A case-insensitive match is always a tolerated variant, even without a trailing-slash retry.
+        self::assertTrue($match['_canonicalVariant']);
     }
 
     #[Test]
@@ -229,7 +234,7 @@ final class RouteMatcherTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],

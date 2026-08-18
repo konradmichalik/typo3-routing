@@ -163,7 +163,7 @@ Three things this deliberately does **not** do:
 
 - **Placeholder values are never folded.** The tolerance covers the path's literal segments only, so `{slug}` reaches the controller exactly as it was sent. Lower-casing the whole path would silently corrupt identifiers.
 - **`requirements` stay case-sensitive.** `['slug' => '[a-z-]+']` still rejects `Intro-To-Php`, opted in or not. The tolerance is about finding the route, never about relaxing its constraints. Since the client just sees a `404`, [`routing:match`](HOW-IT-WORKS.md#match-simulation-command) reports this case separately instead of claiming no route matched.
-- **No redirect is issued.** Both forms answer directly, exactly as with [trailing slashes](CONFIGURATION.md#trailing-slashes). If you want one canonical URL for SEO reasons, do not use this and let the other casing 404.
+- **No redirect is issued by default.** Both forms answer directly, exactly as with [trailing slashes](CONFIGURATION.md#trailing-slashes). Add `#[Route(canonical: true)]` to redirect a differently-cased request to the declared path instead, see [Redirecting instead of tolerating](CONFIGURATION.md#redirecting-instead-of-tolerating).
 
 Generated URLs (`{routing:uri(...)}`, `RouteUrlGenerator`) always use the declared casing.
 

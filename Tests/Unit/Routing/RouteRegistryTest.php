@@ -477,6 +477,20 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesWhetherARouteOptedIntoTheCanonicalRedirect(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, canonical?: bool}> $routes */
+        $routes = [
+            'canonical' => ['path' => '/api/canonical', 'methods' => ['GET'], 'controller' => 'ctrl::canonical', 'env' => null, 'requirements' => [], 'canonical' => true],
+            'plain' => ['path' => '/api/plain', 'methods' => ['GET'], 'controller' => 'ctrl::plain', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        self::assertTrue($registry->isCanonical('canonical'));
+        self::assertFalse($registry->isCanonical('plain'));
+    }
+
+    #[Test]
     public function exposesArgumentSpecsPerRouteName(): void
     {
         $spec = ['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null];

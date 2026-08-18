@@ -154,6 +154,32 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function doesNotRedirectAnExactPathMatchOnACanonicalRoute(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/canonical'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function redirectsATrailingSlashVariantOfACanonicalRouteToItsDeclaredPath(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/canonical/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/example/canonical', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function redirectsAPlaceholderRouteToTheConcretePathIncludingTheSiteBase(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/sub/api/example/canonical-item/42/', 'https://example.com/sub/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/sub/api/example/canonical-item/42', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
     public function routeOwnCorsAttributeAppliesWithoutAnyGlobalCorsConfiguration(): void
     {
         // This test instance has no cors.* extension configuration at all — the global policy is off.

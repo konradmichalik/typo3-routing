@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, JsonErrorResponse, RequestIdResolver, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, JsonErrorResponse, RequestIdResolver, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
 use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteMatcher, RouteRegistry};
 use Override;
@@ -25,9 +25,13 @@ use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotF
 use Symfony\Component\Routing\RequestContext;
 use Throwable;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
-use TYPO3\CMS\Core\Http\Stream;
+use TYPO3\CMS\Core\Http\{Response, Stream};
 
+use function array_filter;
 use function is_string;
+use function str_starts_with;
+
+use const ARRAY_FILTER_USE_KEY;
 
 /**
  * RouteDispatcher.
@@ -63,6 +67,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private CorsPreflightResolver $corsPreflight,
         private CacheBypassGuard $cacheBypass,
         private ClientKeyResolver $clientKeyResolver,
+        private RouteUrlGenerator $urlGenerator,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $configured = '';
@@ -138,6 +143,17 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return JsonErrorResponse::create(404, 'Not Found');
         }
 
+        // 3b. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
+        //     or case) answers 308 to its declared form instead of serving directly, so exactly one URL
+        //     survives for caches and search indexing. Checked after the env filter so a redirect never
+        //     reveals a route invisible in the current context, and before the checks below so a client
+        //     on the wrong URL is redirected instead of getting a body/requirement error for a request
+        //     it is about to resubmit anyway.
+        $redirect = $this->canonicalRedirect($match, $request);
+        if (null !== $redirect) {
+            return $redirect;
+        }
+
         // 4. Request body shape (malformed JSON / unsupported content type) → 400/415, on routes that
         //    actually read from the body. Checked before requirements so the cause is named correctly
         //    instead of surfacing as a derived "missing parameter".
@@ -168,6 +184,39 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         // 8. Dispatch (with optional opt-in response cache; disabled for authenticated routes).
         return $this->withHeaders($this->dispatch($match, $request), $rateLimit['headers']);
+    }
+
+    /**
+     * Null unless the route opted into `#[Route(canonical: true)]` and this match came from a tolerated
+     * variant of its declared path (never for an exact match, and never for a 405 — that path already
+     * short-circuits in matchRoute()). The target is regenerated via RouteUrlGenerator rather than
+     * reusing the declared path verbatim, so a placeholder route redirects to the concrete path (with
+     * the site/language base applied) instead of the literal `{id}` template; the query string carries
+     * over unchanged. A fragment is never sent to the server, so there is nothing to preserve there.
+     *
+     * @param array<string, mixed> $match
+     */
+    private function canonicalRedirect(array $match, ServerRequestInterface $request): ?ResponseInterface
+    {
+        if (true !== ($match['_canonicalVariant'] ?? false)) {
+            return null;
+        }
+
+        $routeName = (string) ($match['_route'] ?? '');
+        if (!$this->registry->isCanonical($routeName)) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $parameters */
+        $parameters = array_filter($match, static fn (string $key): bool => !str_starts_with($key, '_'), ARRAY_FILTER_USE_KEY);
+        $location = $this->urlGenerator->generate($request, $routeName, $parameters);
+
+        $query = $request->getUri()->getQuery();
+        if ('' !== $query) {
+            $location .= '?'.$query;
+        }
+
+        return new Response('php://temp', 308, ['Location' => $location]);
     }
 
     /**

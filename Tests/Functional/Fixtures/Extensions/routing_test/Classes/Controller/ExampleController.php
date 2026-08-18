@@ -170,4 +170,16 @@ final class ExampleController implements RouteControllerInterface
         // #[Cors] applies even when no global CORS configuration is set for this test instance.
         return new JsonResponse(['ok' => true]);
     }
+
+    #[Route(path: '/api/example/canonical', name: 'example_canonical', canonical: true)]
+    public function canonical(): JsonResponse
+    {
+        return new JsonResponse(['canonical' => true]);
+    }
+
+    #[Route(path: '/api/example/canonical-item/{id}', name: 'example_canonical_item', requirements: ['id' => '\d+'], canonical: true)]
+    public function canonicalItem(int $id): JsonResponse
+    {
+        return new JsonResponse(['id' => $id]);
+    }
 }

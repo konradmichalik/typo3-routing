@@ -19,7 +19,7 @@ use KonradMichalik\Ttt\Attribute\WithEnvironment;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry};
@@ -475,6 +475,75 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function doesNotRedirectAnExactPathMatchOnACanonicalRoute(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/canonical'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function redirectsATrailingSlashVariantOfACanonicalRouteToItsDeclaredPath(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/canonical/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/canonical', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function redirectsACaseInsensitiveVariantOfACanonicalRouteToItsDeclaredPath(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/Canonical-Loose'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/canonical-loose', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function redirectsAPlaceholderRouteToTheConcretePathNotTheTemplate(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/canonical-item/42/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/canonical-item/42', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function includesTheSiteBaseInTheRedirectLocation(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/sub/api/canonical/', 'https://example.com/sub/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/sub/api/canonical', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function preservesTheQueryStringAcrossTheCanonicalRedirect(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/canonical/?foo=bar'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/canonical?foo=bar', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function usesA308RedirectSoAPostIsNotDowngraded(): void
+    {
+        $response = $this->dispatch($this->request('POST', 'https://example.com/api/canonical/'));
+
+        self::assertSame(308, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function methodNotAllowedTakesPrecedenceOverACanonicalRedirect(): void
+    {
+        $response = $this->dispatch($this->request('DELETE', 'https://example.com/api/canonical/'));
+
+        self::assertSame(405, $response->getStatusCode());
+    }
+
+    #[Test]
     public function fallsBackToDefaultPrefixWhenExtensionConfigurationThrows(): void
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -484,7 +553,7 @@ final class RouteDispatcherTest extends TestCase
         $context = new Context();
         $cors = new CorsHandler($extensionConfiguration);
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
-        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -1015,12 +1084,12 @@ final class RouteDispatcherTest extends TestCase
 
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
 
-        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), $extensionConfiguration);
+        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $extensionConfiguration);
     }
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'vaCount' => ['path' => '/va/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
@@ -1043,6 +1112,9 @@ final class RouteDispatcherTest extends TestCase
             'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'exclusiveKnown' => ['path' => '/api/exclusive/known', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'classExclusivePrefix' => '/api/exclusive/'],
             'json' => ['path' => '/api/json', 'methods' => ['POST'], 'controller' => 'ctrl::json', 'env' => null, 'requirements' => []],
+            'canonical' => ['path' => '/api/canonical', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'canonical' => true],
+            'canonicalItem' => ['path' => '/api/canonical-item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+'], 'canonical' => true],
+            'canonicalLoose' => ['path' => '/api/canonical-loose', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'caseInsensitive' => true, 'canonical' => true],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -1087,6 +1159,9 @@ final class RouteDispatcherTest extends TestCase
                 ['name' => 'title', 'type' => 'string', 'source' => 'input', 'nullable' => false, 'hasDefault' => false, 'default' => null],
                 ['name' => 'priority', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 0],
             ],
+            'canonical' => [],
+            'canonicalItem' => [$id],
+            'canonicalLoose' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */

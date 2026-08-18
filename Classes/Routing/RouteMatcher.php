@@ -58,7 +58,7 @@ final readonly class RouteMatcher
     public function match(string $path, RequestContext $context): array
     {
         try {
-            return $this->matchTolerantly($this->registry->getMatcher($context), $path);
+            return $this->matchTolerantly($this->registry->getMatcher($context), $path, alreadyVariant: false);
         } catch (ResourceNotFoundException $exception) {
             $caseInsensitiveMatcher = $this->registry->getCaseInsensitiveMatcher($context);
 
@@ -66,7 +66,9 @@ final readonly class RouteMatcher
                 throw $exception;
             }
 
-            $match = $this->matchTolerantly($caseInsensitiveMatcher, $path);
+            // Reaching this matcher at all means the exact-case path already failed against the
+            // standard matcher, so any match here is a tolerated variant regardless of trailing slash.
+            $match = $this->matchTolerantly($caseInsensitiveMatcher, $path, alreadyVariant: true);
             $this->assertRequirementsHold($match);
 
             return $match;
@@ -74,15 +76,23 @@ final readonly class RouteMatcher
     }
 
     /**
+     * Stamps `_canonicalVariant`: whether the returned match came from a tolerated variant of the
+     * declared path rather than the exact path itself. `#[Route(canonical: true)]` reads this to decide
+     * whether to redirect — kept out of the matcher's own contract, since deciding what to do with the
+     * signal is the dispatcher's business, not the matcher's.
+     *
      * @return array<string, mixed>
      *
      * @throws ResourceNotFoundException
      * @throws MethodNotAllowedException
      */
-    private function matchTolerantly(UrlMatcherInterface $matcher, string $path): array
+    private function matchTolerantly(UrlMatcherInterface $matcher, string $path, bool $alreadyVariant): array
     {
         try {
-            return $matcher->match($path);
+            $match = $matcher->match($path);
+            $match['_canonicalVariant'] = $alreadyVariant;
+
+            return $match;
         } catch (ResourceNotFoundException $exception) {
             $variant = $this->trailingSlashVariant($path);
 
@@ -90,7 +100,10 @@ final readonly class RouteMatcher
                 throw $exception;
             }
 
-            return $matcher->match($variant);
+            $match = $matcher->match($variant);
+            $match['_canonicalVariant'] = true;
+
+            return $match;
         }
     }
 

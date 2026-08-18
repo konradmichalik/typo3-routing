@@ -28,6 +28,21 @@ Two things stay untouched by it:
 
 Case is a separate matter and has no global switch: a route opts into it individually with `#[Route(caseInsensitive: true)]`, see [Case-insensitive paths](USAGE.md#case-insensitive-paths).
 
+### Redirecting instead of tolerating
+
+Answering both forms directly is right for API clients, who should not pay a second round trip. For a route serving HTML or a download, the same tolerance produces two URLs for one resource, which fragments caches and splits search ranking. `#[Route(canonical: true)]` opts a route into the other behaviour: a request that only matched a tolerated variant (trailing slash, or case via `caseInsensitive`) gets a `308 Permanent Redirect` to the declared path instead of the response.
+
+```php
+#[Route(path: '/downloads/report', name: 'report', canonical: true)]
+```
+
+```text
+/downloads/report      →  served directly
+/downloads/report/     →  308 → /downloads/report
+```
+
+`308` rather than `301` or `302`, because it preserves the request method and body — a tolerated `POST` is never silently downgraded to `GET`. A route with placeholders redirects to the concrete resolved path, never to the `{id}` template, and the query string carries over unchanged. `405` still wins over the redirect: a path that matches with the wrong method answers `405` regardless of which variant it was. Nullable and class-level inheritance work exactly like `caseInsensitive`. Not opting in (the default) keeps today's behaviour: both forms answered directly, no redirect.
+
 ## Exclusive path prefixes
 
 Separate from the gate, you can reserve path spaces **exclusively** for attribute routes. Inside them a path matching no route returns a JSON `404` instead of falling through to page rendering. Configure it via **Settings → Extension Configuration → typo3_routing**:

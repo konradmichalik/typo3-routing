@@ -240,12 +240,27 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     }
 
     /**
+     * "exclusive" only makes sense as a claim over a shared class prefix; on a single method route there
+     * is no "rest of the prefix" left to turn into a 404, so it would silently do nothing.
+     */
+    private function assertNoMethodLevelExclusive(Route $route, ReflectionMethod $method, string $serviceId): void
+    {
+        if (true !== $route->exclusive) {
+            return;
+        }
+
+        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s::%s()" has no effect on a method route; "exclusive" is a class-level-only setting. Move it to the class-level #[Route].', $serviceId, $method->getName()), 1750000032);
+    }
+
+    /**
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cache
      * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
     private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute): void
     {
+        $this->assertNoMethodLevelExclusive($route, $method, $serviceId);
+
         // Class-level #[Route] prefixes the path/name, defaults the env and provides base requirements.
         $namePrefix = '';
         $pathPrefix = '';

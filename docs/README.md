@@ -14,6 +14,7 @@ The everyday surface: what you write on a controller to make an endpoint exist.
 | [Route groups](routes/route-groups.md) | A class-level `#[Route]` as a shared prefix, which parameters inherit from it, and sharing route definitions through a base class |
 | [Typed controller arguments](routes/arguments.md) | How a method signature is fed from the request: type coercion, backed enums, entity binding, variadics, `#[Param]` |
 | [URL generation](routes/url-generation.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator, so a path is never duplicated |
+| [Records](routes/records.md) | A recipe for list/detail endpoints over database records, and why it stays a recipe |
 
 ## [Route features](features/README.md)
 

@@ -57,7 +57,7 @@ final readonly class RouteInvoker
      *
      * Authentication is checked against the credentials the calling request carries. Rate limiting
      * being absent means a consumer re-exposing these routes owns abuse control on its own transport.
-     * See docs/EXTENDING.md for the full contract and its BC promise.
+     * See docs/background/extending.md for the full contract and its BC promise.
      *
      * @param array<string, mixed> $input values keyed by the argument's wire name (see RouteRegistry::getArguments())
      *
@@ -120,7 +120,7 @@ final readonly class RouteInvoker
 
         // 4. Authentication (401) against the credentials the calling request carries. The request-token
         //    check is deliberately skipped: CSRF protects browser-initiated state changes, and this
-        //    invocation has no browser — see docs/EXTENDING.md.
+        //    invocation has no browser — see docs/background/extending.md.
         $denied = $this->accessGuard->enforceAuthentication($match, $synthetic);
         if (null !== $denied) {
             return $denied;

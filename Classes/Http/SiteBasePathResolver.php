@@ -29,7 +29,7 @@ final class SiteBasePathResolver
 {
     public function stripSiteBase(ServerRequestInterface $request): string
     {
-        // Percent-encoded, not decoded — see "Encoded vs. decoded paths" in docs/HOW-IT-WORKS.md.
+        // Percent-encoded, not decoded — see "Encoded vs. decoded paths" in docs/background/how-it-works.md.
         $path = $request->getUri()->getPath();
         $basePath = $this->resolveBasePath($request);
 

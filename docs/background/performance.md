@@ -68,7 +68,7 @@ The ranges overlap completely.
 **3. About +0.1 ms when the tolerance fires.** A differently-cased request measures +0.66 to +0.68 ms against +0.58 ms for the exact path. That covers the whole fallback chain: a failed compiled match, a failed trailing-slash retry, a freshly built `UrlMatcher` over the opted-in collection, then the requirement re-check.
 
 > [!NOTE]
-> The fallback uses the plain `UrlMatcher`, not the compiled matcher baked at container build time. That is deliberate and explained in [How It Works](HOW-IT-WORKS.md): `CompiledUrlMatcherDumper` resolves placeholder-free routes through an exact-match table that no regex modifier can reach. The +0.1 ms is the price of that decision, and it is only ever paid by a request that would otherwise have been a 404.
+> The fallback uses the plain `UrlMatcher`, not the compiled matcher baked at container build time. That is deliberate and explained in [How it works](how-it-works.md): `CompiledUrlMatcherDumper` resolves placeholder-free routes through an exact-match table that no regex modifier can reach. The +0.1 ms is the price of that decision, and it is only ever paid by a request that would otherwise have been a 404.
 
 ## Mechanism-level results
 
@@ -97,7 +97,7 @@ The mechanisms operate two to three orders of magnitude below the HTTP noise ban
 
 One route opting into `caseInsensitive` adds **+0.02 to +0.09 µs** to the gate, because it then lower-cases the path and walks a second prefix list once the first has missed. Measurable in a tight loop, invisible in a request.
 
-The same opt-in also takes every **404** under a claimed prefix from 1.2 µs to 5.9 µs of matching work, because `getCaseInsensitiveMatcher()` stops returning `null` and a third attempt is made. Under 5 µs in absolute terms, but worth knowing if an installation serves a high volume of 404s inside an [exclusive prefix](CONFIGURATION.md).
+The same opt-in also takes every **404** under a claimed prefix from 1.2 µs to 5.9 µs of matching work, because `getCaseInsensitiveMatcher()` stops returning `null` and a third attempt is made. Under 5 µs in absolute terms, but worth knowing if an installation serves a high volume of 404s inside an [exclusive prefix](../operating/configuration.md#exclusive-path-prefixes).
 
 ### Why the two levels disagree about the fallback
 

@@ -1,53 +1,15 @@
-# Usage
-
-Implement the marker interface [`RouteControllerInterface`](../Classes/Routing/RouteControllerInterface.php) and annotate public methods with [`#[Route]`](../Classes/Attribute/Route.php). No further configuration is needed beyond registering the controller as a service (autoconfiguration in your `Configuration/Services.yaml` is sufficient).
+# The `#[Route]` attribute
 
 ```php
-use KonradMichalik\Typo3Routing\Attribute\Route;
-use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
-use TYPO3\CMS\Core\Http\JsonResponse;
-
-final readonly class CourseSearchController implements RouteControllerInterface
-{
-    public function __construct(/* … injected services … */) {}
-
-    #[Route(path: '/api/course-search/count', name: 'course_search_count')]
-    public function count(): ResponseInterface
-    {
-        return new JsonResponse(['count' => 42]);
-    }
-}
+#[Route(path: '/api/courses/{id}', name: 'course_show', requirements: ['id' => '\d+'])]
+public function show(int $id): ResponseInterface { /* … */ }
 ```
 
-A controller method declares **only the parameters it needs** — there is no fixed signature. Type-hint `ServerRequestInterface` to receive the request; everything else is resolved by name from the route (see [Typed arguments](ARGUMENTS.md)).
-
-## Contents
-
-- [The `#[Route]` attribute](#the-route-attribute)
-- [Priority](#priority)
-- [Defaults (optional placeholders)](#defaults-optional-placeholders)
-- [Schemes](#schemes)
-- [Host](#host)
-  - [Wildcards and multiple hosts](#wildcards-and-multiple-hosts)
-- [Description](#description)
-- [Deprecating a route](#deprecating-a-route)
-- [Case-insensitive paths](#case-insensitive-paths)
-- [Class-level prefix (route groups)](#class-level-prefix-route-groups)
-- [Requirements](#requirements)
-  - [Named requirement patterns](#named-requirement-patterns)
-- [Error responses from controllers](#error-responses-from-controllers)
-
-How a controller method's signature is fed from the request — type coercion, enums, entity binding, variadics and `#[Param]` — is covered in [Typed controller arguments](ARGUMENTS.md).
-
-## The `#[Route]` attribute
-
-The attribute is repeatable. Its parameters:
+[`#[Route]`](../../Classes/Attribute/Route.php) on a public method of a [route controller](README.md) is what makes an endpoint exist — see [Defining routes](README.md) for the three things a controller needs. The attribute is **repeatable**, so one method can answer several paths, and it may additionally sit on the class as a [shared prefix](#class-level-prefix-route-groups).
 
 | Parameter      | Type                    | Default   | Description                                                              |
 |----------------|-------------------------|-----------|--------------------------------------------------------------------------|
-| `path`         | `string`                | –         | Full request path, relative to the site base (e.g. `/api/...`). A trailing slash is tolerated in either direction unless that is switched off — see [Trailing slashes](CONFIGURATION.md#trailing-slashes). |
+| `path`         | `string`                | –         | Full request path, relative to the site base (e.g. `/api/...`). A trailing slash is tolerated in either direction unless that is switched off — see [Trailing slashes](../operating/configuration.md#trailing-slashes). |
 | `methods`      | `list<string>`          | `['GET']` | Allowed HTTP methods.                                                    |
 | `name`         | `?string`               | `null`    | Route name; auto-derived from service id + method when omitted.          |
 | `env`          | `?string`               | `null`    | Bind the route to a top-level application context (e.g. `Development`).  |
@@ -58,7 +20,12 @@ The attribute is repeatable. Its parameters:
 | `host`         | `?string`               | `null`    | Restrict the route to a specific hostname (e.g. `'api.example.com'`); null = any host. See below. |
 | `description`  | `?string`               | `null`    | Human-readable summary of what the endpoint does; surfaced in `routing:debug` and the OpenAPI export. See below. |
 | `caseInsensitive` | `?bool`              | `null`    | Match the path's and host's literal segments regardless of case. See below. |
-| `exclusive`    | `?bool`                 | `null`    | Claim the class's own route prefix exclusively: an unmatched path under it becomes a 404 instead of falling through to a page. Class-level only — a method-level value is a build-time error. See [Exclusive path prefixes](CONFIGURATION.md#exclusive-path-prefixes). |
+| `exclusive`    | `?bool`                 | `null`    | Claim the class's own route prefix exclusively: an unmatched path under it becomes a 404 instead of falling through to a page. Class-level only — a method-level value is a build-time error. See [Exclusive class-level claim](route-groups.md#exclusive-class-level-claim). |
+| `canonical`    | `?bool`                 | `null`    | Redirect a request that only matched a tolerated variant of this path (trailing slash, or case) to the declared path with a `308`. See [Redirecting instead of tolerating](#redirecting-instead-of-tolerating). |
+| `sites`        | `?list<string>`         | `null`    | Site identifiers this route is reachable from; out of scope answers a 404. See [Site- and language-bound routes](#site--and-language-bound-routes). |
+| `languages`    | `?list<int>`            | `null`    | Language ids this route is reachable in; out of scope answers a 404. See [Site- and language-bound routes](#site--and-language-bound-routes). |
+
+Each parameter that needs more than a table row has its own section below. What is *not* on this page: how the controller method's signature is fed from the request — type coercion, enums, entity binding, variadics and `#[Param]` — which is [Typed controller arguments](arguments.md).
 
 ## Priority
 
@@ -88,7 +55,7 @@ The default flows through everywhere the placeholder does: it is available as a 
 
 Keys starting with `_` are reserved for internal metadata and are rejected at build time.
 
-Instead of repeating the placeholder name in `defaults`, a [`#[Param]`](ARGUMENTS.md#declaring-the-constraint-at-the-parameter) on the parameter contributes its PHP default — `public function blog(#[Param] int $page = 1)` makes the trailing `{page}` optional without a `defaults` entry.
+Instead of repeating the placeholder name in `defaults`, a [`#[Param]`](arguments.md#declaring-the-constraint-at-the-parameter) on the parameter contributes its PHP default — `public function blog(#[Param] int $page = 1)` makes the trailing `{page}` optional without a `defaults` entry.
 
 ## Schemes
 
@@ -114,7 +81,7 @@ public function status(): ResponseInterface { /* … */ }
 
 A request from a different host gets the same `404 Not Found` as an unmatched path. `{routing:uri(route: 'api_status')}` generates a full absolute URL when the current request's host differs, for the same reason as `schemes` above.
 
-`host` is a **matching filter, not an authorization boundary** — use [`#[Authenticate]`](AUTHENTICATION.md) for access control. It is matched against the request's URI host, the same source TYPO3's own `trustedHostsPattern` validates upstream of this middleware.
+`host` is a **matching filter, not an authorization boundary** — use [`#[Authenticate]`](../features/authentication.md) for access control. It is matched against the request's URI host, the same source TYPO3's own `trustedHostsPattern` validates upstream of this middleware.
 
 ### Wildcards and multiple hosts
 
@@ -143,7 +110,7 @@ A human-readable summary of what the endpoint does — not derived from PHPDoc, 
 public function show(int $id): ResponseInterface { /* … */ }
 ```
 
-It shows up in `routing:debug` (truncated in the table, full in `--json` and the detail view) and in the OpenAPI export (see [OpenAPI](HOW-IT-WORKS.md#openapi-export)): a description with more than one sentence has its first sentence split off as the operation `summary`, the full text stays the `description`.
+It shows up in `routing:debug` (truncated in the table, full in `--json` and the detail view) and in the OpenAPI export (see [OpenAPI](../operating/openapi.md)): a description with more than one sentence has its first sentence split off as the operation `summary`, the full text stays the `description`.
 
 ## Deprecating a route
 
@@ -173,7 +140,7 @@ Every response the route produces — success, a cached hit, a conditional `304`
 
 The same declaration also sets `deprecated: true` on the OpenAPI operation, and shows in `routing:debug` (detail view and `--json`; `--deprecated` filters the table to only these routes).
 
-At class level, `#[DeprecatedRoute]` applies to every method route without its own — same rule as [`#[Cors]`](CONFIGURATION.md#per-route-overrides-with-cors) and `description` above; a method's own attribute wins entirely rather than merging field by field. There is no `410 Gone` after `sunset` passes: [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) is explicit that deprecation is a hint, and turning an endpoint off has to stay a deliberate, separate act.
+At class level, `#[DeprecatedRoute]` applies to every method route without its own — same rule as [`#[Cors]`](../features/cors.md#per-route-overrides-with-cors) and `description` above; a method's own attribute wins entirely rather than merging field by field. There is no `410 Gone` after `sunset` passes: [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) is explicit that deprecation is a hint, and turning an endpoint off has to stay a deliberate, separate act.
 
 ## Case-insensitive paths
 
@@ -193,8 +160,8 @@ public function show(string $slug): ResponseInterface { /* … */ }
 Three things this deliberately does **not** do:
 
 - **Placeholder values are never folded.** The tolerance covers the path's literal segments only, so `{slug}` reaches the controller exactly as it was sent. Lower-casing the whole path would silently corrupt identifiers.
-- **`requirements` stay case-sensitive.** `['slug' => '[a-z-]+']` still rejects `Intro-To-Php`, opted in or not. The tolerance is about finding the route, never about relaxing its constraints. Since the client just sees a `404`, [`routing:match`](HOW-IT-WORKS.md#match-simulation-command) reports this case separately instead of claiming no route matched.
-- **No redirect is issued by default.** Both forms answer directly, exactly as with [trailing slashes](CONFIGURATION.md#trailing-slashes). Add `#[Route(canonical: true)]` to redirect a differently-cased request to the declared path instead, see [Redirecting instead of tolerating](CONFIGURATION.md#redirecting-instead-of-tolerating).
+- **`requirements` stay case-sensitive.** `['slug' => '[a-z-]+']` still rejects `Intro-To-Php`, opted in or not. The tolerance is about finding the route, never about relaxing its constraints. Since the client just sees a `404`, [`routing:match`](../operating/commands.md#routingmatch) reports this case separately instead of claiming no route matched.
+- **No redirect is issued by default.** Both forms answer directly, exactly as with [trailing slashes](../operating/configuration.md#trailing-slashes). Add `#[Route(canonical: true)]` to redirect a differently-cased request to the declared path instead, see [Redirecting instead of tolerating](#redirecting-instead-of-tolerating).
 
 Generated URLs (`{routing:uri(...)}`, `RouteUrlGenerator`) always use the declared casing.
 
@@ -202,48 +169,40 @@ Nothing is opted in by default, and the extra matching pass runs only after the 
 
 The same opt-in applies to [`host`](#host)'s literal labels: a route combining `caseInsensitive: true` with a `host` constraint also accepts mixed-case host input. Host placeholders and their `requirements` are unaffected, same as for path placeholders above.
 
-## Class-level prefix (route groups)
+## Redirecting instead of tolerating
 
-Placing `#[Route]` on the **controller class** turns it into a prefix shared by every method route — handy for grouping related endpoints or versioning an API (`/api/v1`, `/api/v2`). At most one class-level `#[Route]` is allowed.
+Answering both forms directly is right for API clients, who should not pay a second round trip. For a route serving HTML or a download, the same tolerance produces two URLs for one resource, which fragments caches and splits search ranking. `#[Route(canonical: true)]` opts a route into the other behaviour: a request that only matched a tolerated variant (trailing slash, or case via `caseInsensitive`) gets a `308 Permanent Redirect` to the declared path instead of the response.
 
 ```php
-use KonradMichalik\Typo3Routing\Attribute\Route;
-use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
-
-#[Route(path: '/api/v1/courses', name: 'v1_courses_', requirements: ['id' => '\d+'])]
-final class CourseController implements RouteControllerInterface
-{
-    // → GET /api/v1/courses/{id}, route name "v1_courses_course_show"
-    #[Route(path: '/{id}', name: 'course_show')]
-    public function show(int $id): ResponseInterface { /* … */ }
-
-    // → GET /api/v1/courses, route name "v1_courses_course_list"
-    #[Route(path: '', name: 'course_list')]
-    public function list(): ResponseInterface { /* … */ }
-}
+#[Route(path: '/downloads/report', name: 'report', canonical: true)]
 ```
 
-How the class-level values combine with each method:
+```text
+/downloads/report      →  served directly
+/downloads/report/     →  308 → /downloads/report
+```
 
-| Parameter      | Combination                                                                                   |
-|----------------|-----------------------------------------------------------------------------------------------|
-| `path`         | Class path is **prepended** to each method path.                                              |
-| `name`         | Class name is **prepended** to each resolved method name (auto-derived name still applies).   |
-| `env`          | Used as the **default** for methods that do not set their own `env`; a method `env` wins.     |
-| `requirements` | **Merged** with method requirements; the method wins per key.                                 |
-| `defaults`     | **Merged** with method defaults; the method wins per key.                                     |
-| `methods`      | **Ignored** at class level — the method default (`['GET']`) is indistinguishable from "unset". |
-| `description`  | Used as the **default** for methods that do not set their own `description`; a method `description` wins. |
-| `caseInsensitive` | Used as the **default** for methods that do not set their own value; a method can opt back out with `false`. |
-| `exclusive`    | **Class-level only** — a value on a method-level `#[Route]` is a build-time error.             |
+`308` rather than `301` or `302`, because it preserves the request method and body — a tolerated `POST` is never silently downgraded to `GET`. A route with placeholders redirects to the concrete resolved path, never to the `{id}` template, and the query string carries over unchanged. `405` still wins over the redirect: a path that matches with the wrong method answers `405` regardless of which variant it was. Nullable and class-level inheritance work exactly like `caseInsensitive`. Not opting in (the default) keeps today's behaviour: both forms answered directly, no redirect.
 
-### Sharing routes through an abstract base controller
+## Site- and language-bound routes
 
-Route discovery reflects the concrete controller's public methods, including ones inherited from a parent class, so an abstract base controller can declare the route methods once while each concrete subclass supplies only its own class-level prefix.
+`sites` and `languages` scope a route to a subset of the installation the same way `env` scopes it to an application context: out of scope means the route behaves as if it does not exist (`404`), checked at match time against the request's `site`/`language` attributes.
 
-A method path of `''` (e.g. `#[Route(path: '', name: 'course_list')]` above) needs the class-level prefix to resolve to something non-empty. Without a class prefix, `path` would resolve to the empty string, which Symfony silently normalizes to `/` — claiming the site's root ahead of TYPO3's own page rendering. The compiler pass rejects this at build time.
+```php
+#[Route(path: '/api/shop/orders', name: 'shop_orders', sites: ['shop-de', 'shop-at'])]
+public function orders(): ResponseInterface { /* … */ }
 
-PHP does not carry method attributes onto an override, so overriding an inherited route method without repeating its `#[Route]` silently removes that route, and repeating `#[Route]` while dropping a modifier such as `#[Authenticate]` silently removes only that modifier. Both are caught at build time with a warning naming the overriding method and the parent method it overrides; a controller that ends up with no route at all (for example because every inherited route method was overridden this way) is warned about separately.
+#[Route(path: '/api/example/localized', name: 'example_localized', languages: [0, 1])]
+public function localized(): ResponseInterface { /* … */ }
+```
+
+- **`sites`** takes site identifiers exactly as configured under `config/sites/<identifier>/config.yaml`. An identifier that names no configured site is not rejected at build time (site configuration cannot be read reliably while the container builds, and the check would go stale the moment a site is renamed) — it is reported once per distinct list, as a runtime warning, regardless of whether it happens to match the current request's site.
+- **`languages`** takes language ids as configured per site.
+- Both default to `null`, meaning every site/language; a class-level `#[Route]` sets the default for methods that do not set their own (same inheritance rule as `caseInsensitive`).
+
+## Class-level prefix (route groups)
+
+The attribute may also sit on the **controller class**, where its `path` and `name` prefix every method route and most other parameters supply a default. That has its own page: [Route groups](route-groups.md).
 
 ## Requirements
 
@@ -252,7 +211,7 @@ PHP does not carry method attributes onto an override, so overriding an inherite
 - **Path placeholders** (a name that appears as `{name}` in the path) are enforced by the **matcher**: a violating path is treated as no match → **404**.
 - **Any other name** is a required **query or POST-body** parameter, validated at **dispatch**: missing or format-violating → **400**, before your controller runs. (`''` means presence only.)
 
-A constraint can equivalently be written on the parameter itself with [`#[Param(requirement:)]`](ARGUMENTS.md#declaring-the-constraint-at-the-parameter) — which additionally allows an *optional but constrained* parameter.
+A constraint can equivalently be written on the parameter itself with [`#[Param(requirement:)]`](arguments.md#declaring-the-constraint-at-the-parameter) — which additionally allows an *optional but constrained* parameter.
 
 ```php
 #[Route(

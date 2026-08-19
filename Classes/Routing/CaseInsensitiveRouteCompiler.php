@@ -18,7 +18,7 @@ use Symfony\Component\Routing\{CompiledRoute, Route, RouteCompiler};
 /**
  * CaseInsensitiveRouteCompiler.
  *
- * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+ * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */

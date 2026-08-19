@@ -39,7 +39,7 @@ final readonly class JsonSchemaMapper
 {
     /**
      * Turns an argument's `type` (as `RouteRegistry::getArguments()` reports it) into a JSON Schema
-     * fragment. docs/EXTENDING.md documents the resulting schema per type, and the BC promise.
+     * fragment. docs/background/extending.md documents the resulting schema per type, and the BC promise.
      *
      * @param string|null $type    a scalar name (`int`, `float`, `bool`, `array`, `mixed`, `string`), a
      *                             `class-string<UnitEnum>` of a **backed** enum, a

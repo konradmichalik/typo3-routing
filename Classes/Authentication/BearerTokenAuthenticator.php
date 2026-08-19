@@ -41,7 +41,7 @@ final readonly class BearerTokenAuthenticator implements RouteAuthenticatorInter
     /**
      * Reads the token from the "Authorization" header, falling back to the
      * REDIRECT_HTTP_AUTHORIZATION server param when Apache/mod_proxy_fcgi has stripped
-     * the header (see docs/AUTHENTICATION.md).
+     * the header (see docs/features/authentication.md).
      */
     public function authenticate(ServerRequestInterface $request, array $options = []): bool
     {

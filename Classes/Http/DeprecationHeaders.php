@@ -62,7 +62,7 @@ final readonly class DeprecationHeaders
 
         $links = $this->links($request, $deprecation);
 
-        return [] === $links ? $response : $response->withHeader('Link', implode(', ', $links));
+        return [] === $links ? $response : $response->withAddedHeader('Link', implode(', ', $links));
     }
 
     /**

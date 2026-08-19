@@ -123,6 +123,19 @@ final class DeprecationHeadersTest extends TestCase
         self::assertSame('', $response->getHeaderLine('Link'));
     }
 
+    #[Test]
+    public function preservesAnExistingLinkHeaderInsteadOfReplacingIt(): void
+    {
+        $response = (new Response('php://temp', 200))->withHeader('Link', '</items?page=2>; rel="next"');
+        $decorated = $this->decorator(['v1' => ['since' => 1, 'sunset' => null, 'successor' => null, 'documentation' => 'https://example.com/migrate']])
+            ->decorate($response, $this->request(), 'v1');
+
+        self::assertSame(
+            '</items?page=2>; rel="next",<https://example.com/migrate>; rel="deprecation"',
+            $decorated->getHeaderLine('Link'),
+        );
+    }
+
     /**
      * @param array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}>                               $deprecations
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes

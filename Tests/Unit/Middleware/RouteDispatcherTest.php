@@ -578,6 +578,76 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function redirectsALegacyPathToTheDeclaredPathByDefault(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/old-name'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/renamed', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function redirectsALegacyPlaceholderPathToTheConcretePathNotTheTemplate(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/old-item/42'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('/api/renamed-item/42', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function usesA308RedirectForALegacyPathSoAPostIsNotDowngraded(): void
+    {
+        $response = $this->dispatch($this->request('POST', 'https://example.com/api/old-name'));
+
+        self::assertSame(308, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function doesNotRedirectTheDeclaredPathOfARouteWithALegacyPath(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/renamed'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function methodNotAllowedTakesPrecedenceOverALegacyPathRedirect(): void
+    {
+        $response = $this->dispatch($this->request('DELETE', 'https://example.com/api/old-name'));
+
+        self::assertSame(405, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function anAliasedLegacyPathAnswersDirectlyWithoutARedirect(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/old-aliased'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertFalse($response->hasHeader('Location'));
+    }
+
+    #[Test]
+    public function aLegacyPathRequestCarriesTheOwningRoutesDeprecationHeaders(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/old-deprecated'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('@1700000000', $response->getHeaderLine('Deprecation'));
+    }
+
+    #[Test]
+    public function aSiteScopedRoutesLegacyPathStaysOutOfScopeTooThroughItsLegacyPath(): void
+    {
+        // The fixture request's site is "main"; the route (and thus its legacy path) is scoped to
+        // "other-site" — proving the legacy-path entry carries the owning route's site scope too.
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/old-scoped-renamed'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
     public function fallsBackToDefaultPrefixWhenExtensionConfigurationThrows(): void
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -1189,7 +1259,7 @@ final class RouteDispatcherTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, sites?: list<string>, languages?: list<int>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, sites?: list<string>, languages?: list<int>, legacyPaths?: list<string>, legacyAlias?: bool}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'vaCount' => ['path' => '/va/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
@@ -1219,6 +1289,11 @@ final class RouteDispatcherTest extends TestCase
             'scopedSiteOther' => ['path' => '/api/scoped-site-other', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'sites' => ['other-site']],
             'scopedLanguage' => ['path' => '/api/scoped-language', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'languages' => [0]],
             'scopedLanguageOther' => ['path' => '/api/scoped-language-other', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'languages' => [1]],
+            'renamed' => ['path' => '/api/renamed', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/old-name']],
+            'renamedItem' => ['path' => '/api/renamed-item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+'], 'legacyPaths' => ['/api/old-item/{id}']],
+            'aliasedLegacy' => ['path' => '/api/aliased', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/old-aliased'], 'legacyAlias' => true],
+            'deprecatedRenamed' => ['path' => '/api/deprecated-renamed', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/old-deprecated'], 'legacyAlias' => true],
+            'scopedRenamed' => ['path' => '/api/scoped-renamed', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'sites' => ['other-site'], 'legacyPaths' => ['/api/old-scoped-renamed'], 'legacyAlias' => true],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -1270,6 +1345,10 @@ final class RouteDispatcherTest extends TestCase
             'scopedSiteOther' => [],
             'scopedLanguage' => [],
             'scopedLanguageOther' => [],
+            'renamed' => [],
+            'renamedItem' => [$id],
+            'aliasedLegacy' => [],
+            'scopedRenamed' => [],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
@@ -1290,6 +1369,7 @@ final class RouteDispatcherTest extends TestCase
         $deprecations = [
             'cached' => ['since' => 1700000000, 'sunset' => 1800000000, 'successor' => 'count', 'documentation' => null],
             'guarded' => ['since' => 1700000000, 'sunset' => null, 'successor' => null, 'documentation' => null],
+            'deprecatedRenamed' => ['since' => 1700000000, 'sunset' => null, 'successor' => null, 'documentation' => null],
         ];
 
         $locator = new ServiceLocator([

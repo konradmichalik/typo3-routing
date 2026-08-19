@@ -49,6 +49,8 @@ final readonly class Route
      * @param list<string>|null     $sites           Site identifiers (as configured per-site in config.yaml under config/sites) this route is reachable from; null/empty = every site. Out of scope yields the same 404 as an unmatched path. An unknown identifier is never rejected at build time (site configuration is not reliably readable while the container builds, and would go stale the moment a site is renamed) — it is reported at runtime and by `routing:lint` instead. null = not set, inheriting the class-level value. At class level: default for methods without their own.
      * @param list<int>|null        $languages       Language ids this route is reachable in; null/empty = every language. Out of scope yields the same 404 as an unmatched path. null = not set, inheriting the class-level value. At class level: default for methods without their own.
      * @param list<string>          $aliases         Alternate name(s) this route also resolves under for URL generation (RouteUrlGenerator, `{routing:uri}`/`{routing:uris}`). Never matches a request path, and never appears in `routing:debug` or the OpenAPI export as a route of its own. An alias colliding with an existing route name, or declared by two routes, fails the container build. At class level: prefixed the same way `name` is.
+     * @param list<string>          $legacyPaths     Old paths (e.g. from before a rename) that still reach this same route. By default a legacy path answers `308 Permanent Redirect` to the declared path, exactly like `canonical`; set `legacyAlias: true` to answer directly instead, for clients that cannot follow redirects. Never appears in `routing:debug`, the OpenAPI export, or generated URLs — only the declared path is canonical. Not inherited from a class-level #[Route] (same rule as `methods`).
+     * @param bool                  $legacyAlias     When true, every path in `legacyPaths` answers directly instead of redirecting. Has no effect without `legacyPaths`. Not inherited from a class-level #[Route] (same rule as `methods`).
      */
     public function __construct(
         public string $path,
@@ -68,5 +70,7 @@ final readonly class Route
         public ?array $sites = null,
         public ?array $languages = null,
         public array $aliases = [],
+        public array $legacyPaths = [],
+        public bool $legacyAlias = false,
     ) {}
 }

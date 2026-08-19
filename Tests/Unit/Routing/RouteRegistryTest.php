@@ -365,6 +365,91 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function derivesLegacyRouteEntriesOnePerLegacyPath(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, legacyPaths?: list<string>}> $routes */
+        $routes = [
+            'v2' => ['path' => '/api/v2', 'methods' => ['GET'], 'controller' => 'ctrl::v2', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/v1', '/api/v0']],
+        ];
+
+        $legacy = RouteRegistry::legacyRoutes($routes);
+
+        self::assertCount(2, $legacy);
+        $paths = array_column($legacy, 'path');
+        self::assertContains('/api/v1', $paths);
+        self::assertContains('/api/v0', $paths);
+    }
+
+    /**
+     * A legacy path must stay out of scope wherever its owning route is: without this, a
+     * site/language-scoped route would leak back into scope everywhere through its old path.
+     */
+    #[Test]
+    public function derivesLegacyRouteEntriesCarryingTheOwningRoutesSiteAndLanguageScope(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, sites?: list<string>, languages?: list<int>, legacyPaths?: list<string>}> $routes */
+        $routes = [
+            'scoped' => ['path' => '/api/scoped', 'methods' => ['GET'], 'controller' => 'ctrl::scoped', 'env' => null, 'requirements' => [], 'sites' => ['main'], 'languages' => [0], 'legacyPaths' => ['/api/old-scoped']],
+        ];
+
+        $legacy = RouteRegistry::legacyRoutes($routes);
+
+        self::assertSame(['main'], $legacy['_legacy_scoped_0']['sites']);
+        self::assertSame([0], $legacy['_legacy_scoped_0']['languages']);
+    }
+
+    /**
+     * The registry's own matcher reports the synthetic entry name, carrying the real owner in
+     * `_legacyOf` as an ordinary route default — RouteMatcher is the one that rewrites `_route` back to
+     * it, since only the dispatcher-facing contract needs that rewrite.
+     */
+    #[Test]
+    public function aLegacyPathMatchesAndCarriesItsOwningRouteNameInLegacyOf(): void
+    {
+        $matcher = $this->legacyRegistry()->getLegacyMatcher($this->getContext());
+
+        self::assertNotNull($matcher);
+        $match = $matcher->match('/api/legacy-count');
+
+        self::assertSame('fixture_count', $match['_legacyOf']);
+        self::assertSame('fixture_controller::count', $match['_controller']);
+    }
+
+    #[Test]
+    public function aRegistryWithoutAnyLegacyPathHasNoLegacyMatcher(): void
+    {
+        self::assertNull($this->createRegistry()->getLegacyMatcher($this->getContext()));
+    }
+
+    #[Test]
+    public function derivesTheLegacyPrefixesFromTheDeclaredLegacyPathsOnly(): void
+    {
+        self::assertSame(['/api/legacy-count'], $this->legacyRegistry()->getLegacyPrefixes());
+    }
+
+    #[Test]
+    public function exposesTheLegacyPrefixesBakedInAtCompileTime(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), legacyPrefixes: ['/baked/']);
+
+        self::assertSame(['/baked/'], $registry->getLegacyPrefixes());
+    }
+
+    #[Test]
+    public function exposesWhetherARouteOptedIntoTheLegacyAlias(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, legacyAlias?: bool}> $routes */
+        $routes = [
+            'aliased' => ['path' => '/api/aliased', 'methods' => ['GET'], 'controller' => 'ctrl::aliased', 'env' => null, 'requirements' => [], 'legacyAlias' => true],
+            'redirected' => ['path' => '/api/redirected', 'methods' => ['GET'], 'controller' => 'ctrl::redirected', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        self::assertTrue($registry->isLegacyAlias('aliased'));
+        self::assertFalse($registry->isLegacyAlias('redirected'));
+    }
+
+    #[Test]
     public function matcherResolvesAKnownPath(): void
     {
         $context = new RequestContext();
@@ -765,6 +850,16 @@ final class RouteRegistryTest extends TestCase
             'fixture_strict' => ['path' => '/api/strict', 'methods' => ['GET'], 'controller' => 'ctrl::strict', 'env' => null, 'requirements' => []],
             'fixture_loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'fixture_loose_item' => ['path' => '/api/loose/{slug}', 'methods' => ['GET'], 'controller' => 'ctrl::looseItem', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
+        ];
+
+        return new RouteRegistry($routes, new ServiceLocator([]));
+    }
+
+    private function legacyRegistry(): RouteRegistry
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, legacyPaths?: list<string>}> $routes */
+        $routes = [
+            'fixture_count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'fixture_controller::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/legacy-count']],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

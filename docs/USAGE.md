@@ -177,10 +177,10 @@ At class level, `#[DeprecatedRoute]` applies to every method route without its o
 
 ## Case-insensitive paths
 
-URL paths are case-sensitive by [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-6.2.2.1), and that is the default here. A single route can opt out, for instance when a legacy client or a hand-typed URL varies the casing:
+URL paths are case-sensitive by [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-6.2.2.1), and that is the default here. A single route can opt into case-insensitive matching, for instance when a legacy client or a hand-typed URL varies the casing:
 
 ```php
-#[Route(path: '/api/courses/{slug}', name: 'course_show', caseInsensitive: true)]
+#[Route(path: '/api/courses/{slug}', name: 'course_show_slug', caseInsensitive: true)]
 public function show(string $slug): ResponseInterface { /* … */ }
 ```
 

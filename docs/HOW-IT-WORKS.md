@@ -70,7 +70,7 @@ A match prints the route name, controller, resolved path parameters and — for 
 One miss gets its own report, because `No route matches` would be misleading: a [case-insensitive route](USAGE.md#case-insensitive-paths) whose path was found but whose `requirements` then rejected a placeholder value.
 
 ```text
- [WARNING] Path "/API/Courses/Intro-To-Php" matches route "course_show", but the
+ [WARNING] Path "/API/Courses/Intro-To-Php" matches route "course_show_slug", but the
            value "Intro-To-Php" for parameter "slug" does not satisfy its
            requirement "[a-z-]+".
 

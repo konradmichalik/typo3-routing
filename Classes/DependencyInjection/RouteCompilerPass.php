@@ -26,6 +26,8 @@ use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
 
 use function array_intersect;
 use function array_map;
+use function array_unique;
+use function array_values;
 use function count;
 use function in_array;
 use function is_a;
@@ -73,6 +75,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private ClassExistenceChecker $classExistenceChecker = new ClassExistenceChecker(),
         private CompilerWarnings $compilerWarnings = new CompilerWarnings(),
         private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
+        private ClassExclusiveResolver $classExclusiveResolver = new ClassExclusiveResolver(),
     ) {}
 
     #[Override]
@@ -92,8 +95,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $hasRoute = $this->collectController(new ReflectionClass($class), $serviceId, $container, $collected);
-            $this->compilerWarnings->warnIfControllerHasNoRoute($hasRoute, $serviceId, RouteControllerInterface::class);
+            ['hasRoute' => $hasRoute, 'hasExclusiveClaim' => $hasExclusiveClaim] = $this->collectController(new ReflectionClass($class), $serviceId, $container, $collected);
+            // A class-level exclusive claim with no method route is a deliberate pattern (see
+            // RoutelessExclusiveController), not the "forgotten #[Route]" mistake the warning targets.
+            $this->compilerWarnings->warnIfControllerHasNoRoute($hasRoute || $hasExclusiveClaim, $serviceId, RouteControllerInterface::class);
             if ($hasRoute) {
                 // Keep the controller fetchable from the locator even though it stays a private service.
                 $controllerReferences[$serviceId] = new Reference($serviceId);
@@ -122,6 +127,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         // Compiled separately: the gate has to open for these in every casing, and the case-insensitive
         // compilation itself carries no usable prefix.
         $registry->setArgument('$caseInsensitivePrefixes', RouteRegistry::staticPrefixes(RouteRegistry::buildCollection(RouteRegistry::caseInsensitiveRoutes($collected->routes))));
+        // A class's own exclusive claim, one entry per opted-in class regardless of how many routes it
+        // declares — recorded independently in $collected->classExclusivePrefixes (not derived from
+        // $collected->routes), so a class with no method routes yet still keeps its claim.
+        $registry->setArgument('$classExclusivePrefixes', array_values(array_unique($collected->classExclusivePrefixes)));
     }
 
     /**
@@ -156,11 +165,15 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
     /**
      * @param ReflectionClass<object> $reflection
+     *
+     * @return array{hasRoute: bool, hasExclusiveClaim: bool}
      */
-    private function collectController(ReflectionClass $reflection, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
+    private function collectController(ReflectionClass $reflection, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): array
     {
         $classRoute = $this->resolveClassRoute($reflection, $serviceId);
         $classCors = $this->corsResolver->resolveClass($reflection);
+        $classExclusivePrefix = $this->classExclusiveResolver->resolvePrefix($classRoute, $serviceId);
+        $collected->recordClassExclusivePrefix($classExclusivePrefix);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -168,10 +181,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors) || $found;
+            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix) || $found;
         }
 
-        return $found;
+        return ['hasRoute' => $found, 'hasExclusiveClaim' => null !== $classExclusivePrefix];
     }
 
     /**
@@ -193,7 +206,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         return $attributes[0]->newInstance();
     }
 
-    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors): bool
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix): bool
     {
         $overriddenRouteMethod = $this->compilerWarnings->findOverriddenRouteMethod($method, Route::class);
         $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
@@ -213,7 +226,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->compilerWarnings->warnIfAModifierWasDropped($overriddenRouteMethod, $method, $serviceId, self::MODIFIER_ATTRIBUTES);
 
         foreach ($routeAttributes as $attribute) {
-            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $collected, $classRoute);
+            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $collected, $classRoute, $classExclusivePrefix);
         }
 
         return true;
@@ -244,8 +257,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
-    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute): void
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
     {
+        $this->classExclusiveResolver->assertNotOnMethod($route, $method, $serviceId);
+
         // Class-level #[Route] prefixes the path/name, defaults the env and provides base requirements.
         $namePrefix = '';
         $pathPrefix = '';
@@ -298,6 +313,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             'description' => $route->description ?? $classRoute?->description,
             'caseInsensitive' => $caseInsensitive ?? false,
             'tags' => $tags ?? [],
+            'classExclusivePrefix' => $classExclusivePrefix,
         ];
         $collected->arguments[$name] = $arguments;
 

@@ -24,7 +24,7 @@ use Symfony\Component\DependencyInjection\Reference;
  */
 final class CollectedRoutes
 {
-    /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}> */
+    /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null}> */
     public array $routes = [];
 
     /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> */
@@ -53,4 +53,27 @@ final class CollectedRoutes
 
     /** @var array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}> */
     public array $corsConfigs = [];
+
+    /**
+     * Every opted-in class's own exclusive prefix, recorded as soon as it is resolved — independent
+     * of whether the class ends up contributing any route at all. Deriving this from $routes instead
+     * would silently drop a class that declares #[Route(exclusive: true)] but has no method routes.
+     *
+     * @var list<string>
+     */
+    public array $classExclusivePrefixes = [];
+
+    /**
+     * Kept here rather than inlined at the call site: a compiler pass with dozens of small collection
+     * steps stays within its own cognitive-complexity budget only by pushing each step's own branching
+     * onto the object that owns the data, not by accumulating every "if resolved, record it" check.
+     */
+    public function recordClassExclusivePrefix(?string $prefix): void
+    {
+        if (null === $prefix) {
+            return;
+        }
+
+        $this->classExclusivePrefixes[] = $prefix;
+    }
 }

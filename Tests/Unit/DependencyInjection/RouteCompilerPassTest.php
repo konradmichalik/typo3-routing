@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathNoPrefixController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, RoutelessExclusiveController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -169,6 +169,28 @@ final class RouteCompilerPassTest extends TestCase
         (new RouteCompilerPass())->process($container);
 
         self::assertSame(['/api/loose/inherited'], $container->getDefinition(RouteRegistry::class)->getArgument('$caseInsensitivePrefixes'));
+    }
+
+    #[Test]
+    public function bakesTheClassExclusivePrefixesIntoTheRegistry(): void
+    {
+        $container = $this->buildContainer(['exclusive' => ExclusiveController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        self::assertSame(['/api/exclusive/'], $container->getDefinition(RouteRegistry::class)->getArgument('$classExclusivePrefixes'));
+    }
+
+    /**
+     * The claim is recorded independently of $routes: a class contributing no method route at all must
+     * not lose it just because there is nothing else to carry it.
+     */
+    #[Test]
+    public function bakesTheClassExclusivePrefixOfAControllerWithNoMethodRoutes(): void
+    {
+        $container = $this->buildContainer(['no_routes' => RoutelessExclusiveController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        self::assertSame(['/api/no-routes/'], $container->getDefinition(RouteRegistry::class)->getArgument('$classExclusivePrefixes'));
     }
 
     #[Test]
@@ -690,6 +712,51 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function throwsWhenExclusiveIsSetOnAMethodLevelRoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionMessageMatches('/has no effect on a method route/');
+
+        $this->discover($this->buildContainer(['method_exclusive' => MethodLevelExclusiveController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenAnExclusiveClassPathHasNoStaticPrefix(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionMessageMatches('/claim every unmatched path site-wide/');
+
+        $this->discover($this->buildContainer(['placeholder_exclusive' => PlaceholderExclusiveController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenAnExclusiveClassPathIsEmptyOrJustRoot(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000033);
+
+        $this->discover($this->buildContainer(['empty_path_exclusive' => EmptyPathExclusiveController::class]));
+    }
+
+    #[Test]
+    public function flattensTheClassExclusivePrefixOntoEveryRouteOfTheClass(): void
+    {
+        $routes = $this->discover($this->buildContainer(['exclusive' => ExclusiveController::class]));
+
+        self::assertSame('/api/exclusive/', $routes['exclusive_known']['classExclusivePrefix'] ?? null);
+    }
+
+    #[Test]
+    public function leavesTheClassExclusivePrefixNullWithoutTheOptIn(): void
+    {
+        $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
+
+        self::assertNull($routes['fixture_count']['classExclusivePrefix'] ?? null);
+    }
+
+    #[Test]
     public function warnsWhenCacheIsCombinedWithAuthentication(): void
     {
         $container = $this->buildContainer([
@@ -881,13 +948,13 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null}>
      */
     private function discover(ContainerBuilder $container): array
     {
         (new RouteCompilerPass())->process($container);
 
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null}> $routes */
         $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
 
         return $routes;

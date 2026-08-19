@@ -17,6 +17,7 @@ use function array_diff;
 use function array_intersect;
 use function array_map;
 use function count;
+use function preg_match;
 use function sprintf;
 use function str_starts_with;
 use function strtoupper;
@@ -227,7 +228,8 @@ final readonly class RouteLinter
                     continue;
                 }
 
-                if (isset($route['requirements'][$argument['name']])) {
+                $requirement = $route['requirements'][$argument['name']] ?? null;
+                if (null !== $requirement && $this->requirementRejectsNonDigits($requirement)) {
                     continue;
                 }
 
@@ -242,6 +244,21 @@ final readonly class RouteLinter
         }
 
         return $findings;
+    }
+
+    /**
+     * A requirement such as `[a-z]+` or `\w+` still lets a non-numeric segment reach argument coercion;
+     * only a pattern that actually rejects every non-digit probe value protects against the `400`.
+     */
+    private function requirementRejectsNonDigits(string $requirement): bool
+    {
+        foreach (['abc', 'a1b2', '-1', '1.5'] as $nonDigitSample) {
+            if (1 === preg_match('{^(?:'.$requirement.')$}sD', $nonDigitSample)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

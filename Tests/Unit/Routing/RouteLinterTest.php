@@ -226,6 +226,20 @@ final class RouteLinterTest extends TestCase
     }
 
     #[Test]
+    public function flagsAnIntTypedPathArgumentWithANonDigitsRequirement(): void
+    {
+        $registry = $this->registry(
+            ['typed' => ['path' => '/api/typed/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::typed', 'env' => null, 'requirements' => ['id' => '[a-z]+']]],
+            ['typed' => [['name' => 'id', 'type' => 'int', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]]],
+        );
+
+        $findings = (new RouteLinter())->lint($registry);
+
+        self::assertCount(1, $findings);
+        self::assertSame('missing-digits-requirement', $findings[0]['check']);
+    }
+
+    #[Test]
     public function doesNotFlagANonIntOrNonPathArgument(): void
     {
         $registry = $this->registry(

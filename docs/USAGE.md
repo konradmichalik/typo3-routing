@@ -208,6 +208,8 @@ How the class-level values combine with each method:
 
 Route discovery reflects the concrete controller's public methods, including ones inherited from a parent class, so an abstract base controller can declare the route methods once while each concrete subclass supplies only its own class-level prefix.
 
+A method path of `''` (e.g. `#[Route(path: '', name: 'course_list')]` above) needs the class-level prefix to resolve to something non-empty. Without a class prefix, `path` would resolve to the empty string, which Symfony silently normalizes to `/` — claiming the site's root ahead of TYPO3's own page rendering. The compiler pass rejects this at build time.
+
 PHP does not carry method attributes onto an override, so overriding an inherited route method without repeating its `#[Route]` silently removes that route, and repeating `#[Route]` while dropping a modifier such as `#[Authenticate]` silently removes only that modifier. Both are caught at build time with a warning naming the overriding method and the parent method it overrides; a controller that ends up with no route at all (for example because every inherited route method was overridden this way) is warned about separately.
 
 ## Requirements

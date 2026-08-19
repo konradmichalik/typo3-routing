@@ -59,7 +59,7 @@ final class OpenApiGeneratorTest extends TestCase
         $routes = ['x' => ['path' => '/api/x', 'methods' => ['GET'], 'controller' => 'ctrl::x', 'env' => null, 'requirements' => []]];
         $registry = new RouteRegistry($routes, new ServiceLocator([]), deprecations: ['x' => ['since' => 1, 'sunset' => null, 'successor' => null, 'documentation' => null]]);
 
-        $document = (new OpenApiGenerator($registry, new JsonSchemaMapper()))->generate('My API', '2.0.0', '/api/');
+        $document = $this->generator($registry)->generate('My API', '2.0.0', '/api/');
 
         self::assertTrue($document['paths']['/api/x']['get']['deprecated']);
     }

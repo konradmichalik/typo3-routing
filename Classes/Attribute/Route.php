@@ -45,6 +45,7 @@ final readonly class Route
      * @param bool|null             $caseInsensitive Match the path's and, when set, the `host`'s literal segments regardless of case, so /api/Example also answers /API/EXAMPLE. Placeholder VALUES keep their original case and their `requirements` stay case-sensitive. Only consulted after the exact path already failed, so nothing else pays for it. null = not set, inheriting the class-level value (default: case-sensitive). At class level: default for methods without their own.
      * @param list<string>|null     $tags            OpenAPI operation tags, grouping endpoints in Swagger UI and client generators. null/empty falls back to the controller's service id, today's default. null = not set, inheriting the class-level value. At class level: default for methods without their own.
      * @param bool|null             $exclusive       Claim this class's own route prefix exclusively: a request under it that matches none of the class's routes gets a JSON 404 instead of falling through to page rendering. Meaningful only on a class-level #[Route]; setting it on a method-level #[Route] is a build-time error. null = not set (default: not exclusive).
+     * @param bool|null             $canonical       When a request only matched a tolerated variant of this path (trailing slash, or case via `caseInsensitive`), answer `308 Permanent Redirect` to the declared path instead of serving the response directly. `308` preserves method and body. Has no effect on a request that matched the exact declared path. null = not set, inheriting the class-level value (default: answer directly, no redirect). At class level: default for methods without their own.
      */
     public function __construct(
         public string $path,
@@ -60,5 +61,6 @@ final readonly class Route
         public ?bool $caseInsensitive = null,
         public ?array $tags = null,
         public ?bool $exclusive = null,
+        public ?bool $canonical = null,
     ) {}
 }

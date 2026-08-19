@@ -226,6 +226,32 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function detailRendersTheCanonicalOptIn(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_canonical']);
+        self::assertMatchesRegularExpression('/Canonical redirect\s+yes/', $tester->getDisplay());
+
+        $tester->execute(['name' => 'example_count']);
+        self::assertMatchesRegularExpression('/Canonical redirect\s+no/', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function jsonOutputCarriesTheCanonicalOptIn(): void
+    {
+        $tester = $this->tester($this->registry());
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, canonical: bool}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+        $flags = array_column($data, 'canonical', 'name');
+
+        self::assertTrue($flags['example_canonical']);
+        self::assertFalse($flags['example_count']);
+    }
+
+    #[Test]
     public function truncatesLongDescriptionsInTableOutputButNotInJsonOrDetail(): void
     {
         $tester = $this->tester($this->registry());
@@ -399,7 +425,7 @@ final class RouteDebugCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
@@ -407,6 +433,7 @@ final class RouteDebugCommandTest extends TestCase
             'example_any' => ['path' => '/api/example/any', 'methods' => [], 'controller' => 'ctrl::any', 'env' => null, 'requirements' => []],
             'example_loose' => ['path' => '/api/example/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'example_tagged' => ['path' => '/api/example/tagged', 'methods' => ['GET'], 'controller' => 'ctrl::tagged', 'env' => null, 'requirements' => [], 'tags' => ['Tagged']],
+            'example_canonical' => ['path' => '/api/example/canonical', 'methods' => ['GET'], 'controller' => 'ctrl::canonical', 'env' => null, 'requirements' => [], 'canonical' => true],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */

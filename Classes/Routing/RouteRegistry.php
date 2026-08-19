@@ -36,19 +36,19 @@ final class RouteRegistry
     private ?RouteCollection $caseInsensitiveCollection = null;
 
     /**
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null}> $routes
-     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                                                                                                                                           $cacheConfigs
-     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                                                                                                                             $rateLimits
-     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                                                                                                                                 $arguments
-     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                                                                                                    $authenticators
-     * @param array<string, string>                                                                                                                                                                                                                                                                                                                         $requestTokenScopes
-     * @param array<mixed>                                                                                                                                                                                                                                                                                                                                  $compiledRoutes
-     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                                                                                                        $corsConfigs
-     * @param list<string>                                                                                                                                                                                                                                                                                                                                  $staticPrefixes
-     * @param array<string, array<string, string>>                                                                                                                                                                                                                                                                                                          $paramDescriptions
-     * @param array<string, list<string>>                                                                                                                                                                                                                                                                                                                   $optionalInputs
-     * @param list<string>                                                                                                                                                                                                                                                                                                                                  $caseInsensitivePrefixes
-     * @param list<string>                                                                                                                                                                                                                                                                                                                                  $classExclusivePrefixes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool}> $routes
+     * @param array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}>                                                                                                                                                                                                                                                                             $cacheConfigs
+     * @param array<string, array{limit: int, interval: string, policy: string, keyBy: string}>                                                                                                                                                                                                                                                                               $rateLimits
+     * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                                                                                                                                                                                                                                   $arguments
+     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                                                                                                                                                                                                                                      $authenticators
+     * @param array<string, string>                                                                                                                                                                                                                                                                                                                                           $requestTokenScopes
+     * @param array<mixed>                                                                                                                                                                                                                                                                                                                                                    $compiledRoutes
+     * @param array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}>                                                                                                                                                                                                                          $corsConfigs
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                                    $staticPrefixes
+     * @param array<string, array<string, string>>                                                                                                                                                                                                                                                                                                                            $paramDescriptions
+     * @param array<string, list<string>>                                                                                                                                                                                                                                                                                                                                     $optionalInputs
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                                    $caseInsensitivePrefixes
+     * @param list<string>                                                                                                                                                                                                                                                                                                                                                    $classExclusivePrefixes
      */
     public function __construct(
         private readonly array $routes,
@@ -75,7 +75,7 @@ final class RouteRegistry
      *
      * @internal dispatch/URL-generation plumbing, not part of the metadata surface — see docs/EXTENDING.md
      *
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null}> $routes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool}> $routes
      */
     public static function buildCollection(array $routes): RouteCollection
     {
@@ -163,9 +163,9 @@ final class RouteRegistry
      *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
      *
-     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null}> $routes
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool}> $routes
      *
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool}>
      */
     public static function caseInsensitiveRoutes(array $routes): array
     {
@@ -309,6 +309,15 @@ final class RouteRegistry
     }
 
     /**
+     * Whether a request that only matched a tolerated variant of this route's path should be
+     * redirected to the declared form instead of served directly. False by default.
+     */
+    public function isCanonical(string $routeName): bool
+    {
+        return $this->routes[$routeName]['canonical'] ?? false;
+    }
+
+    /**
      * The controller method's parameters in declaration order, as resolved at compile time.
      * An empty list means the method takes no arguments (or has no recorded spec).
      *
@@ -342,7 +351,7 @@ final class RouteRegistry
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool}>
      */
     public function getRoutes(): array
     {

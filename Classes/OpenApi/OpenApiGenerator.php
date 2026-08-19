@@ -119,7 +119,7 @@ final readonly class OpenApiGenerator
     /**
      * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, description?: string|null, tags?: list<string>} $route
      * @param array<string, array<string, string>>                                                                                                                                  $usedSchemes
-     * @param array<string, array{class: class-string, schema: array<string, mixed>}>                                                                                                $usedSchemas
+     * @param array<string, array{class: class-string, schema: array<string, mixed>}>                                                                                               $usedSchemas
      *
      * @return array<string, mixed>
      */

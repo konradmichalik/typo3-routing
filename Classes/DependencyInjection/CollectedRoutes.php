@@ -66,6 +66,9 @@ final class CollectedRoutes
     /** @var array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}> */
     public array $deprecations = [];
 
+    /** @var array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>> */
+    public array $returns = [];
+
     /**
      * Kept here rather than inlined at the call site: a compiler pass with dozens of small collection
      * steps stays within its own cognitive-complexity budget only by pushing each step's own branching
@@ -79,7 +82,4 @@ final class CollectedRoutes
 
         $this->classExclusivePrefixes[] = $prefix;
     }
-
-    /** @var array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>> */
-    public array $returns = [];
 }

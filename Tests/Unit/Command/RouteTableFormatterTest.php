@@ -48,6 +48,26 @@ final class RouteTableFormatterTest extends TestCase
     }
 
     #[Test]
+    public function formatsADeprecationWithSinceSunsetAndSuccessor(): void
+    {
+        $formatted = RouteTableFormatter::deprecation(['since' => 1735689600, 'sunset' => 1767225599, 'successor' => 'v2', 'documentation' => null]);
+
+        self::assertSame('since: 2025-01-01, sunset: 2025-12-31, successor: v2', $formatted);
+    }
+
+    #[Test]
+    public function formatsASinceOnlyDeprecationWithoutSunsetOrSuccessor(): void
+    {
+        self::assertSame('since: 2025-01-01', RouteTableFormatter::deprecation(['since' => 1735689600, 'sunset' => null, 'successor' => null, 'documentation' => null]));
+    }
+
+    #[Test]
+    public function fallsBackToADashForARouteWithoutADeprecation(): void
+    {
+        self::assertSame('-', RouteTableFormatter::deprecation(null));
+    }
+
+    #[Test]
     public function leavesShortDescriptionsUntouched(): void
     {
         self::assertSame('Fetch a single course.', RouteTableFormatter::truncatedDescription('Fetch a single course.'));

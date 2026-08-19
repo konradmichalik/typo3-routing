@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, JsonErrorResponse, RequestIdResolver, RouteUrlGenerator, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, DeprecationHeaders, JsonErrorResponse, RequestIdResolver, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
 use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteMatcher, RouteRegistry, SiteLanguageScope};
 use Override;
@@ -69,6 +69,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private ClientKeyResolver $clientKeyResolver,
         private RouteUrlGenerator $urlGenerator,
         private SiteLanguageScope $siteLanguageScope,
+        private DeprecationHeaders $deprecation,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $configured = '';
@@ -107,15 +108,18 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         $corsConfig = null;
-        $response = $this->handleApiRequest($request, $path, $corsConfig);
+        $routeName = null;
+        $response = $this->handleApiRequest($request, $path, $corsConfig, $routeName);
         if (null === $response) {
             // Nothing claims this path exclusively, and it matched no route either — a page, presumably.
             return $handler->handle($request);
         }
 
-        // Every attribute-route response gets a correlation id and, finally, the CORS headers stamped on
-        // — using the matched route's own #[Cors] override when it declared one, else the global config.
+        // Every attribute-route response gets a correlation id, the deprecation headers of the route
+        // it came from (a no-op unless it opted in), and finally the CORS headers stamped on — using
+        // the matched route's own #[Cors] override when it declared one, else the global config.
         $response = RequestIdResolver::decorate($response, $request);
+        $response = $this->deprecation->decorate($response, $request, $routeName);
         $response = $this->cors->decorate($response, $request, $corsConfig);
 
         // Applied once, here, so every response this middleware returns is covered — a matched dispatch,
@@ -128,8 +132,9 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      * exclusively for this middleware. The caller then falls through to normal page rendering.
      *
      * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $corsConfig the matched route's own #[Cors] override, set as soon as a route matches; null when no route matched or it declares none
+     * @param string|null                                                                                                                  $routeName  the matched route's name, set as soon as a route matches (even if it then errors 4xx); null when no route matched
      */
-    private function handleApiRequest(ServerRequestInterface $request, string $path, ?array &$corsConfig): ?ResponseInterface
+    private function handleApiRequest(ServerRequestInterface $request, string $path, ?array &$corsConfig, ?string &$routeName): ?ResponseInterface
     {
         // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try).
         $match = $this->matchRoute($request, $path);
@@ -137,7 +142,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $match;
         }
 
-        $corsConfig = $this->registry->getCorsConfig((string) ($match['_route'] ?? ''));
+        $routeName = (string) ($match['_route'] ?? '');
+        $corsConfig = $this->registry->getCorsConfig($routeName);
 
         // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
         if (!$this->invoker->isVisibleInCurrentContext($match['_env'] ?? null)) {

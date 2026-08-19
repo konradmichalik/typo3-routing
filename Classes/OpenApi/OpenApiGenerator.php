@@ -145,6 +145,7 @@ final readonly class OpenApiGenerator
         }
 
         $operation['description'] = $routeDescription ?? $this->description($name, $route);
+        $operation = $this->withDeprecatedFlag($operation, $name);
 
         if ([] !== $parameters) {
             $operation['parameters'] = $parameters;
@@ -177,6 +178,20 @@ final readonly class OpenApiGenerator
         $tags = $route['tags'] ?? [];
 
         return [] === $tags ? [$serviceId] : $tags;
+    }
+
+    /**
+     * @param array<string, mixed> $operation
+     *
+     * @return array<string, mixed>
+     */
+    private function withDeprecatedFlag(array $operation, string $name): array
+    {
+        if (null !== $this->registry->getDeprecation($name)) {
+            $operation['deprecated'] = true;
+        }
+
+        return $operation;
     }
 
     /**

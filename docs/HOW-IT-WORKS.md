@@ -48,6 +48,7 @@ Filters narrow the table (and `--json`) and combine with AND. The active filters
 | `--cached`       | have response caching                               |
 | `--rate-limited` | have rate limiting                                  |
 | `--csrf`         | require a CSRF request token                        |
+| `--deprecated`   | are marked deprecated (see [Deprecating a route](USAGE.md#deprecating-a-route)) |
 
 ``` bash
 vendor/bin/typo3 routing:debug --method=POST --protected   # protected write endpoints

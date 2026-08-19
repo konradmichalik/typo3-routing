@@ -54,6 +54,7 @@ final class RouteDebugCommand extends Command
         $this->addOption('cached', null, InputOption::VALUE_NONE, 'Only routes with response caching');
         $this->addOption('rate-limited', null, InputOption::VALUE_NONE, 'Only routes with rate limiting');
         $this->addOption('csrf', null, InputOption::VALUE_NONE, 'Only routes requiring a CSRF request token');
+        $this->addOption('deprecated', null, InputOption::VALUE_NONE, 'Only routes marked deprecated');
     }
 
     #[Override]
@@ -98,7 +99,7 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>}>
+     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}>
      */
     private function collectRows(): array
     {
@@ -129,6 +130,7 @@ final class RouteDebugCommand extends Command
                 'arguments' => $this->registry->getArguments($name),
                 'sites' => $route['sites'] ?? [],
                 'languages' => $route['languages'] ?? [],
+                'deprecated' => $this->registry->getDeprecation($name),
             ];
         }
 
@@ -138,7 +140,7 @@ final class RouteDebugCommand extends Command
     /**
      * Active filters as label => predicate. The labels double as the human-readable summary.
      *
-     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>}): bool>
+     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}): bool>
      */
     private function activeFilters(InputInterface $input, ?string $name): array
     {
@@ -180,13 +182,16 @@ final class RouteDebugCommand extends Command
         if (true === $input->getOption('csrf')) {
             $filters['csrf'] = static fn (array $row): bool => null !== $row['csrf'];
         }
+        if (true === $input->getOption('deprecated')) {
+            $filters['deprecated'] = static fn (array $row): bool => null !== $row['deprecated'];
+        }
 
         return $filters;
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>}                                $row
-     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>}): bool> $filters
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}                                $row
+     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null}): bool> $filters
      */
     private function matches(array $row, array $filters): bool
     {
@@ -200,7 +205,7 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>} $row
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null} $row
      */
     private function renderDetail(SymfonyStyle $io, array $row): void
     {
@@ -218,6 +223,8 @@ final class RouteDebugCommand extends Command
         $rateLimit = null === $row['rateLimit']
             ? '-'
             : sprintf('limit: %d, interval: %s, policy: %s, keyBy: %s', $row['rateLimit']['limit'], $row['rateLimit']['interval'], $row['rateLimit']['policy'], $row['rateLimit']['keyBy']);
+
+        $deprecated = RouteTableFormatter::deprecation($row['deprecated']);
 
         $io->definitionList(
             ['Description' => $row['description'] ?? '-'],
@@ -238,6 +245,7 @@ final class RouteDebugCommand extends Command
             ['Arguments' => RouteTableFormatter::arguments($row['arguments'])],
             ['Sites' => RouteTableFormatter::anyOrList($row['sites'])],
             ['Languages' => RouteTableFormatter::anyOrList($row['languages'])],
+            ['Deprecated' => $deprecated],
         );
     }
 

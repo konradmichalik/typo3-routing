@@ -657,6 +657,59 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function stampsDeprecationHeadersOnASuccessResponseAndACacheHit(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/deprecated'));
+        $second = $this->process($this->request('GET', 'https://example.com/api/example/deprecated'));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $second->getHeaderLine('X-TYPO3-API-Cache'));
+
+        foreach ([$first, $second] as $response) {
+            self::assertMatchesRegularExpression('/^@\d+$/', $response->getHeaderLine('Deprecation'));
+            self::assertMatchesRegularExpression('/^\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/', $response->getHeaderLine('Sunset'));
+            self::assertStringContainsString('rel="successor-version"', $response->getHeaderLine('Link'));
+            self::assertStringContainsString('rel="deprecation"', $response->getHeaderLine('Link'));
+        }
+    }
+
+    #[Test]
+    public function stampsDeprecationHeadersOnAConditionalNotModifiedResponse(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/deprecated'));
+        $etag = $first->getHeaderLine('ETag');
+
+        $notModified = $this->process(
+            $this->request('GET', 'https://example.com/api/example/deprecated')->withHeader('If-None-Match', $etag),
+        );
+
+        self::assertSame(304, $notModified->getStatusCode());
+        self::assertMatchesRegularExpression('/^@\d+$/', $notModified->getHeaderLine('Deprecation'));
+    }
+
+    #[Test]
+    public function stampsDeprecationHeadersOnABadRequestResponse(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/deprecated-search'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertMatchesRegularExpression('/^@\d+$/', $response->getHeaderLine('Deprecation'));
+        // No sunset/successor/documentation was declared for this route.
+        self::assertSame('', $response->getHeaderLine('Sunset'));
+        self::assertSame('', $response->getHeaderLine('Link'));
+    }
+
+    #[Test]
+    public function omitsDeprecationHeadersForARouteWithoutTheAttribute(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/count'));
+
+        self::assertSame('', $response->getHeaderLine('Deprecation'));
+        self::assertSame('', $response->getHeaderLine('Sunset'));
+        self::assertSame('', $response->getHeaderLine('Link'));
+    }
+
+    #[Test]
     public function generatesReachableUrlIncludingSiteBase(): void
     {
         $generator = $this->get(RouteUrlGenerator::class);

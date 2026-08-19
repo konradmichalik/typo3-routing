@@ -105,7 +105,8 @@ final class SwaggerUiControllerTest extends TestCase
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
         $routes = ['umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::umlaut', 'env' => null, 'requirements' => []]];
         $registry = new RouteRegistry($routes, new ServiceLocator([]));
-        $controller = new SwaggerUiController(new OpenApiGenerator($registry, new JsonSchemaMapper()), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
+        $schemas = new JsonSchemaMapper();
+        $controller = new SwaggerUiController(new OpenApiGenerator($registry, $schemas, new ResponsesBuilder($schemas)), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
 
         $response = $controller->openApiJson($this->request());
 

@@ -38,4 +38,4 @@ Two consequences of that shape are worth stating up front, because they explain 
 | [Typed controller arguments](arguments.md) | Type coercion, backed enums, Extbase entity binding, variadics, and overriding the source with `#[Param]` |
 | [URL generation](url-generation.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator, so a path is never duplicated |
 
-Once a route exists, everything else is optional: [caching, rate limiting, authentication and CORS](../features/README.md) are separate attributes you add next to `#[Route]`, and [`routing:debug`](../operating/commands.md#routingdebug) lists what you have declared.
+Once a route exists, everything else is optional: [caching, rate limiting, authentication, request tokens and CORS](../features/README.md) are separate attributes you add next to `#[Route]`, and [`routing:debug`](../operating/commands.md#routingdebug) lists what you have declared.

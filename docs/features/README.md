@@ -39,7 +39,7 @@ The full pipeline, including matching and the environment filter, is in [How it 
 ## How they interact
 
 - **`#[Authenticate]` disables `#[Cache]`.** The cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining them raises a build-time warning and the cache is ignored. The [caching page](caching.md) also covers the case this safeguard cannot catch: a *public* cached route whose controller inspects the frontend-user context itself.
-- **A Bearer token needs no `#[RequireRequestToken]`.** A foreign origin cannot set the `Authorization` header, so bearer-protected routes are CSRF-immune. Adding it is harmless but pointless.
+- **A Bearer token needs no `#[RequireRequestToken]`.** Browsers do not attach bearer tokens automatically the way they do cookies, so a cross-site request cannot forge one — bearer-protected routes are CSRF-immune. Adding it is harmless but pointless.
 - **`keyBy: 'user'` wants an `#[Authenticate]` next to it.** Rate limiting runs before authentication, so an anonymous request has no user identity and falls back to being throttled by IP.
 - **A per-route `#[Cors]` replaces the global CORS configuration entirely** for that route, rather than merging with it field by field.
 

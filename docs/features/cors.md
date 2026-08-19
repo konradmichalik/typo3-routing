@@ -4,7 +4,7 @@ Browser clients on a different origin need CORS headers. CORS is **off by defaul
 
 ## Global configuration
 
-Configured under **Settings → Extension Configuration → typo3_routing**; a non-empty `cors.allowedOrigins` is what enables CORS at all.
+Configured under **Settings → Extension Configuration → typo3_routing**; a non-empty `cors.allowedOrigins` enables the global CORS policy. A per-route `#[Cors]` attribute can enable CORS when this setting is empty.
 
 | Setting                | Description                                                                                       | Default                        |
 |------------------------|---------------------------------------------------------------------------------------------------|--------------------------------|

@@ -40,7 +40,7 @@ The tolerance costs nothing in the normal case: the extra match attempt only run
 Two things stay untouched by it:
 
 - **The declared form stays canonical.** Generated URLs ([`{routing:uri()}`, `RouteUrlGenerator`](../routes/url-generation.md)) keep exactly the form you wrote, and so do the route exports that report it — [`routing:debug`](commands.md#routingdebug) and the [OpenAPI document](openapi.md).
-- **`405` beats the retry.** A path that matches a route with the wrong HTTP method answers `405` with its `Allow` header, whether or not the trailing slash matched what was declared.
+- **`405` beats the retry.** A path that matches a route under the active `trailingSlash` policy but uses the wrong HTTP method answers `405` with its `Allow` header. With `trailingSlash: 0`, the opposite-slash form is not a path match at all and stays a plain `404`, not a `405`.
 
 Case is a separate matter and has no global switch: a route opts into it individually with `#[Route(caseInsensitive: true)]`, see [Case-insensitive paths](../routes/route-attribute.md#case-insensitive-paths).
 
@@ -83,4 +83,4 @@ The dispatcher middleware runs in the **frontend** stack, **after** `typo3/cms-f
 This default covers every built-in [authenticator](../features/authentication.md): the `frontend.user` / `backend.user` context aspects and the request token in the `SecurityAspect` (provided by the core request-token middleware, which runs even earlier) are all populated before the dispatcher's access checks.
 
 > [!NOTE]
-> A purely public or Bearer-only setup needs neither auth middleware. You may pull the dispatcher in front of them — by overriding the ordering in your own `Configuration/RequestMiddlewares.php` — for a marginally earlier short-circuit, as long as no route uses the FE/BE-user authenticators.
+> A purely public or Bearer-only setup needs neither auth middleware. For a marginally earlier short-circuit — as long as no route uses the FE/BE-user authenticators — disable the dispatcher's own middleware (`konradmichalik/typo3-routing/dispatcher`) in your `Configuration/RequestMiddlewares.php` and re-register it under a new identifier with only `'after' => ['typo3/cms-frontend/site']`. Redefining `after` on the existing identifier does not work: TYPO3 merges middleware definitions recursively, so the original auth-middleware constraints would still apply alongside whatever you add.

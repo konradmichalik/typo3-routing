@@ -10,6 +10,7 @@ Placing `#[Route]` on the **controller class** turns it into a prefix shared by 
 ```php
 use KonradMichalik\Typo3Routing\Attribute\Route;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
+use Psr\Http\Message\ResponseInterface;
 
 #[Route(path: '/api/v1/courses', name: 'v1_courses_', requirements: ['id' => '\d+'])]
 final class CourseController implements RouteControllerInterface

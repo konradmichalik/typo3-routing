@@ -19,9 +19,6 @@ use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 /**
  * RoutelessExclusiveController.
  *
- * Declares its exclusive claim but contributes no method route at all — the claim must still be
- * baked, not silently dropped for lack of anything else to carry it.
- *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[Route(path: '/api/no-routes', exclusive: true)]

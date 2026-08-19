@@ -95,8 +95,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $hasRoute = $this->collectController(new ReflectionClass($class), $serviceId, $container, $collected);
-            $this->compilerWarnings->warnIfControllerHasNoRoute($hasRoute, $serviceId, RouteControllerInterface::class);
+            ['hasRoute' => $hasRoute, 'hasExclusiveClaim' => $hasExclusiveClaim] = $this->collectController(new ReflectionClass($class), $serviceId, $container, $collected);
+            // A class-level exclusive claim with no method route is a deliberate pattern (see
+            // RoutelessExclusiveController), not the "forgotten #[Route]" mistake the warning targets.
+            $this->compilerWarnings->warnIfControllerHasNoRoute($hasRoute || $hasExclusiveClaim, $serviceId, RouteControllerInterface::class);
             if ($hasRoute) {
                 // Keep the controller fetchable from the locator even though it stays a private service.
                 $controllerReferences[$serviceId] = new Reference($serviceId);
@@ -163,8 +165,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
     /**
      * @param ReflectionClass<object> $reflection
+     *
+     * @return array{hasRoute: bool, hasExclusiveClaim: bool}
      */
-    private function collectController(ReflectionClass $reflection, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): bool
+    private function collectController(ReflectionClass $reflection, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): array
     {
         $classRoute = $this->resolveClassRoute($reflection, $serviceId);
         $classCors = $this->corsResolver->resolveClass($reflection);
@@ -180,7 +184,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix) || $found;
         }
 
-        return $found;
+        return ['hasRoute' => $found, 'hasExclusiveClaim' => null !== $classExclusivePrefix];
     }
 
     /**

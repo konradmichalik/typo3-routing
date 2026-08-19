@@ -31,7 +31,7 @@ use TYPO3\CMS\Core\Http\JsonResponse;
  */
 final class ExampleController implements RouteControllerInterface
 {
-    #[Route(path: '/api/example/count', name: 'example_count')]
+    #[Route(path: '/api/example/count', name: 'example_count', aliases: ['example_count_legacy'])]
     public function count(): JsonResponse
     {
         return new JsonResponse(['count' => 3]);

@@ -95,7 +95,18 @@ final class RouteUrlGeneratorTest extends TestCase
         self::assertStringStartsWith('https://api.example.com/api/secure-tenant', $url);
     }
 
-    private function createGenerator(): RouteUrlGenerator
+    #[Test]
+    public function generatesUrlThroughAnAlias(): void
+    {
+        $request = $this->request('https://example.com/', 'https://example.com/');
+
+        self::assertSame('/api/count', $this->createGenerator(['legacy_count' => 'fixture_count'])->generate($request, 'legacy_count'));
+    }
+
+    /**
+     * @param array<string, string> $aliases
+     */
+    private function createGenerator(array $aliases = []): RouteUrlGenerator
     {
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null}> $routes */
         $routes = [
@@ -139,7 +150,7 @@ final class RouteUrlGeneratorTest extends TestCase
                 'host' => 'api.example.com',
             ],
         ];
-        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), aliases: $aliases);
 
         return new RouteUrlGenerator($registry, new SiteBasePathResolver());
     }

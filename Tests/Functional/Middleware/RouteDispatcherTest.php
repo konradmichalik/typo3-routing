@@ -762,6 +762,15 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function generatesTheSameUrlThroughARouteAlias(): void
+    {
+        $generator = $this->get(RouteUrlGenerator::class);
+        $request = $this->request('GET', 'https://example.com/', 'https://example.com/');
+
+        self::assertSame('/api/example/count', $generator->generate($request, 'example_count_legacy'));
+    }
+
+    #[Test]
     public function matchesShorterPathForTrailingPlaceholderWithDefault(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/blog'));

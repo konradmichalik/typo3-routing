@@ -48,6 +48,7 @@ final readonly class Route
      * @param bool|null             $canonical       When a request only matched a tolerated variant of this path (trailing slash, or case via `caseInsensitive`), answer `308 Permanent Redirect` to the declared path instead of serving the response directly. `308` preserves method and body. Has no effect on a request that matched the exact declared path. null = not set, inheriting the class-level value (default: answer directly, no redirect). At class level: default for methods without their own.
      * @param list<string>|null     $sites           Site identifiers (as configured per-site in config.yaml under config/sites) this route is reachable from; null/empty = every site. Out of scope yields the same 404 as an unmatched path. An unknown identifier is never rejected at build time (site configuration is not reliably readable while the container builds, and would go stale the moment a site is renamed) — it is reported at runtime and by `routing:lint` instead. null = not set, inheriting the class-level value. At class level: default for methods without their own.
      * @param list<int>|null        $languages       Language ids this route is reachable in; null/empty = every language. Out of scope yields the same 404 as an unmatched path. null = not set, inheriting the class-level value. At class level: default for methods without their own.
+     * @param list<string>          $aliases         Alternate name(s) this route also resolves under for URL generation (RouteUrlGenerator, `{routing:uri}`/`{routing:uris}`). Never matches a request path, and never appears in `routing:debug` or the OpenAPI export as a route of its own. An alias colliding with an existing route name, or declared by two routes, fails the container build. At class level: prefixed the same way `name` is.
      */
     public function __construct(
         public string $path,
@@ -66,5 +67,6 @@ final readonly class Route
         public ?bool $canonical = null,
         public ?array $sites = null,
         public ?array $languages = null,
+        public array $aliases = [],
     ) {}
 }

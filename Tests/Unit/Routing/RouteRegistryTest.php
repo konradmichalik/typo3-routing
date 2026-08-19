@@ -678,6 +678,47 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function aRouteCollectionAliasResolvesToTheAliasedRoute(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['fixture_count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), aliases: ['legacy_count' => 'fixture_count']);
+
+        $route = $registry->getRouteCollection()->get('legacy_count');
+
+        self::assertNotNull($route);
+        self::assertSame('/api/count', $route->getPath());
+    }
+
+    #[Test]
+    public function getRouteCollectionIsMemoisedWithAliasesApplied(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['fixture_count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), aliases: ['legacy_count' => 'fixture_count']);
+
+        $first = $registry->getRouteCollection();
+        $second = $registry->getRouteCollection();
+
+        self::assertSame($first, $second);
+        self::assertNotNull($second->get('legacy_count'));
+    }
+
+    #[Test]
+    public function exposesTheAliasesPointingToARouteAndEmptyForARouteWithoutAny(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'fixture_count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'fixture_other' => ['path' => '/api/other', 'methods' => ['GET'], 'controller' => 'ctrl::other', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), aliases: ['legacy_a' => 'fixture_count', 'legacy_b' => 'fixture_count']);
+
+        self::assertSame(['legacy_a', 'legacy_b'], $registry->getAliasesFor('fixture_count'));
+        self::assertSame([], $registry->getAliasesFor('fixture_other'));
+    }
+
+    #[Test]
     public function exposesAuthenticatorsPerRouteName(): void
     {
         $authenticators = ['secure' => [['service' => 'auth_a', 'options' => ['role' => 'admin']]]];

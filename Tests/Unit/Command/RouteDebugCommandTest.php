@@ -228,6 +228,43 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function detailListsTheAliasesPointingToTheRoute(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
+        $tester = $this->tester(new RouteRegistry($routes, new ServiceLocator([]), aliases: ['legacy_count' => 'example_count', 'old_count' => 'example_count']));
+
+        $tester->execute(['name' => 'example_count']);
+
+        self::assertStringContainsString('legacy_count, old_count', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function detailFallsBackForARouteWithoutAnyAlias(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_count']);
+
+        self::assertStringContainsString('Aliases', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function includesAliasesInJsonOutput(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
+        $tester = $this->tester(new RouteRegistry($routes, new ServiceLocator([]), aliases: ['legacy_count' => 'example_count']));
+
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, aliases: list<string>}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertSame(['legacy_count'], $data[0]['aliases']);
+    }
+
+    #[Test]
     public function detailRendersCacheAndAnyMethodsAndEmptyFallbacks(): void
     {
         $tester = $this->tester($this->registry());

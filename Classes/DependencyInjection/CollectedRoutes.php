@@ -69,6 +69,9 @@ final class CollectedRoutes
     /** @var array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>> */
     public array $returns = [];
 
+    /** @var array<string, string> Alias name → the route name it resolves to */
+    public array $aliases = [];
+
     /**
      * Kept here rather than inlined at the call site: a compiler pass with dozens of small collection
      * steps stays within its own cognitive-complexity budget only by pushing each step's own branching

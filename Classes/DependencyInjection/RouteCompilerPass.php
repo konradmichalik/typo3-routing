@@ -71,6 +71,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
         private CorsResolver $corsResolver = new CorsResolver(),
         private ClassExistenceChecker $classExistenceChecker = new ClassExistenceChecker(),
+        private CompilerWarnings $compilerWarnings = new CompilerWarnings(),
     ) {}
 
     #[Override]
@@ -90,7 +91,9 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            if ($this->collectController(new ReflectionClass($class), $serviceId, $container, $collected)) {
+            $hasRoute = $this->collectController(new ReflectionClass($class), $serviceId, $container, $collected);
+            $this->compilerWarnings->warnIfControllerHasNoRoute($hasRoute, $serviceId, RouteControllerInterface::class);
+            if ($hasRoute) {
                 // Keep the controller fetchable from the locator even though it stays a private service.
                 $controllerReferences[$serviceId] = new Reference($serviceId);
             }
@@ -191,9 +194,12 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
     private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors): bool
     {
+        $overriddenRouteMethod = $this->compilerWarnings->findOverriddenRouteMethod($method, Route::class);
+
         $routeAttributes = $method->getAttributes(Route::class);
         if ([] === $routeAttributes) {
             $this->assertNoOrphanedModifiers($method, $serviceId);
+            $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
 
             return false;
         }
@@ -203,6 +209,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $auth = $this->resolveAuthenticators($method, $serviceId, $container, $collected);
         $requestToken = $this->resolveRequestToken($method);
         $cors = $this->corsResolver->resolveMethod($method, $classCors);
+        $this->compilerWarnings->warnIfAModifierWasDropped($overriddenRouteMethod, $method, $serviceId, self::MODIFIER_ATTRIBUTES);
 
         foreach ($routeAttributes as $attribute) {
             $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $collected, $classRoute);

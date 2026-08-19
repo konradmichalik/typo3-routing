@@ -54,6 +54,7 @@ The request the controller finally sees is synthesised from it: the route's firs
 | Step | Programmatic invocation | Why |
 |---|---|---|
 | Env filter (`Route::$env`) | enforced → 404 | a route unreachable over HTTP must stay unreachable |
+| Site/language scope (`Route::$sites`/`$languages`) | enforced → 404 | mirrors the dispatcher: a route out of scope for the calling request's site/language must stay unreachable |
 | Mandatory placeholders, path `requirements` | enforced → 404 | such a path could never have matched, so it must not reach a controller |
 
 One consequence is worth spelling out: a violated path requirement is the single case where the answer *differs* from an HTTP call by design. Over HTTP that path matches no route, so — unless `exclusivePrefixes` claims it — the middleware declines and the page router takes over. An invocation names the route explicitly and has no page to fall back to, so the route's own "no resource for this value" answer stands as a 404.
@@ -120,7 +121,7 @@ $schema = $this->schemas->objectSchemaForClass(CourseDto::class);
 
 ## Reference consumer: the OpenAPI export
 
-[`Classes/OpenApi/OpenApiGenerator.php`](../../Classes/OpenApi/OpenApiGenerator.php) (internal) is the extension's own reference consumer of this API — it builds an OpenAPI 3.1 document purely from `RouteRegistry::getRoutes()`, `getArguments()`, `getAuthenticators()`, `getRequestTokenScope()`, `getCacheConfig()`, and `getRateLimit()`, with no access to anything `@internal`. Reading it end to end is the fastest way to see the metadata API used for something non-trivial: parameter/request-body construction from argument specs, security scheme mapping from authenticators, and error-response generation from which modifiers are present.
+[`Classes/OpenApi/OpenApiGenerator.php`](../../Classes/OpenApi/OpenApiGenerator.php) (internal) is the extension's own reference consumer of this API — it builds an OpenAPI 3.1 document purely from `RouteRegistry::getRoutes()`, `getArguments()`, `getAuthenticators()`, `getRequestTokenScope()`, `getCacheConfig()`, `getRateLimit()`, `getReturns()`, and `getDeprecation()`, with no access to anything `@internal`. Reading it end to end is the fastest way to see the metadata API used for something non-trivial: parameter/request-body construction from argument specs, security scheme mapping from authenticators, response-schema construction from `#[Returns]`, and error-response generation from which modifiers are present.
 
 ## What's deliberately not exposed
 

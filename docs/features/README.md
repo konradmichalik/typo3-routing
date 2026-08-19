@@ -1,6 +1,6 @@
 # Route features
 
-Everything on this page is **opt-in**. A route that declares none of these attributes is public, uncached, unthrottled and same-origin — which is the right default for most endpoints and costs nothing at runtime, because each feature is gated behind a registry lookup that returns `null` when the route did not declare it.
+Everything on this page is **opt-in**. A route that declares none of these attributes is public, uncached, unthrottled and same-origin by default — which is the right default for most endpoints and costs nothing at runtime, because each feature is gated behind a registry lookup that returns `null` when the route did not declare it. The [global CORS configuration](cors.md#global-configuration) can still allow cross-origin access for every route, declared or not; a route's own [`#[Cors]`](cors.md#per-route-overrides-with-cors) replaces that global policy entirely rather than adding to it.
 
 Each one is a separate attribute stacked next to the `#[Route]`:
 

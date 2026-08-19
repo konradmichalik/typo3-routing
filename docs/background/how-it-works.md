@@ -53,13 +53,13 @@ Several ordering decisions in there are deliberate rather than incidental:
 - **Rate limiting runs before authentication**, so a coarse per-IP limit absorbs token brute-force attempts before any authentication logic executes.
 - **The response cache is consulted after the rate limit**, so a cacheable response cannot be used to bypass the limit.
 
-Every response this middleware returns — a matched dispatch, but also an early error response above — also gets the [deprecation headers](../routes/route-attribute.md#deprecating-a-route) of the route it came from (a no-op unless it opted in) stamped on afterwards.
+Every response reaching this decoration stage — a matched dispatch, but also an early error response from step 4 onward above — also gets the [deprecation headers](../routes/route-attribute.md#deprecating-a-route) of the route it came from (a no-op unless it opted in) stamped on afterward. The CORS preflight response (step 2) and a path-gate or matcher miss falling through to page rendering (steps 1 and 3) never reach this stage.
 
-## What every response carries
+## What every response from this middleware carries
 
-`404`, `405`, `400`, `401`, `403`, `429` and controller-thrown [`HttpProblemException`](../routes/route-attribute.md#error-responses-from-controllers) are all emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details: `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}`, where `detail` is omitted when it would only repeat the title. The **success** response format is entirely the controller's choice.
+`400`, `401`, `403`, `404`, `405`, `415` and `429` emitted by this middleware, and controller-thrown [`HttpProblemException`](../routes/route-attribute.md#error-responses-from-controllers), are all emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details: `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}`, where `detail` is omitted when it would only repeat the title. A path that falls through to page rendering (steps 1 and 3) is not this middleware's response, so it is not held to this format. The **success** response format is entirely the controller's choice.
 
-Every response, success or error, also carries an `X-Request-ID` header — echoed back when the client sent one, otherwise generated, so a single id correlates a request across logs and proxies.
+Every response reaching the decoration stage above, success or error, also carries an `X-Request-ID` header — echoed back when the client sent one, otherwise generated, so a single id correlates a request across logs and proxies.
 
 ## Reading further
 

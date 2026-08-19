@@ -18,9 +18,9 @@ All of them live under **Settings → Extension Configuration → typo3_routing*
 
 ## Path gate
 
-The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path (plus its slashless form where it ends in a slash, so the [trailing-slash tolerance](#trailing-slashes) below can do its work), baked into the compiled container next to the compiled matcher. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
+The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path (plus its slashless form where it ends in a slash, so the [trailing-slash tolerance](#trailing-slashes) below can do its work), baked into the compiled container next to the compiled matcher, merged with the [exclusive path prefixes](#exclusive-path-prefixes) below (configured and class-level alike) — an exclusively claimed path space must reach the dispatcher even where it holds no route at all. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
 
-A path outside the gate falls through to normal page rendering at zero cost. With no routes registered at all the gate is empty and rejects everything, so the dispatcher costs a single string comparison per page request. [Performance](../background/performance.md#traffic-that-is-not-an-api-request) puts a number on that.
+A path outside the gate falls through to normal page rendering at zero cost. With no routes registered and no exclusive prefix configured, the gate is empty and rejects everything, so the dispatcher costs a single string comparison per page request. [Performance](../background/performance.md#traffic-that-is-not-an-api-request) puts a number on that.
 
 > [!NOTE]
 > A route whose path starts with a placeholder (e.g. `/{slug}`) has no static prefix, so it opens the gate for every path — the matcher then decides. That is unavoidable and correct: such a route can match anywhere.
@@ -46,7 +46,7 @@ Case is a separate matter and has no global switch: a route opts into it individ
 
 ## Exclusive path prefixes
 
-Separate from the gate, you can reserve path spaces **exclusively** for attribute routes. Inside them a path matching no route returns a JSON `404` instead of falling through to page rendering.
+You can reserve path spaces **exclusively** for attribute routes, feeding them into the [path gate](#path-gate) above so a path inside them reaches the dispatcher even where no route claims it. Inside them a path matching no route returns a JSON `404` instead of falling through to page rendering.
 
 | Setting             | Description                                                                                       | Default   |
 |---------------------|---------------------------------------------------------------------------------------------------|-----------|

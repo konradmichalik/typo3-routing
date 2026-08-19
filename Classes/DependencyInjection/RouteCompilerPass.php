@@ -72,6 +72,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private CorsResolver $corsResolver = new CorsResolver(),
         private ClassExistenceChecker $classExistenceChecker = new ClassExistenceChecker(),
         private CompilerWarnings $compilerWarnings = new CompilerWarnings(),
+        private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
     ) {}
 
     #[Override]
@@ -265,6 +266,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
         // The method wins per requirement/default key; a method env overrides the class default.
         $path = $pathPrefix.$route->path;
+        $this->emptyPathGuard->assertNotEmpty($path, $name, $serviceId, $method);
         $requirements = [...$classRequirements, ...$route->requirements];
         $defaults = [...$classDefaults, ...$route->defaults];
 

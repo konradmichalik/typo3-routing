@@ -161,4 +161,32 @@ final class LegacyPathValidatorTest extends TestCase
 
         $this->addToAssertionCount(1);
     }
+
+    #[Test]
+    public function doesNothingWhenLegacyAndDeclaredPlaceholdersMatch(): void
+    {
+        $collected = new CollectedRoutes();
+        $collected->routes = [
+            'show' => ['path' => '/api/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/legacy/{id}']],
+        ];
+
+        (new LegacyPathValidator())->assertNoCollisions($collected);
+
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    public function rejectsALegacyPathWithAnIncompatiblePlaceholderName(): void
+    {
+        $collected = new CollectedRoutes();
+        $collected->routes = [
+            'show' => ['path' => '/api/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/legacy/{oldId}']],
+        ];
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000037);
+        $this->expectExceptionMessageMatches('/^Legacy path "\/legacy\/\{oldId\}" on route "show" declares placeholders \{oldId\}, but the route\'s path "\/api\/\{id\}" declares \{id\}\./');
+
+        (new LegacyPathValidator())->assertNoCollisions($collected);
+    }
 }

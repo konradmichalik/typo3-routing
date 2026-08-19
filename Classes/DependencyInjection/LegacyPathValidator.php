@@ -19,6 +19,9 @@ use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotF
 use Symfony\Component\Routing\Matcher\{UrlMatcher, UrlMatcherInterface};
 use Symfony\Component\Routing\RequestContext;
 
+use function implode;
+use function preg_match_all;
+use function sort;
 use function sprintf;
 use function str_ends_with;
 use function substr;
@@ -38,7 +41,11 @@ final readonly class LegacyPathValidator
      * trailing-slash-tolerated variant, or a declared #[Route(caseInsensitive: true)] route matching it
      * in another case — since the primary matcher (and the case-insensitive one) runs before legacy
      * matching and would claim the request first, silently defeating the configured legacy behaviour. Nor
-     * may two routes both claim the same legacy path.
+     * may two routes both claim the same legacy path. A legacy path's placeholders must also name the
+     * exact same set as the declared path: the synthetic legacy route reuses the declared route's
+     * `requirements`/`defaults` and its match feeds both controller argument resolution and the
+     * redirect's URL generation verbatim, so a differently-named placeholder (`{oldId}` vs. `{id}`) would
+     * silently miss the canonical parameter.
      */
     public function assertNoCollisions(CollectedRoutes $collected): void
     {
@@ -54,6 +61,12 @@ final readonly class LegacyPathValidator
             foreach ($route['legacyPaths'] ?? [] as $legacyPath) {
                 $this->assertLegacyPathIsFree($legacyPath, $name, $declaredPaths, $matcher, $caseInsensitiveMatcher, $claimedBy);
                 $claimedBy[$legacyPath] = $name;
+
+                $declaredPlaceholders = self::placeholders($route['path']);
+                $legacyPlaceholders = self::placeholders($legacyPath);
+                if ($declaredPlaceholders !== $legacyPlaceholders) {
+                    throw new LogicException(sprintf('Legacy path "%s" on route "%s" declares placeholders {%s}, but the route\'s path "%s" declares {%s}. A legacy path must use the exact same placeholder names as the declared path.', $legacyPath, $name, implode(', ', $legacyPlaceholders), $route['path'], implode(', ', $declaredPlaceholders)), 1750000037);
+                }
             }
         }
     }
@@ -126,5 +139,17 @@ final readonly class LegacyPathValidator
         }
 
         return '/' === $path ? null : substr($path, 0, -1);
+    }
+
+    /**
+     * @return list<string> placeholder names, sorted for order-independent set comparison
+     */
+    private static function placeholders(string $path): array
+    {
+        preg_match_all('/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/', $path, $matches);
+        $names = $matches[1];
+        sort($names);
+
+        return $names;
     }
 }

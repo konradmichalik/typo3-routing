@@ -204,6 +204,12 @@ How the class-level values combine with each method:
 | `description`  | Used as the **default** for methods that do not set their own `description`; a method `description` wins. |
 | `caseInsensitive` | Used as the **default** for methods that do not set their own value; a method can opt back out with `false`. |
 
+### Sharing routes through an abstract base controller
+
+Route discovery reflects the concrete controller's public methods, including ones inherited from a parent class, so an abstract base controller can declare the route methods once while each concrete subclass supplies only its own class-level prefix.
+
+PHP does not carry method attributes onto an override, so overriding an inherited route method without repeating its `#[Route]` silently removes that route, and repeating `#[Route]` while dropping a modifier such as `#[Authenticate]` silently removes only that modifier. Both are caught at build time with a warning naming the overriding method and the parent method it overrides; a controller that ends up with no route at all (for example because every inherited route method was overridden this way) is warned about separately.
+
 ## Requirements
 
 `requirements` constrains parameters by name, with two enforcement layers depending on where the parameter lives:

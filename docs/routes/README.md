@@ -31,10 +31,12 @@ Two consequences of that shape are worth stating up front, because they explain 
 - **The method signature is the input contract.** A controller method declares only the parameters it needs — there is no fixed signature. Type-hint `ServerRequestInterface` to receive the request; every other parameter is resolved by name from the path, query string or body and cast to its declared type. See [Typed controller arguments](arguments.md).
 - **Contradictions fail at build time, not at request time.** Duplicate route names, unsupported parameter shapes, a `defaults` entry on a non-trailing placeholder, a modifier attribute on a method without a `#[Route]` — all of these stop the container build with an explicit message.
 
+One gap in that second promise is worth knowing about if you [share route definitions through a base class](route-groups.md#declare-the-route-methods-final): a method override that repeats the parent's `#[Route]` but drops a modifier it carried is not detected, because nothing in the build knows what the overridden method declared.
+
 | Page | What's inside |
 |------|---------------|
 | [The `#[Route]` attribute](route-attribute.md) | Every parameter: `requirements`, priority, optional placeholders, schemes, host, case tolerance, and how a controller returns an error |
-| [Route groups](route-groups.md) | A class-level `#[Route]` as a shared prefix, and which parameters inherit from it |
+| [Route groups](route-groups.md) | A class-level `#[Route]` as a shared prefix, which parameters inherit from it, and sharing route definitions through a base class |
 | [Typed controller arguments](arguments.md) | Type coercion, backed enums, Extbase entity binding, variadics, and overriding the source with `#[Param]` |
 | [URL generation](url-generation.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator, so a path is never duplicated |
 

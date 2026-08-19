@@ -62,3 +62,49 @@ PHP does not carry method attributes onto an override, so overriding an inherite
 ## What else can sit on the class
 
 Of the [opt-in feature attributes](../features/README.md), only [`#[Cors]`](../features/cors.md#per-route-overrides-with-cors) is inheritable in the same way. `#[Authenticate]`, `#[Cache]` and `#[RequireRequestToken]` are method-only by design — a protection or a cache policy that silently extends to every method added later is not a safe default.
+
+## Sharing route definitions through a base class
+
+Route discovery reflects the **public methods of the concrete controller**, and those include methods inherited from a parent class. An abstract base class can therefore hold the route definitions while each concrete controller supplies nothing but its own prefix.
+
+```php
+abstract class ResourceController implements RouteControllerInterface
+{
+    #[Route(path: '', name: 'list')]
+    final public function list(#[Param(requirement: '\d+')] int $page = 1): ResponseInterface { /* … */ }
+
+    #[Route(path: '/{uid}', name: 'detail', requirements: ['uid' => Requirement::DIGITS])]
+    final public function detail(int $uid): ResponseInterface { /* … */ }
+
+    /** @return list<string> */
+    abstract protected function fields(): array;
+}
+
+// → /api/products and /api/products/{uid}, names "products_list" and "products_detail"
+#[Route(path: '/api/products', name: 'products_')]
+final class ProductController extends ResourceController { /* … */ }
+
+// → /api/news and /api/news/{uid}, names "news_list" and "news_detail"
+#[Route(path: '/api/news', name: 'news_')]
+final class NewsController extends ResourceController { /* … */ }
+```
+
+The abstract class contributes no routes of its own: Symfony's service autodiscovery tags abstract classes as `container.excluded`, and the compiler pass skips them a second time. Everything else is resolved per subclass. Paths and names are prefixed, `requirements` and [`#[Param]`](arguments.md#declaring-the-constraint-at-the-parameter) contributions are hoisted separately for each one, and inherited method attributes such as `#[Authenticate]`, `#[Cache]`, or `#[RateLimit]` apply to every subclass that inherits the method.
+
+Two rules separate this working from it failing quietly.
+
+### Every concrete controller needs its own class-level `#[Route]`
+
+Class attributes are not inherited. A `#[Route]` on the abstract parent is ignored for the subclass, and its prefix disappears without a message.
+
+The `name` prefix is what keeps two subclasses apart. Without it both inherit the same route name and the container build stops with `Duplicate attribute route name`. That is the good failure: loud, and at build time.
+
+The `path` prefix has no such safety net. If the base declares `#[Route(path: '')]` for a list route and a subclass forgets its class-level `#[Route]`, that route's path is `''`. Symfony's `Route::setPath()` silently normalizes an empty path to `/`, so the route does not merely open the [path gate](../operating/configuration.md#path-gate) for every frontend request, it answers the site's root path, ahead of TYPO3's own page rendering.
+
+### Declare the route methods `final`
+
+PHP does not carry method attributes onto an override. A subclass that overrides an inherited route method to adjust its behaviour **removes the route**: no attribute, no route, no warning.
+
+Repeating the `#[Route]` on the override restores the endpoint but not the parent's other attributes. An override that repeats `#[Route]` while omitting the parent's `#[Authenticate]` is a public endpoint with a green build. The [orphaned-modifier check](README.md) cannot catch it: it fires when a modifier sits on a method without a `#[Route]`, not when a `#[Route]` arrives without the modifier the parent method had.
+
+Marking the route methods `final` turns that mistake into a PHP fatal error instead of a silent change in behaviour. Variation belongs in `abstract protected` hooks, which carry no attributes and can be overridden freely.

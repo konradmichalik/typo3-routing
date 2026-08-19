@@ -30,6 +30,13 @@ use function strtoupper;
  */
 final readonly class RouteLinter
 {
+    private RouteConstraintOverlap $constraintOverlap;
+
+    public function __construct()
+    {
+        $this->constraintOverlap = new RouteConstraintOverlap();
+    }
+
     /**
      * @return list<array{severity: 'warning'|'info', check: string, route: string|null, controller: string|null, message: string}>
      */
@@ -132,6 +139,10 @@ final readonly class RouteLinter
         $later = $routes[$laterName];
 
         if (!$this->methodsOverlap($earlier['methods'], $later['methods'])) {
+            return null;
+        }
+
+        if (!$this->constraintOverlap->overlaps($earlier, $later)) {
             return null;
         }
 

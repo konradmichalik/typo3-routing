@@ -155,6 +155,50 @@ final class RouteLinterTest extends TestCase
     }
 
     #[Test]
+    public function doesNotFlagTheSamePathWithDisjointPlaceholderRequirements(): void
+    {
+        $registry = $this->registry([
+            'numeric' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::numeric', 'env' => null, 'requirements' => ['id' => '\d+']],
+            'alpha' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::alpha', 'env' => null, 'requirements' => ['id' => '[a-z]+']],
+        ]);
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
+    #[Test]
+    public function doesNotFlagTheSamePathWithDistinctHosts(): void
+    {
+        $registry = $this->registry([
+            'api' => ['path' => '/status', 'methods' => ['GET'], 'controller' => 'ctrl::api', 'env' => null, 'requirements' => [], 'host' => 'api.example.com'],
+            'www' => ['path' => '/status', 'methods' => ['GET'], 'controller' => 'ctrl::www', 'env' => null, 'requirements' => [], 'host' => 'www.example.com'],
+        ]);
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
+    #[Test]
+    public function doesNotFlagTheSamePathWithDistinctSchemes(): void
+    {
+        $registry = $this->registry([
+            'http' => ['path' => '/api/split', 'methods' => ['GET'], 'controller' => 'ctrl::http', 'env' => null, 'requirements' => [], 'schemes' => ['http']],
+            'https' => ['path' => '/api/split', 'methods' => ['GET'], 'controller' => 'ctrl::https', 'env' => null, 'requirements' => [], 'schemes' => ['https']],
+        ]);
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
+    #[Test]
+    public function doesNotFlagALowerPriorityRouteAsShadowedWhenRequirementsAreDisjoint(): void
+    {
+        $registry = $this->registry([
+            'high' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::high', 'env' => null, 'requirements' => ['id' => '\d+'], 'priority' => 10],
+            'low' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::low', 'env' => null, 'requirements' => ['id' => '[a-z]+']],
+        ]);
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
+    #[Test]
     public function flagsAnIntTypedPathArgumentWithoutADigitsRequirement(): void
     {
         $registry = $this->registry(

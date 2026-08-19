@@ -728,6 +728,15 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertJsonStringEqualsJsonString('{"name":"über"}', (string) $response->getBody());
     }
 
+    #[Test]
+    public function enforcesAGraphemeClusterRequirementOnAPathPlaceholder(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/graphemes/%C3%BCber'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"cluster":"über"}', (string) $response->getBody());
+    }
+
     /**
      * No prefix is claimed exclusively here (the default), so a path violating the placeholder's own
      * requirement stays the page router's business, same as any other unmatched path — see the note on

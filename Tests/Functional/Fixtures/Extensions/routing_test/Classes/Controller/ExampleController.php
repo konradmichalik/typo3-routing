@@ -246,4 +246,11 @@ final class ExampleController implements RouteControllerInterface
         // A Unicode-aware requirement on an otherwise ASCII path.
         return new JsonResponse(['name' => $name]);
     }
+
+    #[Route(path: '/api/example/graphemes/{cluster}', name: 'example_grapheme_cluster', requirements: ['cluster' => '\X+'])]
+    public function graphemeCluster(string $cluster): JsonResponse
+    {
+        // \X (extended grapheme cluster) is another construct that needs the derived "utf8" option.
+        return new JsonResponse(['cluster' => $cluster]);
+    }
 }

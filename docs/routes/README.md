@@ -39,5 +39,6 @@ One gap in that second promise is worth knowing about if you [share route defini
 | [Route groups](route-groups.md) | A class-level `#[Route]` as a shared prefix, which parameters inherit from it, and sharing route definitions through a base class |
 | [Typed controller arguments](arguments.md) | Type coercion, backed enums, Extbase entity binding, variadics, and overriding the source with `#[Param]` |
 | [URL generation](url-generation.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator, so a path is never duplicated |
+| [List/detail endpoints for database records](records.md) | A recipe combining the above for exposing a table, and why that stays a recipe rather than a feature |
 
 Once a route exists, everything else is optional: [caching, rate limiting, authentication, request tokens and CORS](../features/README.md) are separate attributes you add next to `#[Route]`, and [`routing:debug`](../operating/commands.md#routingdebug) lists what you have declared.

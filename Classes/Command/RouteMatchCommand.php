@@ -23,7 +23,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
 use Symfony\Component\Routing\RequestContext;
 
+use function array_map;
 use function implode;
+use function in_array;
 use function is_string;
 use function ltrim;
 use function sprintf;
@@ -53,6 +55,8 @@ final class RouteMatchCommand extends Command
         $this->addOption('method', null, InputOption::VALUE_REQUIRED, 'Request method (default: GET)');
         $this->addOption('scheme', null, InputOption::VALUE_REQUIRED, 'Request scheme (default: https)');
         $this->addOption('host', null, InputOption::VALUE_REQUIRED, 'Request host (default: localhost)');
+        $this->addOption('site', null, InputOption::VALUE_REQUIRED, 'Simulate this site identifier, to check a route\'s "sites" constraint');
+        $this->addOption('language', null, InputOption::VALUE_REQUIRED, 'Simulate this language id, to check a route\'s "languages" constraint');
     }
 
     #[Override]
@@ -82,9 +86,51 @@ final class RouteMatchCommand extends Command
             return Command::FAILURE;
         }
 
+        $rejection = $this->siteRejection($match, $input) ?? $this->languageRejection($match, $input);
+        if (null !== $rejection) {
+            $io->warning($rejection);
+
+            return Command::FAILURE;
+        }
+
         $this->render($io, $match);
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @param array<string, mixed> $match
+     */
+    private function siteRejection(array $match, InputInterface $input): ?string
+    {
+        /** @var list<string> $sites */
+        $sites = $match['_sites'] ?? [];
+        $site = $this->option($input, 'site');
+        if ([] === $sites || null === $site || in_array($site, $sites, true)) {
+            return null;
+        }
+
+        return sprintf('Path matches route "%s", but simulated site "%s" is not in its allowed sites: "%s".', (string) ($match['_route'] ?? ''), $site, implode('", "', $sites));
+    }
+
+    /**
+     * @param array<string, mixed> $match
+     */
+    private function languageRejection(array $match, InputInterface $input): ?string
+    {
+        /** @var list<int> $languages */
+        $languages = $match['_languages'] ?? [];
+        $language = $this->option($input, 'language');
+        if ([] === $languages || null === $language) {
+            return null;
+        }
+
+        $languageId = (int) $language;
+        if (in_array($languageId, $languages, true)) {
+            return null;
+        }
+
+        return sprintf('Path matches route "%s", but simulated language %d is not in its allowed languages: "%s".', (string) ($match['_route'] ?? ''), $languageId, implode('", "', array_map(strval(...), $languages)));
     }
 
     private function context(InputInterface $input): RequestContext
@@ -115,6 +161,19 @@ final class RouteMatchCommand extends Command
         if (is_string($env) && '' !== $env) {
             // The matcher ignores env; the dispatcher hides the route (404) outside this context.
             $rows[] = ['Env' => $env.' (only reachable in this application context)'];
+        }
+
+        /** @var list<string> $sites */
+        $sites = $match['_sites'] ?? [];
+        if ([] !== $sites) {
+            // The matcher ignores sites/languages too; the dispatcher hides the route (404) outside them.
+            $rows[] = ['Sites' => implode(', ', $sites).' (only reachable from these sites)'];
+        }
+
+        /** @var list<int> $languages */
+        $languages = $match['_languages'] ?? [];
+        if ([] !== $languages) {
+            $rows[] = ['Languages' => implode(', ', array_map(strval(...), $languages)).' (only reachable in these languages)'];
         }
 
         $io->definitionList(...$rows);

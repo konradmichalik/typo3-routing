@@ -180,6 +180,38 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function dispatchesARouteScopedToTheRequestsSite(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-site'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function hidesARouteScopedToADifferentSite(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-site-other'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function dispatchesARouteScopedToTheRequestsLanguage(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-language'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function hidesARouteScopedToADifferentLanguage(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-language-other'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
     public function routeOwnCorsAttributeAppliesWithoutAnyGlobalCorsConfiguration(): void
     {
         // This test instance has no cors.* extension configuration at all — the global policy is off.

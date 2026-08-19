@@ -19,7 +19,7 @@ use KonradMichalik\Ttt\Assertion\JsonAssertions;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Http\{RouteUrlGenerator, SiteBasePathResolver};
-use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteInvoker, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteInvoker, RouteRegistry, SiteLanguageScope};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, HeaderAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, InvokerProbeController};
@@ -28,7 +28,9 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Core\Site\SiteFinder;
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
@@ -373,6 +375,38 @@ final class RouteInvokerTest extends TestCase
         self::assertSame(404, $response->getStatusCode());
     }
 
+    #[Test]
+    public function invokesARouteScopedToTheCallingRequestsSite(): void
+    {
+        $response = $this->invoker()->invoke('scopedSite', [], $this->request());
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function returnsNotFoundForARouteScopedToAnotherSite(): void
+    {
+        $response = $this->invoker()->invoke('scopedSiteOther', [], $this->request());
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function invokesARouteScopedToTheCallingRequestsLanguage(): void
+    {
+        $response = $this->invoker()->invoke('scopedLanguage', [], $this->request());
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function returnsNotFoundForARouteScopedToAnotherLanguage(): void
+    {
+        $response = $this->invoker()->invoke('scopedLanguageOther', [], $this->request());
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
     private function invoker(?Context $context = null): RouteInvoker
     {
         $registry = $this->registry();
@@ -382,12 +416,13 @@ final class RouteInvokerTest extends TestCase
             new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))),
             new AccessGuard($registry, $context ?? new Context()),
             new RouteUrlGenerator($registry, new SiteBasePathResolver()),
+            new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class)),
         );
     }
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, sites?: list<string>, languages?: list<int>}> $routes */
         $routes = [
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
@@ -412,6 +447,10 @@ final class RouteInvokerTest extends TestCase
             'limited' => ['path' => '/api/limited', 'methods' => ['GET'], 'controller' => 'ctrl::limited', 'env' => null, 'requirements' => []],
             'problem' => ['path' => '/api/problem', 'methods' => ['GET'], 'controller' => 'ctrl::problem', 'env' => null, 'requirements' => []],
             'entity' => ['path' => '/api/entity/{item}', 'methods' => ['GET'], 'controller' => 'entityCtrl::show', 'env' => null, 'requirements' => []],
+            'scopedSite' => ['path' => '/api/scoped-site', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'sites' => ['main']],
+            'scopedSiteOther' => ['path' => '/api/scoped-site-other', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'sites' => ['other-site']],
+            'scopedLanguage' => ['path' => '/api/scoped-language', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'languages' => [0]],
+            'scopedLanguageOther' => ['path' => '/api/scoped-language-other', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'languages' => [1]],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
@@ -472,6 +511,10 @@ final class RouteInvokerTest extends TestCase
             'limited' => [],
             'problem' => [],
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
+            'scopedSite' => [],
+            'scopedSiteOther' => [],
+            'scopedLanguage' => [],
+            'scopedLanguageOther' => [],
         ];
 
         $locator = new ServiceLocator([

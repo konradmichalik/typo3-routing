@@ -17,7 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, JsonErrorResponse, RequestIdResolver, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
-use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteMatcher, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteMatcher, RouteRegistry, SiteLanguageScope};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
@@ -68,6 +68,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         private CacheBypassGuard $cacheBypass,
         private ClientKeyResolver $clientKeyResolver,
         private RouteUrlGenerator $urlGenerator,
+        private SiteLanguageScope $siteLanguageScope,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $configured = '';
@@ -143,12 +144,19 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return JsonErrorResponse::create(404, 'Not Found');
         }
 
-        // 3b. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
+        // 3b. Site/language scope: a route not bound to the current site or language is invisible too.
+        //     Checked before the canonical redirect below for the same reason as the env filter above:
+        //     a redirect must never reveal a route invisible in the current context.
+        if (!$this->siteLanguageScope->isVisibleForSite($match['_sites'] ?? null, $request)
+            || !$this->siteLanguageScope->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
+            return JsonErrorResponse::create(404, 'Not Found');
+        }
+
+        // 3c. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
         //     or case) answers 308 to its declared form instead of serving directly, so exactly one URL
-        //     survives for caches and search indexing. Checked after the env filter so a redirect never
-        //     reveals a route invisible in the current context, and before the checks below so a client
-        //     on the wrong URL is redirected instead of getting a body/requirement error for a request
-        //     it is about to resubmit anyway.
+        //     survives for caches and search indexing. Checked before the checks below so a client on
+        //     the wrong URL is redirected instead of getting a body/requirement error for a request it
+        //     is about to resubmit anyway.
         $redirect = $this->canonicalRedirect($match, $request);
         if (null !== $redirect) {
             return $redirect;

@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathNoPrefixController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathNoPrefixController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -136,6 +136,30 @@ final class RouteCompilerPassTest extends TestCase
         $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
 
         self::assertFalse($routes['fixture_count']['caseInsensitive'] ?? null);
+    }
+
+    #[Test]
+    public function inheritsTheClassLevelTags(): void
+    {
+        $routes = $this->discover($this->buildContainer(['tagged' => TaggedController::class]));
+
+        self::assertSame(['Tagged'], $routes['tagged_inherited']['tags'] ?? null);
+    }
+
+    #[Test]
+    public function aMethodCanOverrideTheClassLevelTags(): void
+    {
+        $routes = $this->discover($this->buildContainer(['tagged' => TaggedController::class]));
+
+        self::assertSame(['Overridden'], $routes['tagged_overridden']['tags'] ?? null);
+    }
+
+    #[Test]
+    public function routesWithoutTagsDefaultToEmpty(): void
+    {
+        $routes = $this->discover($this->buildContainer(['fixture_controller' => FixtureController::class]));
+
+        self::assertSame([], $routes['fixture_count']['tags'] ?? null);
     }
 
     #[Test]
@@ -857,13 +881,13 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     /**
-     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}>
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}>
      */
     private function discover(ContainerBuilder $container): array
     {
         (new RouteCompilerPass())->process($container);
 
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}> $routes */
         $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
 
         return $routes;

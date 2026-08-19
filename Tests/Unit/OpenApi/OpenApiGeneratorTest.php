@@ -66,6 +66,14 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function usesTheRoutesOwnTagsInsteadOfTheServiceIdWhenSet(): void
+    {
+        $operation = $this->generate()['paths']['/api/v1/items-tagged']['get'];
+
+        self::assertSame(['Items', 'Catalog'], $operation['tags']);
+    }
+
+    #[Test]
     public function addsParamDescriptionToTheParameterAndOmitsItWhenAbsent(): void
     {
         [$id, $status] = $this->generate()['paths']['/api/v1/items/{id}']['get']['parameters'];
@@ -310,7 +318,7 @@ final class OpenApiGeneratorTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, tags?: list<string>}> $routes */
         $routes = [
             'items_show' => [
                 'path' => '/api/v1/items/{id}',
@@ -325,6 +333,14 @@ final class OpenApiGeneratorTest extends TestCase
                 'controller' => 'ctrl::create',
                 'env' => null,
                 'requirements' => [],
+            ],
+            'items_tagged' => [
+                'path' => '/api/v1/items-tagged',
+                'methods' => ['GET'],
+                'controller' => 'ctrl::tagged',
+                'env' => null,
+                'requirements' => [],
+                'tags' => ['Items', 'Catalog'],
             ],
         ];
 

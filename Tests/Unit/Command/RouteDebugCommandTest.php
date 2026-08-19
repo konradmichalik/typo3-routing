@@ -200,6 +200,32 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function detailRendersTagsWithAFallback(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_tagged']);
+        self::assertMatchesRegularExpression('/Tags\s+Tagged/', $tester->getDisplay());
+
+        $tester->execute(['name' => 'example_count']);
+        self::assertMatchesRegularExpression('/Tags\s+-/', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function jsonOutputCarriesTags(): void
+    {
+        $tester = $this->tester($this->registry());
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, tags: list<string>}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+        $tags = array_column($data, 'tags', 'name');
+
+        self::assertSame(['Tagged'], $tags['example_tagged']);
+        self::assertSame([], $tags['example_count']);
+    }
+
+    #[Test]
     public function truncatesLongDescriptionsInTableOutputButNotInJsonOrDetail(): void
     {
         $tester = $this->tester($this->registry());
@@ -373,13 +399,14 @@ final class RouteDebugCommandTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>}> $routes */
         $routes = [
             'example_count' => ['path' => '/api/example/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'example_dev' => ['path' => '/api/example/dev', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['id' => '\d+']],
             'example_secure' => ['path' => '/api/example/secure', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'host' => 'api.example.com', 'description' => 'Charges a payment for the current basket, only reachable over HTTPS.'],
             'example_any' => ['path' => '/api/example/any', 'methods' => [], 'controller' => 'ctrl::any', 'env' => null, 'requirements' => []],
             'example_loose' => ['path' => '/api/example/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
+            'example_tagged' => ['path' => '/api/example/tagged', 'methods' => ['GET'], 'controller' => 'ctrl::tagged', 'env' => null, 'requirements' => [], 'tags' => ['Tagged']],
         ];
 
         /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */

@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Route};
 use KonradMichalik\Typo3Routing\DependencyInjection\CompilerWarnings;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{DropsAuthenticateOnOverrideController, DropsOneInheritedRouteController, InheritsProtectedRouteCleanlyController, NarrowsAuthenticateOnOverrideController, OrCombinedAuthenticateBaseController, OverridesPlainMethodController, ProtectedRouteBaseController, RepeatsAuthenticateOnOverrideController, RepeatsBothAuthenticateOnOverrideController, TwoRouteBaseController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, InheritsProtectedRouteCleanlyController, NarrowsAuthenticateOnOverrideController, OrCombinedAuthenticateBaseController, OverridesPlainMethodController, ProtectedRouteBaseController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, TwoAliasRouteBaseController, TwoRouteBaseController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -107,7 +107,33 @@ final class CompilerWarningsTest extends TestCase
 
         self::assertCount(1, $warnings);
         self::assertStringContainsString('"drops_one::b()" overrides', $warnings[0]);
-        self::assertStringContainsString('does not repeat it', $warnings[0]);
+        self::assertStringContainsString('does not repeat all its #[Route] attributes', $warnings[0]);
+        self::assertStringContainsString('route_b', $warnings[0]);
+    }
+
+    #[Test]
+    public function warnIfRouteWasDroppedWarnsWhenAnOverrideKeepsOnlyOneOfTwoAliases(): void
+    {
+        $overridden = new ReflectionMethod(TwoAliasRouteBaseController::class, 'list');
+        $override = new ReflectionMethod(DropsOneAliasOnOverrideController::class, 'list');
+
+        $warnings = $this->captureWarnings(static fn () => (new CompilerWarnings())->warnIfRouteWasDropped($overridden, $override, 'drops_alias'));
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"drops_alias::list()" overrides', $warnings[0]);
+        self::assertStringContainsString('alias_b', $warnings[0]);
+        self::assertStringNotContainsString('alias_a,', $warnings[0]);
+    }
+
+    #[Test]
+    public function warnIfRouteWasDroppedStaysSilentWhenBothAliasesAreRepeatedInAnyOrder(): void
+    {
+        $overridden = new ReflectionMethod(TwoAliasRouteBaseController::class, 'list');
+        $override = new ReflectionMethod(RepeatsBothAliasesOnOverrideController::class, 'list');
+
+        $warnings = $this->captureWarnings(static fn () => (new CompilerWarnings())->warnIfRouteWasDropped($overridden, $override, 'repeats_both'));
+
+        self::assertSame([], $warnings);
     }
 
     #[Test]

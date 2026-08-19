@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -688,12 +688,36 @@ final class RouteCompilerPassTest extends TestCase
 
         self::assertCount(1, $warnings);
         self::assertStringContainsString('"drops_one::b()" overrides', $warnings[0]);
-        self::assertStringContainsString('does not repeat it', $warnings[0]);
+        self::assertStringContainsString('does not repeat all its #[Route] attributes', $warnings[0]);
+        self::assertStringContainsString('route_b', $warnings[0]);
 
         // The class still has one working route: the zero-routes check does not additionally fire.
         /** @var array<string, array{path: string}> $routes */
         $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
         self::assertSame(['route_a'], array_keys($routes));
+    }
+
+    #[Test]
+    public function warnsWhenAnOverrideRepeatsOnlyOneOfTwoRouteAliasesFromTheParent(): void
+    {
+        $container = $this->buildContainer(['drops_alias' => DropsOneAliasOnOverrideController::class]);
+        $warnings = $this->captureWarnings($container);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"drops_alias::list()" overrides', $warnings[0]);
+        self::assertStringContainsString('alias_b', $warnings[0]);
+
+        /** @var array<string, array{path: string}> $routes */
+        $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
+        self::assertSame(['alias_a'], array_keys($routes));
+    }
+
+    #[Test]
+    public function doesNotWarnWhenAnOverrideRepeatsBothRouteAliasesInAnyOrder(): void
+    {
+        $container = $this->buildContainer(['repeats_both' => RepeatsBothAliasesOnOverrideController::class]);
+
+        self::assertSame([], $this->captureWarnings($container));
     }
 
     #[Test]

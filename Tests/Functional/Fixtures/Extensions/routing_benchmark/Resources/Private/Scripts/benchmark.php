@@ -64,6 +64,12 @@ $scenarios = [
     ],
 ];
 
+/**
+ * The upfront smoke test (step 1) only proves each endpoint answered 200 once; without re-checking
+ * every measured request too, a transient 404 (or any other non-2xx) during the timed loop would
+ * silently record that failure's latency as if it were the real endpoint's, corrupting the numbers
+ * with no indication anything went wrong.
+ */
 function request(string $url): void
 {
     $ch = curl_init($url);
@@ -74,8 +80,14 @@ function request(string $url): void
         \CURLOPT_TIMEOUT => 30,
         \CURLOPT_HTTPHEADER => ['Accept: application/json'],
     ]);
-    curl_exec($ch);
+    $body = curl_exec($ch);
+    $status = curl_getinfo($ch, \CURLINFO_RESPONSE_CODE);
+    $error = curl_error($ch);
     curl_close($ch);
+
+    if (false === $body || $status < 200 || $status >= 300) {
+        throw new RuntimeException(sprintf('Benchmark request failed for %s: HTTP %d %s', $url, $status, $error), 5429005340);
+    }
 }
 
 /**

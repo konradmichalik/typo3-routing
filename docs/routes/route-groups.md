@@ -99,7 +99,7 @@ Class attributes are not inherited. A `#[Route]` on the abstract parent is ignor
 
 The `name` prefix is what keeps two subclasses apart. Without it both inherit the same route name and the container build stops with `Duplicate attribute route name`. That is the good failure: loud, and at build time.
 
-The `path` prefix has no such safety net. If the base declares `#[Route(path: '')]` for a list route and a subclass forgets its class-level `#[Route]`, that route's path is `''` and its derived static prefix is `/`, which opens the [path gate](../operating/configuration.md#path-gate) for every frontend request on the site.
+The `path` prefix has no such safety net. If the base declares `#[Route(path: '')]` for a list route and a subclass forgets its class-level `#[Route]`, that route's path is `''`. Symfony's `Route::setPath()` silently normalizes an empty path to `/`, so the route does not merely open the [path gate](../operating/configuration.md#path-gate) for every frontend request, it answers the site's root path, ahead of TYPO3's own page rendering.
 
 ### Declare the route methods `final`
 

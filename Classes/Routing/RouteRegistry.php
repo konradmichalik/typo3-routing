@@ -401,6 +401,19 @@ final class RouteRegistry
     }
 
     /**
+     * Whether this route's compiled regex carries PCRE's `u` modifier — the same decision
+     * {@see needsUtf8()} made once at collection-build time. `RouteMatcher` consults this when
+     * re-validating a requirement after a case-insensitive match, so the revalidation regex agrees with
+     * the Unicode mode the route was actually compiled with.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/EXTENDING.md
+     */
+    public function routeNeedsUtf8(string $routeName): bool
+    {
+        return isset($this->routes[$routeName]) && self::needsUtf8($this->routes[$routeName]);
+    }
+
+    /**
      * The prefixes the dispatcher turns into its path gate, so no configuration is needed to keep
      * matching off the hot path for ordinary page requests. Baked in at container build time; the
      * fallback mirrors getMatcher() and covers registries constructed without compiled data (tests,
@@ -434,6 +447,10 @@ final class RouteRegistry
             return true;
         }
 
+        if (self::containsNonAscii($route['host'] ?? '')) {
+            return true;
+        }
+
         foreach ($route['requirements'] as $pattern) {
             if (self::containsNonAscii($pattern) || self::hasUnicodeRegexConstruct($pattern)) {
                 return true;
@@ -449,11 +466,12 @@ final class RouteRegistry
     }
 
     /**
-     * `\p{...}`, `\X` and `\x{...}` require PCRE's Unicode mode even in an otherwise all-ASCII pattern.
+     * `\p{...}`/`\P{...}` (and their brace-less single-letter shorthand `\pL`/`\PL`), `\X` and `\x{...}`
+     * all require PCRE's Unicode mode even in an otherwise all-ASCII pattern.
      */
     private static function hasUnicodeRegexConstruct(string $pattern): bool
     {
-        return 1 === preg_match('/\\\\p\{|\\\\X|\\\\x\{/', $pattern);
+        return 1 === preg_match('/\\\\[pP](?:\{|[A-Za-z])|\\\\X|\\\\x\{/', $pattern);
     }
 
     /**

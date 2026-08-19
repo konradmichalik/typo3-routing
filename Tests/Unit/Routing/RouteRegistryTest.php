@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
-use PHPUnit\Framework\Attributes\{CoversClass, Test};
+use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
@@ -103,6 +103,139 @@ final class RouteRegistryTest extends TestCase
         $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
 
         self::assertSame(['/'], $prefixes);
+    }
+
+    #[Test]
+    public function setsTheUtf8OptionForANonAsciiPath(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('umlaut');
+
+        self::assertNotNull($route);
+        self::assertStringEndsWith('u', $route->compile()->getRegex());
+    }
+
+    #[Test]
+    public function doesNotSetTheUtf8OptionForAPurelyAsciiRoute(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'ascii' => ['path' => '/api/x', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('ascii');
+
+        self::assertNotNull($route);
+        self::assertStringEndsNotWith('u', $route->compile()->getRegex());
+    }
+
+    #[Test]
+    public function setsTheUtf8OptionForAUnicodeAwareRequirementOnAnAsciiPath(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'tagged' => ['path' => '/api/tags/{name}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => ['name' => '\p{L}+']],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('tagged');
+
+        self::assertNotNull($route);
+        self::assertStringEndsWith('u', $route->compile()->getRegex());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unicodeRegexConstructProvider(): iterable
+    {
+        yield 'brace-less shorthand \pL' => ['\pL+'];
+        yield 'negated property \P{L}' => ['\P{L}+'];
+        yield 'negated brace-less shorthand \PL' => ['\PL+'];
+        yield 'extended grapheme cluster \X' => ['\X+'];
+        yield 'code point escape \x{...}' => ['\x{1F600}'];
+    }
+
+    #[Test]
+    #[DataProvider('unicodeRegexConstructProvider')]
+    public function setsTheUtf8OptionForEveryUnicodeRegexConstruct(string $requirement): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'tagged' => ['path' => '/api/tags/{name}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => ['name' => $requirement]],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('tagged');
+
+        self::assertNotNull($route);
+        self::assertStringEndsWith('u', $route->compile()->getRegex());
+    }
+
+    #[Test]
+    public function setsTheUtf8OptionForANonAsciiHostOnAnAsciiPath(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, host?: string|null}> $routes */
+        $routes = [
+            'tenant' => ['path' => '/api/status', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => [], 'host' => 'täst.example.com'],
+        ];
+        $route = RouteRegistry::buildCollection($routes)->get('tenant');
+
+        self::assertNotNull($route);
+        self::assertStringEndsWith('u', $route->compile()->getRegex());
+    }
+
+    #[Test]
+    public function routeNeedsUtf8ReflectsTheSameDecisionAsTheCompiledRegex(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+            'ascii' => ['path' => '/api/x', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        self::assertTrue($registry->routeNeedsUtf8('umlaut'));
+        self::assertFalse($registry->routeNeedsUtf8('ascii'));
+        self::assertFalse($registry->routeNeedsUtf8('unknown'));
+    }
+
+    #[Test]
+    public function aNonAsciiRouteMatchesThePercentEncodedPathARealRequestArrivesAs(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+
+        // Both matchers rawurldecode() internally, so the percent-encoded form the gate must let
+        // through (see staticPrefixes below) reaches a working match once "utf8" is set.
+        self::assertSame('umlaut', $registry->getMatcher($this->getContext())->match('/api/%C3%BCber-uns')['_route']);
+    }
+
+    #[Test]
+    public function staticPrefixesIncludeThePercentEncodedFormOfANonAsciiPrefix(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+
+        $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
+
+        self::assertSame(['/api/über-uns', '/api/%C3%BCber-uns'], $prefixes);
+    }
+
+    #[Test]
+    public function staticPrefixesEncodedFormAlsoContributesItsSlashlessVariant(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = [
+            'umlaut' => ['path' => '/api/über/', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []],
+        ];
+
+        $prefixes = RouteRegistry::staticPrefixes((new RouteRegistry($routes, new ServiceLocator([])))->getRouteCollection());
+
+        self::assertSame(['/api/über/', '/api/über', '/api/%C3%BCber/', '/api/%C3%BCber'], $prefixes);
     }
 
     #[Test]

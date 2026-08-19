@@ -119,4 +119,18 @@ final class PathPrefixGateTest extends TestCase
         self::assertTrue($gate->matches('/API/count'));
         self::assertFalse($gate->matches('/some/page'));
     }
+
+    /**
+     * strtolower() only folds ASCII A-Z, so a request for the lower-case multibyte "über" would never
+     * match a declared "Über" prefix under byte-wise ASCII folding — exactly the gap this gate has to
+     * close to agree with CaseInsensitiveRouteCompiler's own "iu"-modifier regex.
+     */
+    #[Test]
+    public function matchesANonAsciiPrefixAcrossUnicodeCase(): void
+    {
+        $gate = new PathPrefixGate([], ['/api/Über']);
+
+        self::assertTrue($gate->matches('/api/über'));
+        self::assertTrue($gate->matches('/api/ÜBER'));
+    }
 }

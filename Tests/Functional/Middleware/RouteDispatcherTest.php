@@ -710,6 +710,49 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function matchesANonAsciiRouteViaThePercentEncodedRequestPath(): void
+    {
+        // TYPO3's Uri never decodes the path; a real client sends exactly this over the wire.
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/%C3%BCber-uns'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"ok":true}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function enforcesAUnicodeAwareRequirementOnAPathPlaceholder(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/tags/%C3%BCber'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"name":"über"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function enforcesAGraphemeClusterRequirementOnAPathPlaceholder(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/graphemes/%C3%BCber'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"cluster":"über"}', (string) $response->getBody());
+    }
+
+    /**
+     * No prefix is claimed exclusively here (the default), so a path violating the placeholder's own
+     * requirement stays the page router's business, same as any other unmatched path — see the note on
+     * fallsThroughForUnknownPathWhenNothingIsClaimedExclusively().
+     */
+    #[Test]
+    public function fallsThroughForASegmentViolatingTheUnicodeAwareRequirement(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/tags/123'), $sentinel);
+
+        self::assertSame($sentinel, $response);
+    }
+
+    #[Test]
     public function generatesReachableUrlIncludingSiteBase(): void
     {
         $generator = $this->get(RouteUrlGenerator::class);

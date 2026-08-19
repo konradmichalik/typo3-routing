@@ -33,6 +33,7 @@ use function in_array;
 use function is_a;
 use function is_string;
 use function sprintf;
+use function str_replace;
 use function trigger_error;
 
 use const E_USER_WARNING;
@@ -80,6 +81,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private ClassExclusiveResolver $classExclusiveResolver = new ClassExclusiveResolver(),
         private DeprecationResolver $deprecationResolver = new DeprecationResolver(),
         private ReturnsResolver $returnsResolver = new ReturnsResolver(),
+        private RouteCompileGuard $compileGuard = new RouteCompileGuard(),
     ) {}
 
     #[Override]
@@ -128,13 +130,18 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$optionalInputs', array_filter($collected->optionalInputs));
 
         $collection = RouteRegistry::buildCollection($collected->routes);
+        $this->compileGuard->assertCompiles($collection, $collected->routes);
         // Pre-compile the matcher tables so request-time matching never re-compiles route regexes.
         $registry->setArgument('$compiledRoutes', (new CompiledUrlMatcherDumper($collection))->getCompiledRoutes());
         // The dispatcher's path gate is derived from the routes themselves, so it needs no configuration.
-        $registry->setArgument('$staticPrefixes', RouteRegistry::staticPrefixes($collection));
+        // A non-ASCII prefix's percent-encoded form (see RouteRegistry::staticPrefixes()) contains a
+        // literal "%", which the container's parameter bag would otherwise try to resolve as "%C3%" —
+        // escaped here the same way any literal "%" in a baked argument has to be.
+        $escapePercent = static fn (string $prefix): string => str_replace('%', '%%', $prefix);
+        $registry->setArgument('$staticPrefixes', array_map($escapePercent, RouteRegistry::staticPrefixes($collection)));
         // Compiled separately: the gate has to open for these in every casing, and the case-insensitive
         // compilation itself carries no usable prefix.
-        $registry->setArgument('$caseInsensitivePrefixes', RouteRegistry::staticPrefixes(RouteRegistry::buildCollection(RouteRegistry::caseInsensitiveRoutes($collected->routes))));
+        $registry->setArgument('$caseInsensitivePrefixes', array_map($escapePercent, RouteRegistry::staticPrefixes(RouteRegistry::buildCollection(RouteRegistry::caseInsensitiveRoutes($collected->routes)))));
         // A class's own exclusive claim, one entry per opted-in class regardless of how many routes it
         // declares — recorded independently in $collected->classExclusivePrefixes (not derived from
         // $collected->routes), so a class with no method routes yet still keeps its claim.

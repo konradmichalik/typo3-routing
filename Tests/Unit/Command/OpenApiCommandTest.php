@@ -79,11 +79,24 @@ final class OpenApiCommandTest extends TestCase
         self::assertStringContainsString("\n", trim($tester->getDisplay()));
     }
 
-    private function tester(): CommandTester
+    #[Test]
+    public function rendersANonAsciiPathUnescaped(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::umlaut', 'env' => null, 'requirements' => []]];
+        $tester = $this->tester(new RouteRegistry($routes, new ServiceLocator([])));
+
+        $tester->execute([]);
+
+        self::assertStringContainsString('/api/über-uns', $tester->getDisplay());
+        self::assertStringNotContainsString('\\u00fc', $tester->getDisplay());
+    }
+
+    private function tester(?RouteRegistry $registry = null): CommandTester
     {
         $schemas = new JsonSchemaMapper();
 
-        return new CommandTester(new OpenApiCommand(new OpenApiGenerator($this->registry(), $schemas, new ResponsesBuilder($schemas))));
+        return new CommandTester(new OpenApiCommand(new OpenApiGenerator($registry ?? $this->registry(), $schemas, new ResponsesBuilder($schemas))));
     }
 
     /**

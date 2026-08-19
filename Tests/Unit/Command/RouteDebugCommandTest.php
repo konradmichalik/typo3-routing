@@ -138,6 +138,19 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function rendersANonAsciiPathUnescapedInJsonOutput(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['example_umlaut' => ['path' => '/api/example/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::umlaut', 'env' => null, 'requirements' => []]];
+        $tester = $this->tester(new RouteRegistry($routes, new ServiceLocator([])));
+
+        $tester->execute(['--json' => true]);
+
+        self::assertStringContainsString('/api/example/über-uns', $tester->getDisplay());
+        self::assertStringNotContainsString('\\u00fc', $tester->getDisplay());
+    }
+
+    #[Test]
     public function warnsWhenNoRoutesAreRegistered(): void
     {
         $tester = $this->tester(new RouteRegistry([], new ServiceLocator([])));

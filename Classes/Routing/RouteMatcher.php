@@ -113,6 +113,10 @@ final readonly class RouteMatcher
      * case. Re-checking each matched placeholder against its declared pattern restores the exact
      * semantics: the tolerance is meant for the path's literal segments, never for the constraints.
      *
+     * The route's own "u" modifier is carried over from {@see RouteRegistry::routeNeedsUtf8()}: without
+     * it, a Unicode-only construct like `\p{L}+` or `\X` is checked against raw bytes instead of code
+     * points and rejects every valid UTF-8 value.
+     *
      * @param array<string, mixed> $match
      *
      * @throws RequirementMismatchException a ResourceNotFoundException naming what it rejected
@@ -122,6 +126,7 @@ final readonly class RouteMatcher
         /** @var array<string, string> $requirements */
         $requirements = $match['_requirements'] ?? [];
         $routeName = (string) ($match['_route'] ?? '');
+        $modifiers = $this->registry->routeNeedsUtf8($routeName) ? 'sDu' : 'sD';
 
         foreach ($requirements as $name => $requirement) {
             $value = $match[$name] ?? null;
@@ -132,7 +137,7 @@ final readonly class RouteMatcher
                 continue;
             }
 
-            if (1 !== preg_match('{^(?:'.$requirement.')$}sD', $value)) {
+            if (1 !== preg_match('{^(?:'.$requirement.')$}'.$modifiers, $value)) {
                 throw new RequirementMismatchException($routeName, $name, $value, $requirement);
             }
         }

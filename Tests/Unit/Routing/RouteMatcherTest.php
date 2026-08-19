@@ -216,6 +216,20 @@ final class RouteMatcherTest extends TestCase
         $this->matcher()->match('/API/Loose', $this->context('DELETE'));
     }
 
+    /**
+     * The revalidation regex in assertRequirementsHold() has to carry the same "u" modifier the route
+     * itself compiled with, or a Unicode-only requirement like \p{L}+ rejects every valid UTF-8 value
+     * after a case-insensitive fallback match.
+     */
+    #[Test]
+    public function aUnicodeRequirementIsSatisfiedAfterACaseInsensitiveMatch(): void
+    {
+        $match = $this->matcher()->match('/API/Loose-Unicode/café', $this->context());
+
+        self::assertSame('looseUnicode', $match['_route']);
+        self::assertSame('café', $match['name']);
+    }
+
     private function matcher(string $trailingSlash = '1'): RouteMatcher
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -242,6 +256,7 @@ final class RouteMatcherTest extends TestCase
             'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
             'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'looseItem' => ['path' => '/api/loose/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::looseItem', 'env' => null, 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
+            'looseUnicode' => ['path' => '/api/loose-unicode/{name}', 'methods' => ['GET'], 'controller' => 'ctrl::looseUnicode', 'env' => null, 'requirements' => ['name' => '\p{L}+'], 'caseInsensitive' => true],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

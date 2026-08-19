@@ -231,4 +231,26 @@ final class ExampleController implements RouteControllerInterface
     {
         return new JsonResponse(['id' => $id, 'title' => 'Example']);
     }
+
+    #[Route(path: '/api/example/über-uns', name: 'example_umlaut')]
+    public function umlaut(): JsonResponse
+    {
+        // A non-ASCII literal path: compiles with the derived "utf8" option and answers the
+        // percent-encoded request path a real client sends.
+        return new JsonResponse(['ok' => true]);
+    }
+
+    #[Route(path: '/api/example/tags/{name}', name: 'example_unicode_tag', requirements: ['name' => '\p{L}+'])]
+    public function unicodeTag(string $name): JsonResponse
+    {
+        // A Unicode-aware requirement on an otherwise ASCII path.
+        return new JsonResponse(['name' => $name]);
+    }
+
+    #[Route(path: '/api/example/graphemes/{cluster}', name: 'example_grapheme_cluster', requirements: ['cluster' => '\X+'])]
+    public function graphemeCluster(string $cluster): JsonResponse
+    {
+        // \X (extended grapheme cluster) is another construct that needs the derived "utf8" option.
+        return new JsonResponse(['cluster' => $cluster]);
+    }
 }

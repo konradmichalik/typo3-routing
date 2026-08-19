@@ -17,8 +17,9 @@ use function array_filter;
 use function array_map;
 use function array_values;
 use function explode;
+use function preg_match;
+use function preg_quote;
 use function str_starts_with;
-use function strtolower;
 use function trim;
 
 /**
@@ -31,25 +32,19 @@ use function trim;
 final readonly class PathPrefixGate
 {
     /**
-     * @var list<string>
-     */
-    private array $caseInsensitivePrefixes;
-
-    /**
      * A set of request-path prefixes. The dispatcher builds two of these: one as the performance gate
      * deciding whether a path may reach the matcher at all, one as the exclusive claim deciding whether
      * an unmatched path inside it yields a JSON 404 instead of a page.
      *
      * Prefixes contributed by routes that opted into case-insensitive matching go into the second list.
-     * They are stored lower-cased once here rather than folded on every request.
      *
      * @param list<string> $prefixes
      * @param list<string> $caseInsensitivePrefixes
      */
-    public function __construct(private array $prefixes, array $caseInsensitivePrefixes = [])
-    {
-        $this->caseInsensitivePrefixes = array_map(strtolower(...), $caseInsensitivePrefixes);
-    }
+    public function __construct(
+        private array $prefixes,
+        private array $caseInsensitivePrefixes = [],
+    ) {}
 
     /**
      * Parses the comma-separated extension configuration value, mirroring CorsHandler::$allowedOrigins.
@@ -71,7 +66,13 @@ final readonly class PathPrefixGate
      * An empty gate matches nothing at all — no route lives behind it and it claims no path. The empty
      * string, contributed by a route whose path starts with a placeholder, matches every path.
      *
-     * Folding the path's case is skipped entirely while no route opted in, which is the default.
+     * The case-insensitive tier is skipped entirely while no route opted in, which is the default. It
+     * compares via a `/iu`-anchored `preg_match()` rather than `strtolower()`: PHP's `strtolower()` only
+     * folds ASCII `A-Z`, so a non-ASCII prefix like `/api/Über` would never match a request for
+     * `/api/über` — the exact case-insensitive multibyte matching `CaseInsensitiveRouteCompiler` already
+     * performs on the compiled regex itself, which this gate has to agree with or the request never
+     * reaches that matcher at all. An invalid-UTF-8 path simply fails every `iu` match rather than
+     * erroring, the same "no match" outcome as any other unmatched path.
      */
     public function matches(string $path): bool
     {
@@ -83,13 +84,8 @@ final readonly class PathPrefixGate
             }
         }
 
-        if ([] === $this->caseInsensitivePrefixes) {
-            return false;
-        }
-
-        $lowered = strtolower($path);
         foreach ($this->caseInsensitivePrefixes as $prefix) {
-            if (str_starts_with($lowered, $prefix)) {
+            if (1 === preg_match('/^'.preg_quote($prefix, '/').'/iu', $path)) {
                 return true;
             }
         }

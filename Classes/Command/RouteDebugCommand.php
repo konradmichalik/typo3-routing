@@ -75,7 +75,7 @@ final class RouteDebugCommand extends Command
         $rows = array_values(array_filter($rows, fn (array $row): bool => $this->matches($row, $filters)));
 
         if ($json) {
-            $output->writeln(json_encode($rows, \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES));
+            $output->writeln(json_encode($rows, \JSON_THROW_ON_ERROR | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE));
 
             return Command::SUCCESS;
         }

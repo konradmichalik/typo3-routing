@@ -96,6 +96,26 @@ final class SwaggerUiControllerTest extends TestCase
     }
 
     #[Test]
+    public function openApiJsonRendersANonAsciiPathUnescaped(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturnCallback(
+            static fn (string $extension, string $key): string => 'swaggerUi' === $key ? '1' : '/api/',
+        );
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['umlaut' => ['path' => '/api/über-uns', 'methods' => ['GET'], 'controller' => 'ctrl::umlaut', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]));
+        $schemas = new JsonSchemaMapper();
+        $controller = new SwaggerUiController(new OpenApiGenerator($registry, $schemas, new ResponsesBuilder($schemas)), $this->urlGenerator(), $extensionConfiguration, new SiteBasePathResolver());
+
+        $response = $controller->openApiJson($this->request());
+
+        $body = (string) $response->getBody();
+        self::assertStringContainsString('/api/über-uns', $body);
+        self::assertStringNotContainsString('\\u00fc', $body);
+    }
+
+    #[Test]
     public function docsThrowsA404ProblemWhenTheFlagIsDisabled(): void
     {
         $controller = $this->controller('0');

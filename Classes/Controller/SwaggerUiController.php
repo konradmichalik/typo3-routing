@@ -46,7 +46,12 @@ final readonly class SwaggerUiController implements RouteControllerInterface
     {
         $this->assertEnabled();
 
-        return new JsonResponse($this->generator->generate('TYPO3 Routing API', '1.0.0', $this->siteServer($request)));
+        return new JsonResponse(
+            $this->generator->generate('TYPO3 Routing API', '1.0.0', $this->siteServer($request)),
+            200,
+            [],
+            JsonResponse::DEFAULT_JSON_FLAGS | \JSON_UNESCAPED_UNICODE,
+        );
     }
 
     #[Route(path: '/api/_routing/docs', name: 'routing_swagger_docs', env: 'Development')]

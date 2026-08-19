@@ -288,6 +288,22 @@ final class RouteDispatcherTest extends TestCase
     }
 
     /**
+     * The claim is bound to the class's own path segment (a trailing slash), not merely to whatever
+     * starts with the same characters — a sibling path that just happens to share the same leading
+     * characters as the claimed prefix is not the class's business and must stay a page request.
+     */
+    #[Test]
+    public function fallsThroughForASiblingPathSharingOnlyTheLeadingCharactersOfAClassExclusivePrefix(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('');
+
+        $response = $dispatcher->process($this->request('GET', 'https://example.com/api/exclusive-other/thing'), $this->handler($sentinel));
+
+        self::assertSame($sentinel, $response);
+    }
+
+    /**
      * Nothing registered and nothing claimed: the gate rejects every path before the matcher is built.
      */
     #[Test]
@@ -1025,7 +1041,7 @@ final class RouteDispatcherTest extends TestCase
             'corsOverride' => ['path' => '/api/cors-override', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
-            'exclusiveKnown' => ['path' => '/api/exclusive/known', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'classExclusivePrefix' => '/api/exclusive'],
+            'exclusiveKnown' => ['path' => '/api/exclusive/known', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'classExclusivePrefix' => '/api/exclusive/'],
             'json' => ['path' => '/api/json', 'methods' => ['POST'], 'controller' => 'ctrl::json', 'env' => null, 'requirements' => []],
         ];
 

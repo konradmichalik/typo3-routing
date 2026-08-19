@@ -53,4 +53,27 @@ final class CollectedRoutes
 
     /** @var array<string, array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}> */
     public array $corsConfigs = [];
+
+    /**
+     * Every opted-in class's own exclusive prefix, recorded as soon as it is resolved — independent
+     * of whether the class ends up contributing any route at all. Deriving this from $routes instead
+     * would silently drop a class that declares #[Route(exclusive: true)] but has no method routes.
+     *
+     * @var list<string>
+     */
+    public array $classExclusivePrefixes = [];
+
+    /**
+     * Kept here rather than inlined at the call site: a compiler pass with dozens of small collection
+     * steps stays within its own cognitive-complexity budget only by pushing each step's own branching
+     * onto the object that owns the data, not by accumulating every "if resolved, record it" check.
+     */
+    public function recordClassExclusivePrefix(?string $prefix): void
+    {
+        if (null === $prefix) {
+            return;
+        }
+
+        $this->classExclusivePrefixes[] = $prefix;
+    }
 }

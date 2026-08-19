@@ -55,7 +55,21 @@ final class ClassExclusiveResolverTest extends TestCase
 
         $prefix = $resolver->resolvePrefix($classRoute, 'service_id');
 
-        self::assertSame('/api/exclusive', $prefix);
+        self::assertSame('/api/exclusive/', $prefix);
+    }
+
+    /**
+     * A path already carrying its own trailing slash must not end up with two.
+     */
+    #[Test]
+    public function doesNotDoubleAnAlreadyTrailingSlash(): void
+    {
+        $resolver = new ClassExclusiveResolver();
+        $classRoute = new Route(path: '/api/exclusive/', exclusive: true);
+
+        $prefix = $resolver->resolvePrefix($classRoute, 'service_id');
+
+        self::assertSame('/api/exclusive/', $prefix);
     }
 
     #[Test]

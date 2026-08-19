@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, RoutelessExclusiveController, TaggedController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -177,7 +177,20 @@ final class RouteCompilerPassTest extends TestCase
         $container = $this->buildContainer(['exclusive' => ExclusiveController::class]);
         (new RouteCompilerPass())->process($container);
 
-        self::assertSame(['/api/exclusive'], $container->getDefinition(RouteRegistry::class)->getArgument('$classExclusivePrefixes'));
+        self::assertSame(['/api/exclusive/'], $container->getDefinition(RouteRegistry::class)->getArgument('$classExclusivePrefixes'));
+    }
+
+    /**
+     * The claim is recorded independently of $routes: a class contributing no method route at all must
+     * not lose it just because there is nothing else to carry it.
+     */
+    #[Test]
+    public function bakesTheClassExclusivePrefixOfAControllerWithNoMethodRoutes(): void
+    {
+        $container = $this->buildContainer(['no_routes' => RoutelessExclusiveController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        self::assertSame(['/api/no-routes/'], $container->getDefinition(RouteRegistry::class)->getArgument('$classExclusivePrefixes'));
     }
 
     #[Test]
@@ -732,7 +745,7 @@ final class RouteCompilerPassTest extends TestCase
     {
         $routes = $this->discover($this->buildContainer(['exclusive' => ExclusiveController::class]));
 
-        self::assertSame('/api/exclusive', $routes['exclusive_known']['classExclusivePrefix'] ?? null);
+        self::assertSame('/api/exclusive/', $routes['exclusive_known']['classExclusivePrefix'] ?? null);
     }
 
     #[Test]

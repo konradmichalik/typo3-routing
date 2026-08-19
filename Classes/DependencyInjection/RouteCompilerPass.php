@@ -26,6 +26,8 @@ use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
 
 use function array_intersect;
 use function array_map;
+use function array_unique;
+use function array_values;
 use function count;
 use function in_array;
 use function is_a;
@@ -123,8 +125,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         // Compiled separately: the gate has to open for these in every casing, and the case-insensitive
         // compilation itself carries no usable prefix.
         $registry->setArgument('$caseInsensitivePrefixes', RouteRegistry::staticPrefixes(RouteRegistry::buildCollection(RouteRegistry::caseInsensitiveRoutes($collected->routes))));
-        // A class's own exclusive claim, one entry per opted-in class regardless of how many routes it declares.
-        $registry->setArgument('$classExclusivePrefixes', RouteRegistry::classExclusivePrefixes($collected->routes));
+        // A class's own exclusive claim, one entry per opted-in class regardless of how many routes it
+        // declares — recorded independently in $collected->classExclusivePrefixes (not derived from
+        // $collected->routes), so a class with no method routes yet still keeps its claim.
+        $registry->setArgument('$classExclusivePrefixes', array_values(array_unique($collected->classExclusivePrefixes)));
     }
 
     /**
@@ -165,6 +169,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $classRoute = $this->resolveClassRoute($reflection, $serviceId);
         $classCors = $this->corsResolver->resolveClass($reflection);
         $classExclusivePrefix = $this->classExclusiveResolver->resolvePrefix($classRoute, $serviceId);
+        $collected->recordClassExclusivePrefix($classExclusivePrefix);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {

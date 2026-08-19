@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\OpenApi\JsonSchemaMapper;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{AllOptionalDto, CourseDto, CourseWithInstructorDto};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
@@ -270,5 +271,54 @@ final class JsonSchemaMapperTest extends TestCase
             ['type' => 'string', 'enum' => []],
             (new JsonSchemaMapper())->schemaForType(Suit::class, 'Hearts'),
         );
+    }
+
+    #[Test]
+    public function mapsADtosPromotedPropertiesToAnObjectSchema(): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(CourseDto::class);
+
+        self::assertSame('object', $schema['type']);
+        self::assertSame(
+            [
+                'id' => ['type' => 'integer'],
+                'title' => ['type' => 'string'],
+                'description' => ['type' => 'string'],
+                'enrolledCount' => ['type' => 'integer'],
+            ],
+            $schema['properties'],
+        );
+    }
+
+    /**
+     * A nullable property or one with a default is optional; everything else is required.
+     */
+    #[Test]
+    public function marksOnlyNonNullableParameterlessPropertiesAsRequired(): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(CourseDto::class);
+
+        self::assertSame(['id', 'title'], $schema['required']);
+    }
+
+    #[Test]
+    public function omitsRequiredEntirelyWhenEveryPropertyIsOptional(): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(AllOptionalDto::class);
+
+        self::assertArrayNotHasKey('required', $schema);
+    }
+
+    #[Test]
+    public function mapsANestedDtoPropertyRecursivelyAndAnEnumPropertyThroughSchemaForType(): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(CourseWithInstructorDto::class);
+
+        self::assertSame(
+            ['type' => 'object', 'properties' => ['id' => ['type' => 'integer'], 'name' => ['type' => 'string']], 'required' => ['id', 'name']],
+            $schema['properties']['instructor'],
+        );
+        self::assertSame(['type' => 'string', 'enum' => ['active', 'inactive']], $schema['properties']['status']);
+        self::assertSame(['id', 'instructor', 'status'], $schema['required']);
     }
 }

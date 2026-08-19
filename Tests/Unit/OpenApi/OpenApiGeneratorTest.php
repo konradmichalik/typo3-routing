@@ -15,10 +15,13 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
-use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator};
+use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator, ResponsesBuilder};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\Collision\CourseDto as CollidingCourseDto;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
+use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
@@ -44,7 +47,7 @@ final class OpenApiGeneratorTest extends TestCase
     #[Test]
     public function omitsServersWhenServerIsEmpty(): void
     {
-        $document = (new OpenApiGenerator($this->registry(), new JsonSchemaMapper()))->generate('My API', '2.0.0', '');
+        $document = $this->generator($this->registry())->generate('My API', '2.0.0', '');
 
         self::assertArrayNotHasKey('servers', $document);
     }
@@ -56,7 +59,7 @@ final class OpenApiGeneratorTest extends TestCase
         $routes = ['x' => ['path' => '/api/x', 'methods' => ['GET'], 'controller' => 'ctrl::x', 'env' => null, 'requirements' => []]];
         $registry = new RouteRegistry($routes, new ServiceLocator([]), deprecations: ['x' => ['since' => 1, 'sunset' => null, 'successor' => null, 'documentation' => null]]);
 
-        $document = (new OpenApiGenerator($registry, new JsonSchemaMapper()))->generate('My API', '2.0.0', '/api/');
+        $document = $this->generator($registry)->generate('My API', '2.0.0', '/api/');
 
         self::assertTrue($document['paths']['/api/x']['get']['deprecated']);
     }
@@ -259,12 +262,96 @@ final class OpenApiGeneratorTest extends TestCase
         self::assertSame('A lone sentence with no split point', $operation['description']);
     }
 
+    #[Test]
+    public function aDeclaredReturnsProducesAContentSchemaOnTheOperation(): void
+    {
+        $operation = $this->features()['paths']['/api/course']['get'];
+
+        self::assertSame(
+            '#/components/schemas/CourseDto',
+            $operation['responses'][200]['content']['application/json']['schema']['$ref'],
+        );
+    }
+
+    #[Test]
+    public function aRepeatedReturnsMergesWithTheGeneratorDerivedStatusInsteadOfDuplicating(): void
+    {
+        $operation = $this->features()['paths']['/api/course']['get'];
+
+        self::assertSame('Course not found', $operation['responses'][404]['description']);
+        // The declared 404 has no schema, so it stays a plain description — no content key at all.
+        self::assertArrayNotHasKey('content', $operation['responses'][404]);
+        // 404 appears exactly once — no duplicate alongside the declared one; 405 is still added
+        // separately since the route declares no #[Returns] for it.
+        self::assertSame([200, 404, 405], array_keys($operation['responses']));
+    }
+
+    #[Test]
+    public function aCollectionReturnsProducesAnArraySchemaOfTheReferencedType(): void
+    {
+        $operation = $this->features()['paths']['/api/courses']['get'];
+        $schema = $operation['responses'][200]['content']['application/json']['schema'];
+
+        self::assertSame('array', $schema['type']);
+        self::assertSame('#/components/schemas/CourseDto', $schema['items']['$ref']);
+    }
+
+    #[Test]
+    public function aNullSchemaReturnsDescribesAResponseWithNoContent(): void
+    {
+        $operation = $this->features()['paths']['/api/no-body']['get'];
+
+        self::assertSame(['description' => 'No Content'], $operation['responses'][204]);
+        self::assertArrayNotHasKey('content', $operation['responses'][204]);
+    }
+
+    #[Test]
+    public function aRouteWithoutReturnsProducesExactlyTheGenericSuccessResponse(): void
+    {
+        $operation = $this->features()['paths']['/api/dev']['get'];
+
+        self::assertSame(['description' => 'Successful response'], $operation['responses'][200]);
+    }
+
+    #[Test]
+    public function sharesOneComponentsSchemaEntryAcrossRoutesDeclaringTheSameDto(): void
+    {
+        $document = $this->features();
+
+        self::assertArrayHasKey('CourseDto', $document['components']['schemas']);
+        self::assertSame('object', $document['components']['schemas']['CourseDto']['type']);
+        self::assertSame(
+            $document['paths']['/api/course']['get']['responses'][200]['content']['application/json']['schema'],
+            $document['paths']['/api/course-again']['get']['responses'][200]['content']['application/json']['schema'],
+        );
+    }
+
+    #[Test]
+    public function rejectsTwoDifferentClassesResolvingToTheSameSchemaName(): void
+    {
+        $routes = [
+            'a' => ['path' => '/api/a', 'methods' => ['GET'], 'controller' => 'ctrl::a', 'env' => null, 'requirements' => []],
+            'b' => ['path' => '/api/b', 'methods' => ['GET'], 'controller' => 'ctrl::b', 'env' => null, 'requirements' => []],
+        ];
+        $returns = [
+            'a' => [['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null]],
+            'b' => [['status' => 200, 'schema' => CollidingCourseDto::class, 'collection' => false, 'description' => null]],
+        ];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), [], [], ['a' => [], 'b' => []], returns: $returns);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000038);
+        $this->expectExceptionMessageMatches('/both resolve to the OpenAPI schema name "CourseDto"/');
+
+        $this->generator($registry)->generate('My API', '1.0.0', '');
+    }
+
     /**
      * @return array<string, mixed>
      */
     private function generate(): array
     {
-        return (new OpenApiGenerator($this->registry(), new JsonSchemaMapper()))->generate('My API', '2.0.0', '/api/');
+        return $this->generator($this->registry())->generate('My API', '2.0.0', '/api/');
     }
 
     /**
@@ -272,7 +359,14 @@ final class OpenApiGeneratorTest extends TestCase
      */
     private function features(): array
     {
-        return (new OpenApiGenerator($this->featureRegistry(), new JsonSchemaMapper()))->generate('My API', '1.0.0', '/api/');
+        return $this->generator($this->featureRegistry())->generate('My API', '1.0.0', '/api/');
+    }
+
+    private function generator(RouteRegistry $registry): OpenApiGenerator
+    {
+        $schemas = new JsonSchemaMapper();
+
+        return new OpenApiGenerator($registry, $schemas, new ResponsesBuilder($schemas));
     }
 
     /**
@@ -301,6 +395,10 @@ final class OpenApiGeneratorTest extends TestCase
             'routing_swagger_openapi_json' => ['path' => '/api/_routing/openapi.json', 'methods' => ['GET'], 'controller' => SwaggerUiController::class.'::openApiJson', 'env' => 'Development', 'requirements' => []],
             'described' => ['path' => '/api/described', 'methods' => ['GET'], 'controller' => 'ctrl::described', 'env' => null, 'requirements' => [], 'description' => 'Fetch a single course by its numeric ID. Includes schedule and availability.'],
             'singleSentence' => ['path' => '/api/single-sentence', 'methods' => ['GET'], 'controller' => 'ctrl::singleSentence', 'env' => null, 'requirements' => [], 'description' => 'A lone sentence with no split point'],
+            'course' => ['path' => '/api/course', 'methods' => ['GET'], 'controller' => 'ctrl::course', 'env' => null, 'requirements' => []],
+            'courseAgain' => ['path' => '/api/course-again', 'methods' => ['GET'], 'controller' => 'ctrl::courseAgain', 'env' => null, 'requirements' => []],
+            'courses' => ['path' => '/api/courses', 'methods' => ['GET'], 'controller' => 'ctrl::courses', 'env' => null, 'requirements' => []],
+            'noBody' => ['path' => '/api/no-body', 'methods' => ['GET'], 'controller' => 'ctrl::noBody', 'env' => null, 'requirements' => []],
         ];
 
         $arguments = [
@@ -324,6 +422,26 @@ final class OpenApiGeneratorTest extends TestCase
             'routing_swagger_openapi_json' => [],
             'described' => [],
             'singleSentence' => [],
+            'course' => [],
+            'courseAgain' => [],
+            'courses' => [],
+            'noBody' => [],
+        ];
+
+        $returns = [
+            'course' => [
+                ['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null],
+                ['status' => 404, 'schema' => null, 'collection' => false, 'description' => 'Course not found'],
+            ],
+            'courseAgain' => [
+                ['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null],
+            ],
+            'courses' => [
+                ['status' => 200, 'schema' => CourseDto::class, 'collection' => true, 'description' => null],
+            ],
+            'noBody' => [
+                ['status' => 204, 'schema' => null, 'collection' => false, 'description' => null],
+            ],
         ];
 
         return new RouteRegistry(
@@ -333,6 +451,7 @@ final class OpenApiGeneratorTest extends TestCase
             [],
             $arguments,
             ['custom' => [['service' => 'App\\Security\\ApiKeyAuthenticator', 'options' => []]]],
+            returns: $returns,
         );
     }
 

@@ -16,8 +16,9 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, RoutelessExclusiveController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, ReturnsController, RoutelessExclusiveController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -717,6 +718,44 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionMessageMatches('/#\[Cache\], #\[RateLimit\].*without a #\[Route\]/');
 
         $this->discover($this->buildContainer(['orphaned' => OrphanedModifierController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenReturnsIsUsedWithoutARoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000013);
+        $this->expectExceptionMessageMatches('/#\[Returns\].*without a #\[Route\]/');
+
+        $this->discover($this->buildContainer(['orphaned' => OrphanedReturnsController::class]));
+    }
+
+    #[Test]
+    public function bakesDeclaredReturnsIntoTheRegistry(): void
+    {
+        $container = $this->buildContainer(['returns' => ReturnsController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>> $returns */
+        $returns = $container->getDefinition(RouteRegistry::class)->getArgument('$returns');
+
+        self::assertSame(
+            [
+                ['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null],
+                ['status' => 404, 'schema' => null, 'collection' => false, 'description' => 'Course not found'],
+            ],
+            $returns['returns_course'],
+        );
+        self::assertArrayNotHasKey('returns_plain', $returns);
+    }
+
+    #[Test]
+    public function rejectsTwoReturnsDeclarationsForTheSameStatus(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000037);
+
+        $this->discover($this->buildContainer(['duplicate' => DuplicateReturnsStatusController::class]));
     }
 
     #[Test]

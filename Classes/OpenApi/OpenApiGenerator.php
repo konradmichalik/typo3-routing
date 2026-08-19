@@ -58,6 +58,7 @@ final readonly class OpenApiGenerator
     public function __construct(
         private RouteRegistry $registry,
         private JsonSchemaMapper $schemas,
+        private ResponsesBuilder $responsesBuilder,
     ) {}
 
     /**
@@ -67,6 +68,7 @@ final readonly class OpenApiGenerator
     {
         $paths = [];
         $usedSchemes = [];
+        $usedSchemas = [];
 
         foreach ($this->registry->getRoutes() as $name => $route) {
             if (str_starts_with($route['controller'], SwaggerUiController::class.'::')) {
@@ -76,7 +78,7 @@ final readonly class OpenApiGenerator
 
             $methods = [] === $route['methods'] ? ['GET'] : $route['methods'];
             foreach ($methods as $method) {
-                $operation = $this->operation($name, $route, $method, $usedSchemes);
+                $operation = $this->operation($name, $route, $method, $usedSchemes, $usedSchemas);
                 $paths[$route['path']][strtolower($method)] = $operation;
             }
         }
@@ -92,7 +94,7 @@ final readonly class OpenApiGenerator
 
         $document['paths'] = $paths;
         $document['components'] = [
-            'schemas' => ['Error' => $this->errorSchema()],
+            'schemas' => ['Error' => $this->errorSchema(), ...$this->schemaDefinitions($usedSchemas)],
             'securitySchemes' => $usedSchemes,
         ];
 
@@ -100,12 +102,28 @@ final readonly class OpenApiGenerator
     }
 
     /**
+     * @param array<string, array{class: class-string, schema: array<string, mixed>}> $usedSchemas
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function schemaDefinitions(array $usedSchemas): array
+    {
+        $definitions = [];
+        foreach ($usedSchemas as $shortName => $entry) {
+            $definitions[$shortName] = $entry['schema'];
+        }
+
+        return $definitions;
+    }
+
+    /**
      * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, description?: string|null, tags?: list<string>} $route
      * @param array<string, array<string, string>>                                                                                                                                  $usedSchemes
+     * @param array<string, array{class: class-string, schema: array<string, mixed>}>                                                                                               $usedSchemas
      *
      * @return array<string, mixed>
      */
-    private function operation(string $name, array $route, string $method, array &$usedSchemes): array
+    private function operation(string $name, array $route, string $method, array &$usedSchemes, array &$usedSchemas): array
     {
         [$serviceId] = explode('::', $route['controller'], 2);
         $arguments = $this->registry->getArguments($name);
@@ -160,7 +178,7 @@ final readonly class OpenApiGenerator
             $operation['security'] = $security;
         }
 
-        $operation['responses'] = $this->responses($name, $route, [] !== $parameters || [] !== $bodyProperties);
+        $operation['responses'] = $this->responses($name, $route, [] !== $parameters || [] !== $bodyProperties, $usedSchemas);
 
         return $operation;
     }
@@ -331,44 +349,21 @@ final readonly class OpenApiGenerator
 
     /**
      * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>} $route
+     * @param array<string, array{class: class-string, schema: array<string, mixed>}>                                               $usedSchemas
      *
      * @return array<int, array<string, mixed>>
      */
-    private function responses(string $name, array $route, bool $hasInput): array
+    private function responses(string $name, array $route, bool $hasInput, array &$usedSchemas): array
     {
-        $responses = ['200' => ['description' => 'Successful response']];
-
-        if ($hasInput) {
-            $responses['400'] = $this->errorResponse('Bad Request (missing or invalid parameter)');
-        }
-        if ([] !== $this->registry->getAuthenticators($name)) {
-            $responses['401'] = $this->errorResponse('Unauthorized');
-        }
-        if (null !== $this->registry->getRequestTokenScope($name)) {
-            $responses['403'] = $this->errorResponse('Forbidden (invalid request token)');
-        }
-
-        $responses['404'] = $this->errorResponse('Not Found');
-
-        if ([] !== $route['methods']) {
-            $responses['405'] = $this->errorResponse('Method Not Allowed');
-        }
-        if (null !== $this->registry->getRateLimit($name)) {
-            $responses['429'] = $this->errorResponse('Too Many Requests');
-        }
-
-        return $responses;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function errorResponse(string $description): array
-    {
-        return [
-            'description' => $description,
-            'content' => ['application/problem+json' => ['schema' => ['$ref' => '#/components/schemas/Error']]],
-        ];
+        return $this->responsesBuilder->build(
+            $this->registry->getReturns($name),
+            $hasInput,
+            [] !== $this->registry->getAuthenticators($name),
+            null !== $this->registry->getRequestTokenScope($name),
+            [] !== $route['methods'],
+            null !== $this->registry->getRateLimit($name),
+            $usedSchemas,
+        );
     }
 
     /**

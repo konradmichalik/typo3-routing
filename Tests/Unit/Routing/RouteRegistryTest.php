@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -507,6 +508,17 @@ final class RouteRegistryTest extends TestCase
         self::assertSame('v2', $deprecation['successor']);
         self::assertSame('https://example.com', $deprecation['documentation']);
         self::assertNull($registry->getDeprecation('v2'));
+    }
+
+    #[Test]
+    public function exposesDeclaredReturnsPerRouteName(): void
+    {
+        $returns = [['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null]];
+        $registry = new RouteRegistry([], new ServiceLocator([]), returns: ['course_show' => $returns]);
+
+        self::assertSame($returns, $registry->getReturns('course_show'));
+        // Routes without a #[Returns] declaration report an empty list.
+        self::assertSame([], $registry->getReturns('unknown'));
     }
 
     #[Test]

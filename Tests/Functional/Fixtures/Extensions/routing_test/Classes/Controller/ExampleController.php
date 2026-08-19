@@ -14,8 +14,9 @@ declare(strict_types=1);
 namespace KonradMichalik\RoutingTest\Controller;
 
 use KonradMichalik\RoutingTest\Domain\Model\Item;
+use KonradMichalik\RoutingTest\Dto\ItemDto;
 use KonradMichalik\RoutingTest\Enum\Status;
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, Param, RateLimit, RequireRequestToken, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, Param, RateLimit, RequireRequestToken, Returns, Route};
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
@@ -221,5 +222,13 @@ final class ExampleController implements RouteControllerInterface
     public function scopedLanguageOther(): JsonResponse
     {
         return new JsonResponse(['ok' => true]);
+    }
+
+    #[Route(path: '/api/example/item-dto/{id}', name: 'example_item_dto', requirements: ['id' => '\d+'])]
+    #[Returns(ItemDto::class)]
+    #[Returns(status: 404, description: 'Item not found')]
+    public function itemDto(int $id): JsonResponse
+    {
+        return new JsonResponse(['id' => $id, 'title' => 'Example']);
     }
 }

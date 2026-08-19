@@ -50,6 +50,7 @@ final class RouteRegistry
      * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $caseInsensitivePrefixes
      * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $classExclusivePrefixes
      * @param array<string, array{since: int, sunset: int|null, successor: string|null, documentation: string|null}>                                                                                                                                                                                                                                                                                                                                                                                                              $deprecations
+     * @param array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>>                                                                                                                                                                                                                                                                                                                                                                                                      $returns
      */
     public function __construct(
         private readonly array $routes,
@@ -68,6 +69,7 @@ final class RouteRegistry
         private readonly array $caseInsensitivePrefixes = [],
         private readonly array $classExclusivePrefixes = [],
         private readonly array $deprecations = [],
+        private readonly array $returns = [],
     ) {}
 
     /**
@@ -319,6 +321,17 @@ final class RouteRegistry
     public function isCanonical(string $routeName): bool
     {
         return $this->routes[$routeName]['canonical'] ?? false;
+    }
+
+    /**
+     * The route's declared #[Returns] response schemas. An empty list means none were declared, and the
+     * OpenAPI export falls back to its generic 200 description.
+     *
+     * @return list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>
+     */
+    public function getReturns(string $routeName): array
+    {
+        return $this->returns[$routeName] ?? [];
     }
 
     /**

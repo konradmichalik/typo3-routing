@@ -143,6 +143,23 @@ What is derived automatically from the attributes:
 - **Responses** — a generic `200` plus the error responses each route can actually produce (`400`/`401`/`403`/`404`/`405`/`429`), all served as `application/problem+json` sharing the RFC 9457 `{type, title, status, detail}` `Error` schema.
 - **Description & summary** — a route's `#[Route(description: …)]` becomes the operation `description`; if it splits into more than one sentence, the first sentence is also emitted as `summary`. Routes without a `description` fall back to a synthesized one-liner naming the controller, CSRF requirement, and application context.
 
+### Declaring a response schema
+
+The generic `200` above says what a route returns nothing about its shape — controller methods are all typed `ResponseInterface`, so there is nothing to reflect on for the success case (unlike request parameters, which come from the typed method signature). `#[Returns]` fills that gap:
+
+```php
+#[Route(path: '/api/courses/{id}', name: 'course_show')]
+#[Returns(CourseDto::class)]
+#[Returns(status: 404, description: 'Course not found')]
+public function show(int $id): ResponseInterface { /* … */ }
+```
+
+- **Repeatable**, one declaration per status code a route can answer with. A declared status **merges with** a generator-derived one instead of living alongside a duplicate — declaring `404` here replaces the generic `Error`-schema `404` with your own description (and schema, if you give one), while `405`/`400`/etc. the route can still produce stay exactly as before.
+- **`schema`** is a DTO class-string; its **public properties** (plain or promoted constructor properties — reflection treats both alike) map to an object schema the same way argument types already do — a nested DTO property is mapped recursively, an enum or Extbase-entity property goes through the same rules as [request parameters](EXTENDING.md#describing-an-argument-as-json-schema). A non-nullable property without a default is `required`. Pass `schema: null` (the default) for a response with no body, e.g. `204` or a schema-less `404`.
+- **`collection: true`** wraps the schema in a JSON array instead of describing a single instance.
+- The same DTO class referenced by more than one route produces **one shared `components/schemas` entry**, referenced everywhere by `$ref` — never inlined twice. Two different classes that happen to share a short name is a build-time error, not a silent collision.
+- A route without `#[Returns]` produces exactly today's output — nothing changes until you opt in.
+
 ### Swagger UI (development only)
 
 A live Swagger UI is a thin, opt-in HTTP layer on top of the same export — no separate spec generation logic. Enable it via the [`swaggerUi` configuration flag](CONFIGURATION.md#swagger-ui-development-only); it's inert everywhere else:

@@ -88,7 +88,7 @@ final readonly class LegacyPathValidator
     }
 
     /**
-     * @param array<string, true>  $declaredPaths
+     * @param array<string, true>   $declaredPaths
      * @param array<string, string> $claimedBy
      */
     private function assertLegacyPathIsFree(string $legacyPath, string $name, array $declaredPaths, UrlMatcherInterface $matcher, ?UrlMatcherInterface $caseInsensitiveMatcher, array $claimedBy): void

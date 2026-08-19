@@ -195,11 +195,11 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors): bool
     {
         $overriddenRouteMethod = $this->compilerWarnings->findOverriddenRouteMethod($method, Route::class);
+        $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
 
         $routeAttributes = $method->getAttributes(Route::class);
         if ([] === $routeAttributes) {
             $this->assertNoOrphanedModifiers($method, $serviceId);
-            $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
 
             return false;
         }

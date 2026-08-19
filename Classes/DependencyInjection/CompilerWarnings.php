@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
+use KonradMichalik\Typo3Routing\Attribute\Route;
 use ReflectionMethod;
 
 use function array_map;
+use function assert;
 use function get_object_vars;
 use function implode;
 use function sprintf;
@@ -56,13 +58,25 @@ final readonly class CompilerWarnings
         return [] === $parentMethod->getAttributes($routeAttribute) ? null : $parentMethod;
     }
 
+    /**
+     * #[Route] is repeatable (aliases on one method), so "the override still has #[Route]" is not
+     * enough: an override repeating only some of the parent's #[Route] instances silently drops the
+     * rest, exactly as an override with none at all drops the single one.
+     */
     public function warnIfRouteWasDropped(?ReflectionMethod $overriddenRouteMethod, ReflectionMethod $method, string $serviceId): void
     {
         if (!$overriddenRouteMethod instanceof ReflectionMethod) {
             return;
         }
 
-        trigger_error(sprintf('"%s::%s()" overrides "%s::%s()", which declares a #[Route], but the override does not repeat it; the inherited route no longer exists. Repeat the #[Route] (and any modifier attributes) on the override, or remove the override if no change was intended.', $serviceId, $method->getName(), $overriddenRouteMethod->getDeclaringClass()->getName(), $method->getName()), E_USER_WARNING);
+        $dropped = $this->droppedInstances($overriddenRouteMethod, $method, Route::class);
+        if ([] === $dropped) {
+            return;
+        }
+
+        $labels = array_map($this->routeLabel(...), $dropped);
+
+        trigger_error(sprintf('"%s::%s()" overrides "%s::%s()", but does not repeat all its #[Route] attributes; the following inherited route(s) no longer exist: %s. Repeat every #[Route] (and any modifier attributes) on the override, or remove the override if no change was intended.', $serviceId, $method->getName(), $overriddenRouteMethod->getDeclaringClass()->getName(), $method->getName(), implode(', ', $labels)), E_USER_WARNING);
     }
 
     /**
@@ -76,7 +90,7 @@ final readonly class CompilerWarnings
 
         $dropped = [];
         foreach ($modifierAttributes as $class => $label) {
-            if ($this->lostAnInstance($overriddenRouteMethod, $method, $class)) {
+            if ([] !== $this->droppedInstances($overriddenRouteMethod, $method, $class)) {
                 $dropped[] = $label;
             }
         }
@@ -88,23 +102,33 @@ final readonly class CompilerWarnings
         trigger_error(sprintf('"%s::%s()" overrides "%s::%s()" and repeats #[Route], but drops %s from the parent; %s no longer applies to this route. Repeat it on the override if that was not intended.', $serviceId, $method->getName(), $overriddenRouteMethod->getDeclaringClass()->getName(), $method->getName(), implode(', ', $dropped), implode(', ', $dropped)), E_USER_WARNING);
     }
 
+    private function routeLabel(object $route): string
+    {
+        assert($route instanceof Route);
+
+        return $route->name ?? $route->path;
+    }
+
     /**
-     * Whether the override lost at least one of the parent's instances of this attribute class.
-     * A class-based presence check is not enough for a repeatable attribute like #[Authenticate]:
-     * an override keeping one of two OR-combined authenticators still "has" the class, while
-     * silently narrowing which credentials are accepted. Instances are compared structurally
-     * (constructor arguments), not by identity, and each parent instance consumes at most one
-     * matching override instance, so duplicates on either side compare correctly.
+     * The parent's instances of this attribute class that the override does not repeat. A
+     * class-based presence check is not enough for a repeatable attribute (#[Route] aliases,
+     * OR-combined #[Authenticate]): an override keeping only some instances still "has" the class,
+     * while silently dropping the rest. Instances are compared structurally (constructor arguments),
+     * not by identity, and each parent instance consumes at most one matching override instance, so
+     * duplicates on either side compare correctly.
+     *
+     * @return list<object>
      */
-    private function lostAnInstance(ReflectionMethod $parent, ReflectionMethod $override, string $attributeClass): bool
+    private function droppedInstances(ReflectionMethod $parent, ReflectionMethod $override, string $attributeClass): array
     {
         $parentInstances = array_map(static fn ($attribute) => $attribute->newInstance(), $parent->getAttributes($attributeClass));
         if ([] === $parentInstances) {
-            return false;
+            return [];
         }
 
         $overrideInstances = array_map(static fn ($attribute) => $attribute->newInstance(), $override->getAttributes($attributeClass));
 
+        $dropped = [];
         foreach ($parentInstances as $parentInstance) {
             $matchedKey = null;
             foreach ($overrideInstances as $key => $overrideInstance) {
@@ -116,12 +140,14 @@ final readonly class CompilerWarnings
             }
 
             if (null === $matchedKey) {
-                return true;
+                $dropped[] = $parentInstance;
+
+                continue;
             }
 
             unset($overrideInstances[$matchedKey]);
         }
 
-        return false;
+        return $dropped;
     }
 }

@@ -11,7 +11,7 @@ The everyday surface: what you write on a controller to make an endpoint exist.
 | Page | What's inside |
 |------|---------------|
 | [The `#[Route]` attribute](routes/route-attribute.md) | Every parameter: `requirements`, priority, optional placeholders, schemes, host, case tolerance, and how a controller returns an error |
-| [Route groups](routes/route-groups.md) | A class-level `#[Route]` as a shared prefix, and which parameters inherit from it |
+| [Route groups](routes/route-groups.md) | A class-level `#[Route]` as a shared prefix, which parameters inherit from it, and sharing route definitions through a base class |
 | [Typed controller arguments](routes/arguments.md) | How a method signature is fed from the request: type coercion, backed enums, entity binding, variadics, `#[Param]` |
 | [URL generation](routes/url-generation.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator, so a path is never duplicated |
 

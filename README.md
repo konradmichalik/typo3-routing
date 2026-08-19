@@ -24,7 +24,7 @@ The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxR
 ## ✨ Features
 
 - [**Attribute routing**](docs/routes/route-attribute.md): declare an endpoint with `#[Route]` directly on a controller method
-- [**Route groups**](docs/routes/route-groups.md): a class-level `#[Route]` prefixes every method route, e.g. for API versioning or a shared base controller
+- [**Route groups**](docs/routes/route-groups.md): a class-level `#[Route]` prefixes every method route, e.g. for API versioning; an abstract base controller can share methods when each concrete subclass declares its own prefix
 - [**Typed arguments**](docs/routes/arguments.md): methods receive type-cast path/query/body values, no manual request reading
 - [**Zero-config discovery**](docs/background/how-it-works.md): routes are collected at container compile time, no extra cache
 - [**Measured overhead**](docs/background/performance.md): requests that cannot be a route are filtered out in under a microsecond; dispatching a matched one costs ~0.6 ms more than a hand-written middleware, a few percent of a minimal JSON endpoint

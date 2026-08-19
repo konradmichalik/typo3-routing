@@ -89,7 +89,7 @@ final class ProductController extends ResourceController { /* … */ }
 final class NewsController extends ResourceController { /* … */ }
 ```
 
-The abstract class contributes no routes of its own: Symfony's service autodiscovery tags abstract classes as `container.excluded`, and the compiler pass skips them a second time. Everything else is resolved per subclass. Paths and names are prefixed, `requirements` and [`#[Param]`](arguments.md#declaring-the-constraint-at-the-parameter) contributions are hoisted separately for each one, and a `#[Cache]` or `#[RateLimit]` on the parent method applies to every subclass that inherits it.
+The abstract class contributes no routes of its own: Symfony's service autodiscovery tags abstract classes as `container.excluded`, and the compiler pass skips them a second time. Everything else is resolved per subclass. Paths and names are prefixed, `requirements` and [`#[Param]`](arguments.md#declaring-the-constraint-at-the-parameter) contributions are hoisted separately for each one, and inherited method attributes such as `#[Authenticate]`, `#[Cache]`, or `#[RateLimit]` apply to every subclass that inherits the method.
 
 Two rules separate this working from it failing quietly.
 

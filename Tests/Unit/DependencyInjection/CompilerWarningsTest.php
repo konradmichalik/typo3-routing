@@ -13,10 +13,10 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Route};
 use KonradMichalik\Typo3Routing\DependencyInjection\CompilerWarnings;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{DropsAuthenticateOnOverrideController, DropsOneInheritedRouteController, InheritsProtectedRouteCleanlyController, OverridesPlainMethodController, ProtectedRouteBaseController, RepeatsAuthenticateOnOverrideController, TwoRouteBaseController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{DropsAuthenticateOnOverrideController, DropsOneInheritedRouteController, InheritsProtectedRouteCleanlyController, NarrowsAuthenticateOnOverrideController, OrCombinedAuthenticateBaseController, OverridesPlainMethodController, ProtectedRouteBaseController, RepeatsAuthenticateOnOverrideController, RepeatsBothAuthenticateOnOverrideController, TwoRouteBaseController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -142,6 +142,42 @@ final class CompilerWarningsTest extends TestCase
         self::assertCount(1, $warnings);
         self::assertStringContainsString('"drops_auth::detail()" overrides', $warnings[0]);
         self::assertStringContainsString('drops #[Authenticate]', $warnings[0]);
+    }
+
+    #[Test]
+    public function warnIfAModifierWasDroppedWarnsWhenAnOverrideKeepsOnlyOneOfTwoOrCombinedInstances(): void
+    {
+        $overridden = new ReflectionMethod(OrCombinedAuthenticateBaseController::class, 'detail');
+        $override = new ReflectionMethod(NarrowsAuthenticateOnOverrideController::class, 'detail');
+
+        $warnings = $this->captureWarnings(static fn () => (new CompilerWarnings())->warnIfAModifierWasDropped($overridden, $override, 'narrows', [Authenticate::class => '#[Authenticate]']));
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"narrows::detail()" overrides', $warnings[0]);
+        self::assertStringContainsString('drops #[Authenticate]', $warnings[0]);
+    }
+
+    #[Test]
+    public function warnIfAModifierWasDroppedStaysSilentWhenBothOrCombinedInstancesAreRepeatedInAnyOrder(): void
+    {
+        $overridden = new ReflectionMethod(OrCombinedAuthenticateBaseController::class, 'detail');
+        $override = new ReflectionMethod(RepeatsBothAuthenticateOnOverrideController::class, 'detail');
+
+        $warnings = $this->captureWarnings(static fn () => (new CompilerWarnings())->warnIfAModifierWasDropped($overridden, $override, 'repeats_both', [Authenticate::class => '#[Authenticate]']));
+
+        self::assertSame([], $warnings);
+    }
+
+    #[Test]
+    public function warnIfAModifierWasDroppedIgnoresAModifierClassTheParentNeverHad(): void
+    {
+        $overridden = new ReflectionMethod(ProtectedRouteBaseController::class, 'detail');
+        $override = new ReflectionMethod(RepeatsAuthenticateOnOverrideController::class, 'detail');
+
+        // The parent has #[Authenticate] but no #[Cache]; nothing to drop for a class it never had.
+        $warnings = $this->captureWarnings(static fn () => (new CompilerWarnings())->warnIfAModifierWasDropped($overridden, $override, 'repeats', [Cache::class => '#[Cache]']));
+
+        self::assertSame([], $warnings);
     }
 
     /**

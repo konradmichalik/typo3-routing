@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, RepeatsAuthenticateOnOverrideController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -717,6 +717,38 @@ final class RouteCompilerPassTest extends TestCase
         $container = $this->buildContainer([
             'repeats' => RepeatsAuthenticateOnOverrideController::class,
             PassAuthenticator::class => PassAuthenticator::class,
+        ]);
+
+        self::assertSame([], $this->captureWarnings($container));
+    }
+
+    #[Test]
+    public function warnsWhenAnOverrideKeepsOnlyOneOfTwoOrCombinedAuthenticateInstances(): void
+    {
+        $container = $this->buildContainer([
+            'narrows' => NarrowsAuthenticateOnOverrideController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+
+        $warnings = $this->captureWarnings($container);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"narrows::detail()" overrides', $warnings[0]);
+        self::assertStringContainsString('drops #[Authenticate]', $warnings[0]);
+
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = $container->getDefinition(RouteRegistry::class)->getArgument('$authenticators');
+        self::assertSame([['service' => PassAuthenticator::class, 'options' => []]], $authenticators['detail']);
+    }
+
+    #[Test]
+    public function doesNotWarnWhenAnOverrideRepeatsBothOrCombinedAuthenticateInstancesInAnyOrder(): void
+    {
+        $container = $this->buildContainer([
+            'repeats_both' => RepeatsBothAuthenticateOnOverrideController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
         ]);
 
         self::assertSame([], $this->captureWarnings($container));

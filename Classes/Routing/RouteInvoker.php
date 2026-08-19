@@ -162,9 +162,9 @@ final readonly class RouteInvoker
      * to a body-sourced argument that this invocation left empty.
      *
      * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool} $route
-     * @param array<string, mixed>                                                                                                                                                                                                                                                                                       $input
-     * @param list<string>                                                                                                                                                                                                                                                                                               $placeholders
-     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>                                                                                                                                                                                             $specs
+     * @param array<string, mixed>                                                                                                                                                                                                                                                                                         $input
+     * @param list<string>                                                                                                                                                                                                                                                                                                 $placeholders
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>                                                                                                                                                                                               $specs
      */
     private function syntheticRequest(ServerRequestInterface $request, array $route, string $path, array $input, array $placeholders, array $specs): ServerRequestInterface
     {

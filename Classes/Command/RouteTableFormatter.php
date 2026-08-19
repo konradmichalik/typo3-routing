@@ -41,7 +41,7 @@ final class RouteTableFormatter
             $row['controller'],
             $row['env'] ?? '-',
             self::requirements($row['requirements']),
-            [] === $row['auth'] ? '-' : implode(', ', $row['auth']),
+            self::joinOrDash($row['auth']),
             $row['csrf'] ?? '-',
             self::truncatedDescription($row['description']),
         ];
@@ -81,6 +81,14 @@ final class RouteTableFormatter
         }
 
         return implode(\PHP_EOL, $parts);
+    }
+
+    /**
+     * @param list<string> $items
+     */
+    public static function joinOrDash(array $items): string
+    {
+        return [] === $items ? '-' : implode(', ', $items);
     }
 
     /**

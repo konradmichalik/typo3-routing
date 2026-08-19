@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -654,6 +654,104 @@ final class RouteCompilerPassTest extends TestCase
     public function ignoresAbstractControllerClasses(): void
     {
         self::assertSame([], $this->discover($this->buildContainer(['abstract' => AbstractRouteController::class])));
+    }
+
+    #[Test]
+    public function appliesTheConcreteClassPrefixToRoutesInheritedFromAnAbstractParent(): void
+    {
+        $routes = $this->discover($this->buildContainer([
+            'products' => InheritedProductController::class,
+            'news' => InheritedNewsController::class,
+        ]));
+
+        // Two route definitions on the abstract parent, one prefix per concrete controller.
+        self::assertSame(['products_list', 'products_detail', 'news_list', 'news_detail'], array_keys($routes));
+        self::assertSame('/api/products', $routes['products_list']['path']);
+        self::assertSame('/api/products/{uid}', $routes['products_detail']['path']);
+        self::assertSame('/api/news/{uid}', $routes['news_detail']['path']);
+        // The controller reference points at the concrete service, not at the parent.
+        self::assertSame('products::detail', $routes['products_detail']['controller']);
+        self::assertSame('news::detail', $routes['news_detail']['controller']);
+        // Both the method requirements and the #[Param] contribution are hoisted per subclass.
+        self::assertSame(['uid' => '\d+'], $routes['news_detail']['requirements']);
+        self::assertSame(['page' => '\d+'], $routes['products_list']['requirements']);
+    }
+
+    #[Test]
+    public function collectsFeatureAttributesFromTheInheritedMethod(): void
+    {
+        $container = $this->buildContainer([
+            'products' => InheritedProductController::class,
+            'news' => InheritedNewsController::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
+        $cacheConfigs = $container->getDefinition(RouteRegistry::class)->getArgument('$cacheConfigs');
+
+        // A #[Cache] on the parent method applies to every subclass that inherits it.
+        self::assertSame(90, $cacheConfigs['products_list']['lifetime']);
+        self::assertSame(['tx_inherited'], $cacheConfigs['products_list']['tags']);
+        self::assertSame(90, $cacheConfigs['news_list']['lifetime']);
+        self::assertArrayNotHasKey('products_detail', $cacheConfigs);
+    }
+
+    #[Test]
+    public function doesNotInheritAClassLevelRoutePrefixFromAnAbstractParent(): void
+    {
+        $routes = $this->discover($this->buildContainer(['unprefixed' => UnprefixedInheritingController::class]));
+
+        // ReflectionClass::getAttributes() reports a class's own attributes only, so the parent's
+        // '/api/base' + 'base_' prefix is silently absent.
+        self::assertSame(['inherited_ping'], array_keys($routes));
+        self::assertSame('/ping', $routes['inherited_ping']['path']);
+    }
+
+    #[Test]
+    public function failsWhenTwoSubclassesShareAnInheritedRouteNameWithoutTheirOwnPrefix(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000000);
+
+        $this->discover($this->buildContainer([
+            'first' => UnprefixedInheritingController::class,
+            'second' => SecondUnprefixedInheritingController::class,
+        ]));
+    }
+
+    #[Test]
+    public function dropsAnInheritedRouteWhenASubclassOverridesTheMethod(): void
+    {
+        $container = $this->buildContainer([
+            'overriding' => OverridingRouteController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+        ]);
+
+        // PHP does not carry method attributes onto an override, and nothing reports the loss.
+        self::assertSame([], $this->discover($container));
+    }
+
+    #[Test]
+    public function dropsTheParentsAuthenticatorWhenAnOverrideRepeatsOnlyTheRoute(): void
+    {
+        $container = $this->buildContainer([
+            'secured' => SecuredInheritingController::class,
+            'rerouting' => ReroutingOverrideController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        $definition = $container->getDefinition(RouteRegistry::class);
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = $definition->getArgument('$authenticators');
+        /** @var array<string, array{path: string}> $routes */
+        $routes = $definition->getArgument('$routes');
+
+        // Inherited untouched: the parent's #[Authenticate] applies.
+        self::assertSame([['service' => PassAuthenticator::class, 'options' => []]], $authenticators['secured_detail']);
+        // Overridden with a repeated #[Route]: the route exists, the protection does not.
+        self::assertSame('/api/rerouting/{uid}', $routes['rerouting_detail']['path']);
+        self::assertArrayNotHasKey('rerouting_detail', $authenticators);
     }
 
     #[Test]

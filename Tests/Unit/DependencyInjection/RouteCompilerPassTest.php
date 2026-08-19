@@ -16,13 +16,14 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateNameController, FixtureController, GetOnlyRequestTokenController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedModifierController, ParamContributionController, PlainService, PrefixedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReservedDefaultKeyController, TypedArgumentController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 
+use function array_keys;
 use function restore_error_handler;
 use function set_error_handler;
 
@@ -661,6 +662,152 @@ final class RouteCompilerPassTest extends TestCase
 
         self::assertCount(1, $warnings);
         self::assertStringContainsString('combines #[Cache] with #[Authenticate]', $warnings[0]);
+    }
+
+    #[Test]
+    public function warnsWhenAMarkerControllerDeclaresNoRoute(): void
+    {
+        $warnings = $this->captureWarnings($this->buildContainer(['no_route' => NoRouteMarkerController::class]));
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"no_route" implements', $warnings[0]);
+        self::assertStringContainsString('declares no #[Route]', $warnings[0]);
+    }
+
+    #[Test]
+    public function doesNotWarnAboutAControllerWithAtLeastOneRoute(): void
+    {
+        self::assertSame([], $this->captureWarnings($this->buildContainer(['fixture_controller' => FixtureController::class])));
+    }
+
+    #[Test]
+    public function warnsWhenAnOverrideDropsAnInheritedRouteWhileTheClassKeepsAnotherOne(): void
+    {
+        $container = $this->buildContainer(['drops_one' => DropsOneInheritedRouteController::class]);
+        $warnings = $this->captureWarnings($container);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"drops_one::b()" overrides', $warnings[0]);
+        self::assertStringContainsString('does not repeat all its #[Route] attributes', $warnings[0]);
+        self::assertStringContainsString('route_b', $warnings[0]);
+
+        // The class still has one working route: the zero-routes check does not additionally fire.
+        /** @var array<string, array{path: string}> $routes */
+        $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
+        self::assertSame(['route_a'], array_keys($routes));
+    }
+
+    #[Test]
+    public function warnsWhenAnOverrideRepeatsOnlyOneOfTwoRouteAliasesFromTheParent(): void
+    {
+        $container = $this->buildContainer(['drops_alias' => DropsOneAliasOnOverrideController::class]);
+        $warnings = $this->captureWarnings($container);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"drops_alias::list()" overrides', $warnings[0]);
+        self::assertStringContainsString('alias_b', $warnings[0]);
+
+        /** @var array<string, array{path: string}> $routes */
+        $routes = $container->getDefinition(RouteRegistry::class)->getArgument('$routes');
+        self::assertSame(['alias_a'], array_keys($routes));
+    }
+
+    #[Test]
+    public function doesNotWarnWhenAnOverrideRepeatsBothRouteAliasesInAnyOrder(): void
+    {
+        $container = $this->buildContainer(['repeats_both' => RepeatsBothAliasesOnOverrideController::class]);
+
+        self::assertSame([], $this->captureWarnings($container));
+    }
+
+    #[Test]
+    public function warnsWhenAnOverrideRepeatsRouteButDropsTheParentsAuthenticate(): void
+    {
+        $container = $this->buildContainer([
+            'drops_auth' => DropsAuthenticateOnOverrideController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+        ]);
+
+        $warnings = $this->captureWarnings($container);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"drops_auth::detail()" overrides', $warnings[0]);
+        self::assertStringContainsString('drops #[Authenticate]', $warnings[0]);
+    }
+
+    #[Test]
+    public function doesNotWarnWhenAnOverrideRepeatsEveryModifier(): void
+    {
+        $container = $this->buildContainer([
+            'repeats' => RepeatsAuthenticateOnOverrideController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+        ]);
+
+        self::assertSame([], $this->captureWarnings($container));
+    }
+
+    #[Test]
+    public function warnsWhenAnOverrideKeepsOnlyOneOfTwoOrCombinedAuthenticateInstances(): void
+    {
+        $container = $this->buildContainer([
+            'narrows' => NarrowsAuthenticateOnOverrideController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+
+        $warnings = $this->captureWarnings($container);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"narrows::detail()" overrides', $warnings[0]);
+        self::assertStringContainsString('drops #[Authenticate]', $warnings[0]);
+
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = $container->getDefinition(RouteRegistry::class)->getArgument('$authenticators');
+        self::assertSame([['service' => PassAuthenticator::class, 'options' => []]], $authenticators['detail']);
+    }
+
+    #[Test]
+    public function doesNotWarnWhenAnOverrideRepeatsBothOrCombinedAuthenticateInstancesInAnyOrder(): void
+    {
+        $container = $this->buildContainer([
+            'repeats_both' => RepeatsBothAuthenticateOnOverrideController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+
+        self::assertSame([], $this->captureWarnings($container));
+    }
+
+    #[Test]
+    public function doesNotWarnWhenAMethodIsInheritedWithoutBeingOverridden(): void
+    {
+        $container = $this->buildContainer([
+            'clean' => InheritsProtectedRouteCleanlyController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+        ]);
+
+        self::assertSame([], $this->captureWarnings($container));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function captureWarnings(ContainerBuilder $container): array
+    {
+        $warnings = [];
+        set_error_handler(static function (int $errno, string $errstr) use (&$warnings): bool {
+            $warnings[] = $errstr;
+
+            return true;
+        }, E_USER_WARNING);
+
+        try {
+            (new RouteCompilerPass())->process($container);
+        } finally {
+            restore_error_handler();
+        }
+
+        return $warnings;
     }
 
     /**

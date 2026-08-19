@@ -135,7 +135,7 @@ Every response the route produces — success, a cached hit, a conditional `304`
 
 | Header | Format | Note |
 |--------|--------|------|
-| `Deprecation` | `@1740787200` | [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) section 2 — an Item Structured Field Date, `@` plus a Unix timestamp. **Never** an HTTP-date; early drafts of the RFC used one, and that is the standard implementation mistake. |
+| `Deprecation` | `@1772323200` | [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) section 2 — an Item Structured Field Date, `@` plus a Unix timestamp. **Never** an HTTP-date; early drafts of the RFC used one, and that is the standard implementation mistake. |
 | `Sunset` | `Thu, 31 Dec 2026 23:59:59 GMT` | [RFC 8594](https://www.rfc-editor.org/rfc/rfc8594) section 3 — an HTTP-date, a different format for historical reasons. Omitted when `sunset` is not given. |
 | `Link: …; rel="successor-version"` | — | Present when `successor` is given. |
 | `Link: …; rel="deprecation"` | — | Present when `documentation` is given. Both `Link` values ride in the same header when both are given. |

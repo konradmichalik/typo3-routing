@@ -44,6 +44,15 @@ final class RouteConstraintOverlapTest extends TestCase
     }
 
     #[Test]
+    public function overlapsWhenBothSidesConstrainThePlaceholderCompatibly(): void
+    {
+        $a = ['path' => '/api/item/{id}', 'requirements' => ['id' => '\d+']];
+        $b = ['path' => '/api/item/{id}', 'requirements' => ['id' => '\d{1,3}']];
+
+        self::assertTrue((new RouteConstraintOverlap())->overlaps($a, $b));
+    }
+
+    #[Test]
     public function overlapsWhenOnlyOneSideConstrainsThePlaceholder(): void
     {
         $a = ['path' => '/api/item/{id}', 'requirements' => ['id' => '\d+']];

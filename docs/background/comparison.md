@@ -18,6 +18,6 @@ Three cases where one of the alternatives is the better answer, stated plainly b
 - **The output is a page.** Anything that should participate in TYPO3's rendering chain — TypoScript, content elements, page caching, a URL editors control — belongs in a plugin or a page type, not in a route.
 - **The path must be configurable at runtime.** Routes are compiled into the DI container, so declaring one is a code change and publishing it is a cache flush. There is deliberately no runtime registration API and no editor-facing route table.
 
-On raw speed, the hand-wired middleware wins: dispatching a matched attribute route costs about 0.6 ms more than an equivalent middleware doing the matching by hand, which is a few percent of a minimal JSON request. Requests that are not routes at all pay under a microsecond. [Performance](performance.md) has the figures, what was measured, and how to reproduce it.
+On raw speed, the hand-wired middleware wins: dispatching a matched attribute route costs about 0.63 ms more than an equivalent middleware doing the matching by hand, which is roughly 3% of a minimal JSON request. Requests that are not routes at all cost about 0.19 ms, nearly all of it building the middleware rather than routing. [Performance](performance.md) has the figures, what was measured, and how to reproduce it.
 
 This extension gives you the endpoints; you own the data layer. There is deliberately no record, query, or serialisation layer on top of `#[Route]` — see [Records](../routes/records.md) for the recipe and the reasoning.

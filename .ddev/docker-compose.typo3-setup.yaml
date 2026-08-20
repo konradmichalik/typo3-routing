@@ -5,9 +5,21 @@ services:
             - EXTENSION_KEY=typo3_routing
             - EXTENSION_NAME=typo3-routing
             - PACKAGE_NAME=konradmichalik/typo3-routing
-            - TYPO3_VERSIONS=13 14
+            - TYPO3_VERSIONS=12 13 14
             - SYMLINK_EXCLUSIONS=Documentation Documentation-GENERATED-temp var vendor public
             - TYPO3_CONTEXT=Development
+
+            # TYPO3 v11 and v12 config
+            - TYPO3_INSTALL_DB_DRIVER=mysqli
+            - TYPO3_INSTALL_DB_USER=root
+            - TYPO3_INSTALL_DB_PASSWORD=root
+            - TYPO3_INSTALL_DB_HOST=db
+            - TYPO3_INSTALL_DB_UNIX_SOCKET=
+            - TYPO3_INSTALL_DB_USE_EXISTING=0
+            - TYPO3_INSTALL_ADMIN_USER=admin
+            - TYPO3_INSTALL_ADMIN_PASSWORD=Password1!
+            - TYPO3_INSTALL_SITE_NAME=EXT:typo3-routing Dev Environment
+            - TYPO3_INSTALL_SITE_SETUP_TYPE=site
 
             # TYPO3 v13 and v14 config
             - TYPO3_DB_DRIVER=mysqli
@@ -18,11 +30,3 @@ services:
             - TYPO3_SETUP_ADMIN_USERNAME=admin
             - TYPO3_SETUP_ADMIN_PASSWORD=Password1!
             - TYPO3_PROJECT_NAME=EXT:typo3-routing Dev Environment
-            - TYPO3_SERVER_TYPE=apache
-
-            # typo3-request-profiler — drives the `ddev benchmark` comparison.
-            # FORCE keeps it recording regardless of application context; KEEP must exceed the
-            # number of requests a benchmark run produces so none get auto-pruned mid-run.
-            - TYPO3_REQUEST_PROFILER_FORCE=1
-            - TYPO3_REQUEST_PROFILER_MIN_MS=0
-            - TYPO3_REQUEST_PROFILER_KEEP=5000

@@ -24,3 +24,25 @@ parameters:
 	typo3:
 		requestGetAttributeMapping:
 			id: 'string'
+
+	# The preset enables every ergebnis/phpstan-rules check it doesn't explicitly disable. These four
+	# conflict with this extension's core design rather than flagging real issues: #[Route]/#[Cache]/
+	# #[Cors] and RouteRegistry are named-arg, optional-param APIs by design; the OpenApi generator
+	# builds its schema/response maps via by-reference accumulator parameters; and JsonSchemaMapper
+	# deliberately suppresses the warning from probing a route requirement regex for validity.
+	ergebnis:
+		noNamedArgument:
+			enabled: false
+		noConstructorParameterWithDefaultValue:
+			enabled: false
+		noParameterPassedByReference:
+			enabled: false
+		noErrorSuppression:
+			enabled: false
+
+	# These base controllers are deliberately overridden by concrete fixtures to test route
+	# inheritance (see docs/routes/route-groups.md) — marking them final would break that override.
+	ignoreErrors:
+		-
+			identifier: ergebnis.finalInAbstractClass
+			path: ../../Tests/Unit/Fixtures/*

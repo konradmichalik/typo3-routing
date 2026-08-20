@@ -29,7 +29,7 @@ abstract class AbstractRouteUriViewHelper extends AbstractViewHelper
 {
     protected $escapeOutput = false;
 
-    protected function resolveRequest(): ?ServerRequestInterface
+    final protected function resolveRequest(): ?ServerRequestInterface
     {
         // $GLOBALS['TYPO3_REQUEST'] is the current PSR-7 request in both v13 and v14 and carries the
         // resolved site/language context — unlike the rendering context's request accessor, whose API
@@ -39,7 +39,7 @@ abstract class AbstractRouteUriViewHelper extends AbstractViewHelper
         return $request instanceof ServerRequestInterface ? $request : null;
     }
 
-    protected function urlGenerator(): RouteUrlGenerator
+    final protected function urlGenerator(): RouteUrlGenerator
     {
         return GeneralUtility::getContainer()->get(RouteUrlGenerator::class);
     }

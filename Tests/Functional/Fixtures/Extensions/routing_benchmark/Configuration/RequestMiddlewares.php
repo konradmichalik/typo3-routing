@@ -40,5 +40,19 @@ return [
                 'konradmichalik/typo3-routing/dispatcher',
             ],
         ],
+        // DiProbeMiddleware is deliberately NOT registered. It builds the dispatcher before the stack
+        // does, which moves that construction cost out of the profiler span `ddev benchmark` measures —
+        // leaving it enabled would silently understate the very overhead the benchmark reports. Paste
+        // the block below in while probing, then remove it again:
+        //
+        // 'konradmichalik/routing-benchmark/di-probe' => [
+        //     'target' => \KonradMichalik\RoutingBenchmark\Middleware\DiProbeMiddleware::class,
+        //     'after' => ['typo3/cms-frontend/site'],
+        //     'before' => [
+        //         'typo3-request-profiler/performance-profiler',
+        //         'konradmichalik/routing-benchmark/plain',
+        //         'konradmichalik/typo3-routing/dispatcher',
+        //     ],
+        // ],
     ],
 ];

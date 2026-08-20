@@ -54,6 +54,16 @@ final readonly class PathPrefixGate
         return new self(array_values(array_filter(array_map(trim(...), explode(',', $list)), static fn (string $item): bool => '' !== $item)));
     }
 
+    /**
+     * The plain (not case-insensitive-folded) prefixes this gate was built from.
+     *
+     * @return list<string>
+     */
+    public function prefixes(): array
+    {
+        return $this->prefixes;
+    }
+
     public function mergedWith(self $other): self
     {
         return new self(

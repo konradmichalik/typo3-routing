@@ -11,7 +11,7 @@ What is worth knowing before an installation goes live:
 | Page | What's inside |
 |------|---------------|
 | [Configuration](configuration.md) | Every extension setting in one table, plus the derived path gate, trailing slashes, exclusive prefixes, environment-bound routes and middleware placement |
-| [Console commands](commands.md) | `routing:debug` to list, filter and audit routes, `routing:match` to ask which route claims a given path |
+| [Console commands](commands.md) | `routing:debug` to list, filter and audit routes, `routing:match` to ask which route claims a given path, `routing:lint` to audit the route set itself for common mistakes |
 | [OpenAPI export](openapi.md) | `routing:openapi`, what it derives from your attributes, and the development-only Swagger UI |
 
-All three commands read the same compiled registry the dispatcher uses, so what they report is what a request will do.
+All four commands read the same compiled registry the dispatcher uses, so what they report is what a request will do.

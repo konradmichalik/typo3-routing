@@ -45,6 +45,14 @@ final class PathPrefixGateTest extends TestCase
     }
 
     #[Test]
+    public function exposesItsParsedPrefixes(): void
+    {
+        $gate = PathPrefixGate::fromCommaList('  /api/ ,, ,  /va/  ');
+
+        self::assertSame(['/api/', '/va/'], $gate->prefixes());
+    }
+
+    #[Test]
     public function anEmptyListMatchesNothing(): void
     {
         $gate = PathPrefixGate::fromCommaList('');

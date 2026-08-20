@@ -59,6 +59,12 @@ services:
               command: 'routing:match'
               description: 'Simulate matching a request path against the registered attribute routes'
 
+    KonradMichalik\Typo3Routing\Command\RouteLintCommand:
+        tags:
+            - name: console.command
+              command: 'routing:lint'
+              description: 'Audit registered attribute routes for common mistakes'
+
     KonradMichalik\Typo3Routing\Command\OpenApiCommand:
         tags:
             - name: console.command

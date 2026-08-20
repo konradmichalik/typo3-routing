@@ -3,12 +3,13 @@
 ```bash
 vendor/bin/typo3 routing:debug [<name>] [--json] [--method=…] [--path=…] [--env=…] [--unprotected|--protected] [--cached] [--rate-limited] [--csrf] [--deprecated]
 vendor/bin/typo3 routing:match <path> [--method=GET] [--scheme=https] [--host=localhost] [--site=…] [--language=…]
+vendor/bin/typo3 routing:lint [--json] [--strict]
 ```
 
 > [!TIP]
-> Both commands read the same compiled registry as the dispatcher, so they can never drift from actual runtime behaviour.
+> All three commands read the same compiled registry as the dispatcher, so they can never drift from actual runtime behaviour.
 
-A third command, `routing:openapi`, exports the same registry as an API document and has its own page: [OpenAPI export](openapi.md).
+A fourth command, `routing:openapi`, exports the same registry as an API document and has its own page: [OpenAPI export](openapi.md).
 
 ## `routing:debug`
 
@@ -116,3 +117,23 @@ One miss gets its own report, because `No route matches` would be misleading: a 
 ```
 
 At request time this stays an ordinary `404`: the distinction is a development aid, not something the client is told.
+
+## `routing:lint`
+
+Audits the compiled route metadata for mistakes that are otherwise invisible until something behaves oddly in production — the same read-only, zero-runtime-cost approach as `routing:debug`. It reuses `RouteRegistry`; no new data is collected at compile time.
+
+```bash
+vendor/bin/typo3 routing:lint            # human-readable table
+vendor/bin/typo3 routing:lint --json     # machine-readable (CI / tooling)
+vendor/bin/typo3 routing:lint --strict   # exit 1 when any finding exists, not only error-level ones
+```
+
+| Check                                                                     | Severity | Rationale                                                                                                        |
+| -------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Route path with no static prefix (e.g. `/{slug}`)                        | warning  | Opens the [path gate](configuration.md#path-gate) for every request; the matcher alone then decides                |
+| Two routes with an identical path and overlapping methods, equal priority | warning  | Match order follows registration order, which is stable but not something the author controls or can see           |
+| A route fully shadowed by an identical-path route at a higher priority   | warning  | Every method it declares is already claimed first — a dead endpoint                                                |
+| An `int`-typed path argument with no digits requirement                  | warning  | The path matches, then argument coercion fails, so the client gets `400` where `404` was meant                     |
+| An exclusive prefix (`ext_conf_template.txt`) with no route inside it    | info     | Turns every path under it into a JSON `404` instead of falling through to page rendering                            |
+
+A clean route set exits `0` with no findings. No check currently reaches `error` severity — until one does, `--strict` is the only way to fail a CI build on a finding; without it, the command always exits `0` unless a future error-level check fires.

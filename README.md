@@ -8,7 +8,7 @@
 ![TYPO3](https://img.shields.io/badge/TYPO3-13.4%20%7C%2014.3-orange.svg)
 [![Supported PHP Versions](https://img.shields.io/packagist/dependency-v/konradmichalik/typo3-routing/php?logo=php)](https://packagist.org/packages/konradmichalik/typo3-routing)
 [![CGL](https://img.shields.io/github/actions/workflow/status/konradmichalik/typo3-routing/cgl.yml?label=cgl&logo=github)](https://github.com/konradmichalik/typo3-routing/actions/workflows/cgl.yml)
-[![Coverage](https://img.shields.io/coverallsCoverage/github/konradmichalik/typo3-routing?logo=coveralls)](https://coveralls.io/github/konradmichalik/typo3-routing)
+[![Coverage](https://coveralls.io/repos/github/konradmichalik/typo3-routing/badge.svg?branch=main)](https://coveralls.io/github/konradmichalik/typo3-routing)
 [![Tests](https://img.shields.io/github/actions/workflow/status/konradmichalik/typo3-routing/tests.yml?label=tests&logo=github)](https://github.com/konradmichalik/typo3-routing/actions/workflows/tests.yml)
 [![License](https://poser.pugx.org/konradmichalik/typo3-routing/license)](LICENSE.md)
 

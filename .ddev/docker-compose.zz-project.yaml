@@ -1,0 +1,24 @@
+# .ddev/docker-compose.zz-project.yaml — repo-owned overrides for
+# docker-compose.typo3-setup.yaml.
+#
+# Unlike docker-compose.typo3-setup.yaml, this file isn't managed by the
+# add-on, so it survives `ddev add-on get` upgrades. DDEV merges every
+# docker-compose.*.yaml file under .ddev/ in filename order, and Compose
+# merges the "environment" list by variable name - the "zz" prefix keeps this
+# file sorting after docker-compose.typo3-setup.yaml, so its values win for
+# any variable both files set.
+#
+# Run `ddev restart` after changing it.
+services:
+    web:
+        environment:
+            # This project only supports TYPO3 13/14 (see composer.json).
+            - TYPO3_VERSIONS=13 14
+            - TYPO3_SERVER_TYPE=apache
+
+            # typo3-request-profiler — drives the `ddev benchmark` comparison.
+            # FORCE keeps it recording regardless of application context; KEEP must exceed the
+            # number of requests a benchmark run produces so none get auto-pruned mid-run.
+            - TYPO3_REQUEST_PROFILER_FORCE=1
+            - TYPO3_REQUEST_PROFILER_MIN_MS=0
+            - TYPO3_REQUEST_PROFILER_KEEP=5000

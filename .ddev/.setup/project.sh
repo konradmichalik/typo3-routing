@@ -1,9 +1,8 @@
-#ddev-generated
 # .ddev/.setup/project.sh — repo-owned customizations for `ddev install`.
 #
-# Copy this file to .ddev/.setup/project.sh and adjust it. It is sourced by
-# utils.sh on every install, and it survives `ddev add-on get` upgrades since
-# it isn't managed by the add-on. Delete anything you don't need.
+# This file is sourced by utils.sh on every install. It is not managed by the
+# add-on, so it survives `ddev add-on get` upgrades. Delete anything you don't
+# need.
 #
 # $VERSION expands at use time, not when this file is sourced — write it
 # single-quoted (or with \$VERSION inside a double-quoted string) so it

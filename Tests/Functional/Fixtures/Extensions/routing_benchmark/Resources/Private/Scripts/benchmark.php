@@ -31,7 +31,9 @@ $warmup = 5;
 
 /*
  * Matched scenario pairs: each routing endpoint has a byte-for-byte identical plain counterpart.
- * The only difference is how the request is dispatched.
+ * The only difference is how the request is dispatched. 'status' is the HTTP status both variants are
+ * expected to answer with, defaulting to 200; it sits on the scenario rather than the variant because
+ * a pair that redirects always redirects on both sides, that being the point of the pairing.
  */
 $scenarios = [
     'noop (no arguments)' => [
@@ -62,6 +64,41 @@ $scenarios = [
         'routing' => '/API/Bench/Routing/CI',
         'plain' => '/API/Bench/Plain/CI',
     ],
+    // v1.2.0: DeprecationHeaders::decorate() stamped on every response of a deprecated route —
+    // Deprecation, Sunset, and two Link entries (one resolved through RouteUrlGenerator).
+    'DeprecatedRoute' => [
+        'routing' => '/api/bench/routing/deprecated',
+        'plain' => '/api/bench/plain/deprecated',
+    ],
+    // v1.2.0: SiteLanguageScope's two in_array() checks, on a route that opted in and is in scope.
+    'sites/languages scope' => [
+        'routing' => '/api/bench/routing/scoped',
+        'plain' => '/api/bench/plain/scoped',
+    ],
+    // v1.2.0: `canonical: true` requested at its declared path — must cost the same as any other
+    // static route, canonicalRedirect() returns immediately on `_canonicalVariant === false`.
+    'canonical (exact)' => [
+        'routing' => '/api/bench/routing/canonical',
+        'plain' => '/api/bench/plain/canonical',
+    ],
+    // v1.2.0: the same route requested via the tolerated trailing-slash variant — canonicalRedirect()
+    // now builds a 308 through RouteUrlGenerator::generate(), against a hand-rolled literal redirect.
+    'canonical (redirects)' => [
+        'routing' => '/api/bench/routing/canonical/',
+        'plain' => '/api/bench/plain/canonical/',
+        'status' => 308,
+    ],
+    // v1.2.0: a legacy path redirecting to its current route (legacyRedirect(), default behaviour).
+    'legacyPaths (redirects)' => [
+        'routing' => '/api/bench/routing/legacy-old',
+        'plain' => '/api/bench/plain/legacy-old',
+        'status' => 308,
+    ],
+    // v1.2.0: `legacyAlias: true` — the old path served directly, legacyRedirect() short-circuits.
+    'legacyPaths (alias)' => [
+        'routing' => '/api/bench/routing/alias-old',
+        'plain' => '/api/bench/plain/alias-old',
+    ],
 ];
 
 /**
@@ -70,7 +107,7 @@ $scenarios = [
  * silently record that failure's latency as if it were the real endpoint's, corrupting the numbers
  * with no indication anything went wrong.
  */
-function request(string $url): void
+function request(string $url, int $expectedStatus): void
 {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -85,8 +122,8 @@ function request(string $url): void
     $error = curl_error($ch);
     curl_close($ch);
 
-    if (false === $body || $status < 200 || $status >= 300) {
-        throw new RuntimeException(sprintf('Benchmark request failed for %s: HTTP %d %s', $url, $status, $error), 5429005340);
+    if (false === $body || $status !== $expectedStatus) {
+        throw new RuntimeException(sprintf('Benchmark request failed for %s: expected HTTP %d, got HTTP %d %s', $url, $expectedStatus, $status, $error), 5429005340);
     }
 }
 
@@ -115,10 +152,12 @@ echo "  base URL : {$baseUrl}\n";
 echo "  requests : {$count} per endpoint ({$warmup} warmup, interleaved)\n";
 echo "  profiles : {$profilesDir}\n\n";
 
-// 1. Smoke-test every endpoint and bail early on non-200, otherwise the numbers are meaningless.
+// 1. Smoke-test every endpoint and bail early on an unexpected status, otherwise the numbers are
+//    meaningless. Most scenarios expect 200; the redirect scenarios expect 308.
 foreach ($scenarios as $label => $pair) {
-    foreach ($pair as $variant => $path) {
-        $ch = curl_init($baseUrl.$path);
+    $expected = $pair['status'] ?? 200;
+    foreach (['routing', 'plain'] as $variantName) {
+        $ch = curl_init($baseUrl.$pair[$variantName]);
         curl_setopt_array($ch, [
             \CURLOPT_RETURNTRANSFER => true,
             \CURLOPT_SSL_VERIFYPEER => false,
@@ -128,8 +167,8 @@ foreach ($scenarios as $label => $pair) {
         $body = curl_exec($ch);
         $status = curl_getinfo($ch, \CURLINFO_HTTP_CODE);
         curl_close($ch);
-        if (200 !== $status) {
-            fwrite(\STDERR, "ERROR: {$variant} endpoint {$path} returned HTTP {$status}, not 200.\n");
+        if ($expected !== $status) {
+            fwrite(\STDERR, "ERROR: {$variantName} endpoint {$pair[$variantName]} returned HTTP {$status}, expected {$expected}.\n");
             fwrite(\STDERR, '       Body: '.substr((string) $body, 0, 300)."\n");
             fwrite(\STDERR, "       Are both fixture extensions installed and caches flushed?\n");
             exit(1);
@@ -150,9 +189,10 @@ if (is_dir($profilesDir)) {
 
 // 3. Warmup (opcode/realpath caches, autoloader) — not measured.
 foreach ($scenarios as $pair) {
+    $expected = $pair['status'] ?? 200;
     for ($i = 0; $i < $warmup; ++$i) {
-        request($baseUrl.$pair['routing']);
-        request($baseUrl.$pair['plain']);
+        request($baseUrl.$pair['routing'], $expected);
+        request($baseUrl.$pair['plain'], $expected);
     }
 }
 
@@ -165,8 +205,9 @@ foreach (glob($profilesDir.'/*.json') ?: [] as $file) {
 echo 'Running';
 for ($i = 0; $i < $count; ++$i) {
     foreach ($scenarios as $pair) {
-        request($baseUrl.$pair['routing']);
-        request($baseUrl.$pair['plain']);
+        $expected = $pair['status'] ?? 200;
+        request($baseUrl.$pair['routing'], $expected);
+        request($baseUrl.$pair['plain'], $expected);
     }
     if (0 === $i % 10) {
         echo '.';

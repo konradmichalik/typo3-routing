@@ -45,5 +45,5 @@ Why it exists, how it works, what it costs, and how to build on it.
 |------|---------------|
 | [How it compares](background/comparison.md) | When to reach for this versus `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
 | [How it works](background/how-it-works.md) | Compile-time discovery, the runtime dispatch pipeline step by step, and the response contract |
-| [Performance](background/performance.md) | Measured dispatch overhead, what the path gate costs unrelated traffic, and how to reproduce both |
+| [Performance](background/performance.md) | What a matched route costs against a hand-written middleware, what an unrelated page request costs, and how to reproduce both |
 | [Extending](background/extending.md) | Building tooling on the route metadata (`RouteRegistry`, `RouteInvoker`), the `@api`/`@internal` surface, and the BC promise |

@@ -26,6 +26,25 @@ services:
     KonradMichalik\Typo3Routing\Middleware\RouteDispatcher:
         public: true
 
+    # Everything the dispatcher needs only *after* its path gate accepts a request. A locator, so none
+    # of it is built for a request that never gets that far — which is every ordinary page request, and
+    # was measured to be most of this extension's per-request cost. See the class docblock.
+    KonradMichalik\Typo3Routing\Middleware\DispatcherServices:
+        arguments:
+            $services: !service_locator
+                KonradMichalik\Typo3Routing\Routing\RouteMatcher: '@KonradMichalik\Typo3Routing\Routing\RouteMatcher'
+                KonradMichalik\Typo3Routing\Cache\ResponseCacheManager: '@KonradMichalik\Typo3Routing\Cache\ResponseCacheManager'
+                KonradMichalik\Typo3Routing\RateLimit\RateLimitCheck: '@KonradMichalik\Typo3Routing\RateLimit\RateLimitCheck'
+                KonradMichalik\Typo3Routing\Routing\ControllerInvoker: '@KonradMichalik\Typo3Routing\Routing\ControllerInvoker'
+                KonradMichalik\Typo3Routing\Authentication\AccessGuard: '@KonradMichalik\Typo3Routing\Authentication\AccessGuard'
+                KonradMichalik\Typo3Routing\Http\CorsHandler: '@KonradMichalik\Typo3Routing\Http\CorsHandler'
+                KonradMichalik\Typo3Routing\Http\CorsPreflightResolver: '@KonradMichalik\Typo3Routing\Http\CorsPreflightResolver'
+                KonradMichalik\Typo3Routing\Cache\CacheBypassGuard: '@KonradMichalik\Typo3Routing\Cache\CacheBypassGuard'
+                KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver: '@KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver'
+                KonradMichalik\Typo3Routing\Http\RouteUrlGenerator: '@KonradMichalik\Typo3Routing\Http\RouteUrlGenerator'
+                KonradMichalik\Typo3Routing\Routing\SiteLanguageScope: '@KonradMichalik\Typo3Routing\Routing\SiteLanguageScope'
+                KonradMichalik\Typo3Routing\Http\DeprecationHeaders: '@KonradMichalik\Typo3Routing\Http\DeprecationHeaders'
+
     # Public so the routing:uri ViewHelper can fetch it from the container at render time.
     KonradMichalik\Typo3Routing\Http\RouteUrlGenerator:
         public: true

@@ -20,7 +20,7 @@ use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, DeprecationHeaders, RouteUrlGenerator, SiteBasePathResolver};
-use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
+use KonradMichalik\Typo3Routing\Middleware\{DispatcherServices, RouteDispatcher};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry, SiteLanguageScope};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
@@ -657,7 +657,7 @@ final class RouteDispatcherTest extends TestCase
         $context = new Context();
         $cors = new CorsHandler($extensionConfiguration);
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
-        $dispatcher = new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), new AccessGuard($registry, $context), $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $this->deprecationHeaders($registry), $extensionConfiguration);
+        $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->dispatcherServices($registry, $matcher, $cors, $context, new AccessGuard($registry, $context)), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
             $this->handler(new Response('php://temp', 200)),
@@ -1244,7 +1244,31 @@ final class RouteDispatcherTest extends TestCase
 
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
 
-        return new RouteDispatcher($registry, $matcher, new SiteBasePathResolver(), $this->responseCache, $this->rateLimitCheck, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))), $accessGuard, $cors, new CorsPreflightResolver($registry, $matcher, $cors), new CacheBypassGuard($context), new ClientKeyResolver($context), new RouteUrlGenerator($registry, new SiteBasePathResolver()), $this->siteLanguageScope(), $this->deprecationHeaders($registry), $extensionConfiguration);
+        return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->dispatcherServices($registry, $matcher, $cors, $context, $accessGuard), $extensionConfiguration);
+    }
+
+    /**
+     * The dispatcher reaches everything it needs after the path gate through a locator rather than its
+     * constructor (see DispatcherServices). A real ServiceLocator is built here rather than a mock,
+     * because mis-wiring one is exactly what DispatcherServices asserts against, and a mock would let
+     * that mistake through.
+     */
+    private function dispatcherServices(RouteRegistry $registry, RouteMatcher $matcher, CorsHandler $cors, Context $context, AccessGuard $accessGuard): DispatcherServices
+    {
+        return new DispatcherServices(new ServiceLocator([
+            RouteMatcher::class => static fn (): RouteMatcher => $matcher,
+            ResponseCacheManager::class => fn (): ResponseCacheManager => $this->responseCache,
+            RateLimitCheck::class => fn (): RateLimitCheck => $this->rateLimitCheck,
+            ControllerInvoker::class => fn (): ControllerInvoker => new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))),
+            AccessGuard::class => static fn (): AccessGuard => $accessGuard,
+            CorsHandler::class => static fn (): CorsHandler => $cors,
+            CorsPreflightResolver::class => static fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors),
+            CacheBypassGuard::class => static fn (): CacheBypassGuard => new CacheBypassGuard($context),
+            ClientKeyResolver::class => static fn (): ClientKeyResolver => new ClientKeyResolver($context),
+            RouteUrlGenerator::class => static fn (): RouteUrlGenerator => new RouteUrlGenerator($registry, new SiteBasePathResolver()),
+            SiteLanguageScope::class => $this->siteLanguageScope(...),
+            DeprecationHeaders::class => fn (): DeprecationHeaders => $this->deprecationHeaders($registry),
+        ]));
     }
 
     private function siteLanguageScope(): SiteLanguageScope

@@ -10,3 +10,37 @@ services:
     # The plain middleware is fetched from the container by the TYPO3 middleware stack at runtime.
     KonradMichalik\RoutingBenchmark\Middleware\PlainBenchmarkMiddleware:
         public: true
+
+    # A locator, not the container: every routing service below is private, and the container refuses
+    # a get() on a private service by design.
+    routing_benchmark.di_locator:
+        class: Symfony\Component\DependencyInjection\ServiceLocator
+        tags: ['container.service_locator']
+        arguments:
+            -
+                ExtensionConfiguration: '@TYPO3\CMS\Core\Configuration\ExtensionConfiguration'
+                CacheManager: '@TYPO3\CMS\Core\Cache\CacheManager'
+                SiteFinder: '@TYPO3\CMS\Core\Site\SiteFinder'
+                Context: '@TYPO3\CMS\Core\Context\Context'
+                LogManager: '@TYPO3\CMS\Core\Log\LogManager'
+                RouteRegistry: '@KonradMichalik\Typo3Routing\Routing\RouteRegistry'
+                RouteMatcher: '@KonradMichalik\Typo3Routing\Routing\RouteMatcher'
+                SiteBasePathResolver: '@KonradMichalik\Typo3Routing\Http\SiteBasePathResolver'
+                ResponseCacheManager: '@KonradMichalik\Typo3Routing\Cache\ResponseCacheManager'
+                RateLimitCheck: '@KonradMichalik\Typo3Routing\RateLimit\RateLimitCheck'
+                ControllerInvoker: '@KonradMichalik\Typo3Routing\Routing\ControllerInvoker'
+                AccessGuard: '@KonradMichalik\Typo3Routing\Authentication\AccessGuard'
+                CorsHandler: '@KonradMichalik\Typo3Routing\Http\CorsHandler'
+                CorsPreflightResolver: '@KonradMichalik\Typo3Routing\Http\CorsPreflightResolver'
+                CacheBypassGuard: '@KonradMichalik\Typo3Routing\Cache\CacheBypassGuard'
+                ClientKeyResolver: '@KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver'
+                RouteUrlGenerator: '@KonradMichalik\Typo3Routing\Http\RouteUrlGenerator'
+                SiteLanguageScope: '@KonradMichalik\Typo3Routing\Routing\SiteLanguageScope'
+                DeprecationHeaders: '@KonradMichalik\Typo3Routing\Http\DeprecationHeaders'
+                RouteDispatcher: '@KonradMichalik\Typo3Routing\Middleware\RouteDispatcher'
+
+    # Enabled only while probing — see the class docblock for why it must not be left registered.
+    KonradMichalik\RoutingBenchmark\Middleware\DiProbeMiddleware:
+        public: true
+        arguments:
+            $services: '@routing_benchmark.di_locator'

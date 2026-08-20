@@ -27,7 +27,7 @@ The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxR
 - [**Route groups**](docs/routes/route-groups.md): a class-level `#[Route]` prefixes every method route, e.g. for API versioning; an abstract base controller can share methods when each concrete subclass declares its own prefix
 - [**Typed arguments**](docs/routes/arguments.md): methods receive type-cast path/query/body values, no manual request reading
 - [**Zero-config discovery**](docs/background/how-it-works.md): routes are collected at container compile time, no extra cache
-- [**Measured overhead**](docs/background/performance.md): requests that cannot be a route are filtered out in under a microsecond; dispatching a matched one costs ~0.6 ms more than a hand-written middleware, a few percent of a minimal JSON endpoint
+- [**Measured overhead**](docs/background/performance.md): dispatching a matched route costs ~0.63 ms more than a hand-written middleware, about 3% of a minimal JSON endpoint; a request that cannot be a route costs ~0.19 ms, nearly all of it container construction
 - [**URL generation**](docs/routes/url-generation.md): a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
 - [**Opt-in caching**](docs/features/caching.md): cache responses with `#[Cache]`, with tag-based invalidation
 - [**Opt-in rate limiting**](docs/features/rate-limiting.md): throttle requests per client IP with `#[RateLimit]`

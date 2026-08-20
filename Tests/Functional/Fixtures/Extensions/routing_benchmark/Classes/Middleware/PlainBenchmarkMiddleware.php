@@ -17,8 +17,11 @@ use KonradMichalik\RoutingBenchmark\Domain\Model\Item;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
 use Symfony\Component\DependencyInjection\Attribute\Lazy;
-use TYPO3\CMS\Core\Http\JsonResponse;
+use TYPO3\CMS\Core\Http\{JsonResponse, Response};
+use TYPO3\CMS\Core\Site\Entity\{SiteInterface, SiteLanguage};
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
+
+use function in_array;
 
 // The "conventional middleware" side of the benchmark. It does by hand exactly what the
 // routing layer does for the BenchmarkController endpoints: match the path, pull and cast
@@ -76,12 +79,85 @@ final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
         // and the differently-cased request cost the same here. That asymmetry against the routing side
         // is the point of the comparison, not a flaw in it.
         //
-        // Appended last on purpose: inserting it earlier would shift the four scenarios above by one
-        // string comparison and break comparability with the recorded baseline figures.
+        // Kept before the v1.2.0 scenarios below on purpose: inserting it later would shift this
+        // existing scenario by a few string comparisons and break comparability with the recorded
+        // baseline figures.
         if (0 === strcasecmp($path, '/api/bench/plain/ci')) {
             return new JsonResponse(['ok' => true]);
         }
 
-        return $handler->handle($request);
+        return $this->deprecated($path)
+            ?? $this->scoped($request, $path)
+            ?? $this->canonical($path)
+            ?? $this->legacy($path)
+            ?? $handler->handle($request);
+    }
+
+    /**
+     * Counterpart of #[DeprecatedRoute]: the headers a developer would write by hand, without
+     * reimplementing a URL generator for the successor link (nobody would).
+     */
+    private function deprecated(string $path): ?ResponseInterface
+    {
+        if ('/api/bench/plain/deprecated' !== $path) {
+            return null;
+        }
+
+        $response = (new JsonResponse(['ok' => true]))
+            ->withHeader('Deprecation', '@1767225600')
+            ->withHeader('Sunset', 'Fri, 01 Jan 2027 00:00:00 GMT');
+
+        return $response->withAddedHeader('Link', '</api/bench/plain/noop>; rel="successor-version", <https://example.com/docs/deprecated>; rel="deprecation"');
+    }
+
+    /**
+     * Counterpart of #[Route(sites:, languages:)]: the two in_array() checks the feature performs,
+     * against the same request attributes.
+     */
+    private function scoped(ServerRequestInterface $request, string $path): ?ResponseInterface
+    {
+        if ('/api/bench/plain/scoped' !== $path) {
+            return null;
+        }
+
+        $site = $request->getAttribute('site');
+        $language = $request->getAttribute('language');
+        if ($site instanceof SiteInterface && in_array($site->getIdentifier(), ['main'], true)
+            && $language instanceof SiteLanguage && in_array($language->getLanguageId(), [0], true)) {
+            return new JsonResponse(['ok' => true]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Counterpart of #[Route(canonical: true)]: exact path served directly, trailing-slash variant
+     * redirected by hand — a literal Location, not a regenerated URL.
+     */
+    private function canonical(string $path): ?ResponseInterface
+    {
+        if ('/api/bench/plain/canonical' === $path) {
+            return new JsonResponse(['ok' => true]);
+        }
+        if ('/api/bench/plain/canonical/' === $path) {
+            return new Response('php://temp', 308, ['Location' => '/api/bench/plain/canonical']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Counterpart of #[Route(legacyPaths:)], with and without `legacyAlias: true`.
+     */
+    private function legacy(string $path): ?ResponseInterface
+    {
+        if ('/api/bench/plain/legacy-new' === $path || '/api/bench/plain/alias-new' === $path || '/api/bench/plain/alias-old' === $path) {
+            return new JsonResponse(['ok' => true]);
+        }
+        if ('/api/bench/plain/legacy-old' === $path) {
+            return new Response('php://temp', 308, ['Location' => '/api/bench/plain/legacy-new']);
+        }
+
+        return null;
     }
 }

@@ -13,11 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Middleware;
 
-use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
-use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
-use KonradMichalik\Typo3Routing\Http\{ConditionalGet, CorsHandler, CorsPreflightResolver, DeprecationHeaders, JsonErrorResponse, RequestIdResolver, RouteUrlGenerator, SiteBasePathResolver};
-use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
-use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, PathPrefixGate, RouteMatcher, RouteRegistry, SiteLanguageScope};
+use KonradMichalik\Typo3Routing\Http\{ConditionalGet, JsonErrorResponse, RequestIdResolver, SiteBasePathResolver};
+use KonradMichalik\Typo3Routing\Routing\{PathPrefixGate, RouteRegistry};
 use Override;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
@@ -55,21 +52,15 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private PathPrefixGate $exclusive;
 
+    /**
+     * Only what the gate itself needs is injected directly. Everything used after the gate accepts a
+     * request comes from {@see DispatcherServices}, so a page request never builds it — see that class
+     * for the measurement that motivated the split.
+     */
     public function __construct(
         private RouteRegistry $registry,
-        private RouteMatcher $matcher,
         private SiteBasePathResolver $basePathResolver,
-        private ResponseCacheManager $cache,
-        private RateLimitCheck $rateLimitCheck,
-        private ControllerInvoker $invoker,
-        private AccessGuard $accessGuard,
-        private CorsHandler $cors,
-        private CorsPreflightResolver $corsPreflight,
-        private CacheBypassGuard $cacheBypass,
-        private ClientKeyResolver $clientKeyResolver,
-        private RouteUrlGenerator $urlGenerator,
-        private SiteLanguageScope $siteLanguageScope,
-        private DeprecationHeaders $deprecation,
+        private DispatcherServices $services,
         ExtensionConfiguration $extensionConfiguration,
     ) {
         $configured = '';
@@ -120,8 +111,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         // it came from (a no-op unless it opted in), and finally the CORS headers stamped on — using
         // the matched route's own #[Cors] override when it declared one, else the global config.
         $response = RequestIdResolver::decorate($response, $request);
-        $response = $this->deprecation->decorate($response, $request, $routeName);
-        $response = $this->cors->decorate($response, $request, $corsConfig);
+        $response = $this->services->deprecation()->decorate($response, $request, $routeName);
+        $response = $this->services->cors()->decorate($response, $request, $corsConfig);
 
         // Applied once, here, so every response this middleware returns is covered — a matched dispatch,
         // but also the early 404/405/400/401/403/429 responses that never reach dispatch() at all.
@@ -147,15 +138,15 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $corsConfig = $this->registry->getCorsConfig($routeName);
 
         // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
-        if (!$this->invoker->isVisibleInCurrentContext($match['_env'] ?? null)) {
+        if (!$this->services->invoker()->isVisibleInCurrentContext($match['_env'] ?? null)) {
             return JsonErrorResponse::create(404, 'Not Found');
         }
 
         // 3b. Site/language scope: a route not bound to the current site or language is invisible too.
         //     Checked before either redirect below for the same reason as the env filter above: a
         //     redirect must never reveal a route invisible in the current context.
-        if (!$this->siteLanguageScope->isVisibleForSite($match['_sites'] ?? null, $request)
-            || !$this->siteLanguageScope->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
+        if (!$this->services->siteLanguageScope()->isVisibleForSite($match['_sites'] ?? null, $request)
+            || !$this->services->siteLanguageScope()->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
             return JsonErrorResponse::create(404, 'Not Found');
         }
 
@@ -183,13 +174,13 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         // 4. Request body shape (malformed JSON / unsupported content type) → 400/415, on routes that
         //    actually read from the body. Checked before requirements so the cause is named correctly
         //    instead of surfacing as a derived "missing parameter".
-        $bodyError = $this->invoker->firstRequestBodyError($match, $request);
+        $bodyError = $this->services->invoker()->firstRequestBodyError($match, $request);
         if (null !== $bodyError) {
             return $bodyError;
         }
 
         // 5. Input requirements (query/body) → 400. Path requirements are matcher-enforced (404).
-        $error = $this->invoker->firstInputRequirementError($match, $request);
+        $error = $this->services->invoker()->firstInputRequirementError($match, $request);
         if (null !== $error) {
             return JsonErrorResponse::create(400, $error);
         }
@@ -203,7 +194,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         // 7. Access control (opt-in): authentication (401) then CSRF/request token (403).
-        $denied = $this->accessGuard->enforce($match, $request);
+        $denied = $this->services->accessGuard()->enforce($match, $request);
         if (null !== $denied) {
             return $this->withHeaders($denied, $rateLimit['headers']);
         }
@@ -269,7 +260,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     {
         /** @var array<string, mixed> $parameters */
         $parameters = array_filter($match, static fn (string $key): bool => !str_starts_with($key, '_'), ARRAY_FILTER_USE_KEY);
-        $location = $this->urlGenerator->generate($request, $routeName, $parameters);
+        $location = $this->services->urlGenerator()->generate($request, $routeName, $parameters);
 
         $query = $request->getUri()->getQuery();
         if ('' !== $query) {
@@ -288,7 +279,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface|null
     {
         try {
-            return $this->matcher->match($path, $this->requestContext($request));
+            return $this->services->matcher()->match($path, $this->requestContext($request));
         } catch (ResourceNotFoundException) {
             return $this->exclusive->matches($path) ? JsonErrorResponse::create(404, 'Not Found') : null;
         } catch (MethodNotAllowedException $exception) {
@@ -305,7 +296,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function preflight(ServerRequestInterface $request, string $path): ?ResponseInterface
     {
-        return $this->corsPreflight->resolve($request, $path, $this->requestContext($request));
+        return $this->services->corsPreflight()->resolve($request, $path, $this->requestContext($request));
     }
 
     private function requestContext(ServerRequestInterface $request): RequestContext
@@ -331,7 +322,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return ['blocked' => null, 'headers' => []];
         }
 
-        return $this->rateLimitCheck->evaluate($routeName, $config, $this->clientKeyResolver->resolve($config, $request));
+        return $this->services->rateLimitCheck()->evaluate($routeName, $config, $this->services->clientKeyResolver()->resolve($config, $request));
     }
 
     /**
@@ -362,16 +353,16 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $cached = $this->readCache($cacheConfig, $routeName, $request);
         if ($cached instanceof ResponseInterface) {
             // A cached entry already carries its ETag, so a conditional GET can short-circuit.
-            $cached = $this->cache->withCacheStatus($cached, $cacheConfig, $request, 'HIT');
+            $cached = $this->services->cache()->withCacheStatus($cached, $cacheConfig, $request, 'HIT');
 
             return ConditionalGet::notModified($request, $cached) ?? $cached;
         }
 
-        $response = $this->invoker->invoke($match, $request);
+        $response = $this->services->invoker()->invoke($match, $request);
         // The real body is stored (and returned) here; process() empties it for HEAD afterwards — a HEAD
         // request must prime the same cache entry a subsequent GET reads, not an empty one.
         $response = $this->writeCache($cacheConfig, $routeName, $request, $response);
-        $response = $this->cache->withCacheStatus($response, $cacheConfig, $request, 'MISS');
+        $response = $this->services->cache()->withCacheStatus($response, $cacheConfig, $request, 'MISS');
 
         // notModified is a no-op unless the response was cached (only then does it carry an ETag).
         return ConditionalGet::notModified($request, $response) ?? $response;
@@ -400,11 +391,11 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function readCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request): ?ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $this->cache->cacheableMethod($request) || $this->cacheBypass->skipsRead($request)) {
+        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || $this->services->cacheBypass()->skipsRead($request)) {
             return null;
         }
 
-        return $this->cache->get($this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']));
+        return $this->services->cache()->get($this->services->cache()->buildKey($routeName, $request, $cacheConfig['ignoreParams']));
     }
 
     /**
@@ -416,13 +407,13 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function writeCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $this->cache->cacheableMethod($request) || 200 !== $response->getStatusCode() || $this->cacheBypass->skipsWrite($request)) {
+        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || 200 !== $response->getStatusCode() || $this->services->cacheBypass()->skipsWrite($request)) {
             return $response;
         }
 
         // Attach the ETag before storing so this first response and later cache hits share the validator.
-        $response = $this->cache->withETag($response);
-        $this->cache->store($this->cache->buildKey($routeName, $request, $cacheConfig['ignoreParams']), $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
+        $response = $this->services->cache()->withETag($response);
+        $this->services->cache()->store($this->services->cache()->buildKey($routeName, $request, $cacheConfig['ignoreParams']), $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
 
         return $response;
     }

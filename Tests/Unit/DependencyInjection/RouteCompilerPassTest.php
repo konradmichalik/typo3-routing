@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -790,6 +790,32 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function fallsBackToTheClassLevelRateLimitForMethodsWithoutTheirOwn(): void
+    {
+        $container = $this->buildContainer(['rate_limited_controller' => RateLimitedController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{limit: int, interval: string, policy: string, keyBy: string}> $rateLimits */
+        $rateLimits = $container->getDefinition(RouteRegistry::class)->getArgument('$rateLimits');
+
+        self::assertSame(10, $rateLimits['rate_limit_class_level']['limit']);
+        self::assertSame('1 minute', $rateLimits['rate_limit_class_level']['interval']);
+    }
+
+    #[Test]
+    public function ownRateLimitWinsEntirelyOverTheClassLevelFallback(): void
+    {
+        $container = $this->buildContainer(['rate_limited_controller' => RateLimitedController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{limit: int, interval: string, policy: string, keyBy: string}> $rateLimits */
+        $rateLimits = $container->getDefinition(RouteRegistry::class)->getArgument('$rateLimits');
+
+        self::assertSame(5, $rateLimits['rate_limit_method_level']['limit']);
+        self::assertSame('fixed_window', $rateLimits['rate_limit_method_level']['policy']);
+    }
+
+    #[Test]
     public function capturesCorsConfigForTheMethodsOwnAttribute(): void
     {
         $container = $this->buildContainer(['cors_controller' => CorsController::class]);
@@ -864,6 +890,15 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionCode(1750000024);
 
         $this->discover($this->buildContainer(['bogus_key' => InvalidRateLimitKeyController::class]));
+    }
+
+    #[Test]
+    public function throwsOnUnsupportedRateLimitPolicyDeclaredAtClassLevel(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000001);
+
+        $this->discover($this->buildContainer(['bogus_class' => InvalidClassLevelRateLimitController::class]));
     }
 
     #[Test]

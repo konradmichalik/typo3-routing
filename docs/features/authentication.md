@@ -31,6 +31,30 @@ public function report(): ResponseInterface
 > [!IMPORTANT]
 > A route without `#[Authenticate]` is public. Audit your open endpoints at any time with `vendor/bin/typo3 routing:debug --unprotected`.
 
+## Class-level `#[Authenticate]`
+
+`#[Authenticate]` may also sit on the **controller class**, where it supplies the default for every method route that does not declare its own — the same fallback model as a class-level [`#[Cors]`](cors.md#per-route-overrides-with-cors).
+
+```php
+#[Authenticate(FrontendUserAuthenticator::class)]
+final class AccountController implements RouteControllerInterface
+{
+    // No own #[Authenticate]: falls back to the class-level FrontendUserAuthenticator.
+    #[Route(path: '/api/account', name: 'account_show')]
+    public function show(): ResponseInterface { /* … */ }
+
+    // Own #[Authenticate] wins entirely over the class-level one — not merged.
+    #[Route(path: '/api/account/support', name: 'account_support')]
+    #[Authenticate(BackendUserAuthenticator::class)]
+    public function support(): ResponseInterface { /* … */ }
+}
+```
+
+A method's own `#[Authenticate]` attribute(s) always replace the class-level list entirely rather than combining with it — the same rule as `#[Cors]`. `routing:debug --unprotected` audits the *resolved* authenticator per route, so it reflects the class-level fallback without any extra configuration.
+
+> [!CAUTION]
+> A class-level attribute is **never inherited by a subclass** (PHP reflects only the concrete class's own attributes). If an abstract base declares routes *and* a class-level `#[Authenticate]`, a concrete subclass that inherits those routes without repeating the attribute gets **no fallback at all** — the inherited routes become public. When sharing routes through a [base class](../routes/route-groups.md#sharing-route-definitions-through-a-base-class), either keep `#[Authenticate]` on the shared method (which *is* inherited) or repeat the class-level attribute on every concrete subclass.
+
 ## Built-in authenticators
 
 ### `BearerTokenAuthenticator`

@@ -61,7 +61,7 @@ PHP does not carry method attributes onto an override, so overriding an inherite
 
 ## What else can sit on the class
 
-Of the [opt-in feature attributes](../features/README.md), [`#[Cors]`](../features/cors.md#per-route-overrides-with-cors) and [`#[RateLimit]`](../features/rate-limiting.md#class-level-ratelimit) are inheritable in the same way — a method's own attribute always wins entirely over the class-level fallback. `#[Authenticate]`, `#[Cache]` and `#[RequireRequestToken]` are method-only by design — a protection or a cache policy that silently extends to every method added later is not a safe default.
+Of the [opt-in feature attributes](../features/README.md), [`#[Cors]`](../features/cors.md#per-route-overrides-with-cors), [`#[RateLimit]`](../features/rate-limiting.md#class-level-ratelimit) and [`#[Authenticate]`](../features/authentication.md#class-level-authenticate) are inheritable in the same way — a method's own attribute always wins entirely over the class-level fallback. `#[Cache]` and `#[RequireRequestToken]` are method-only by design — a cache policy that silently extends to every method added later is not a safe default.
 
 ## Sharing route definitions through a base class
 

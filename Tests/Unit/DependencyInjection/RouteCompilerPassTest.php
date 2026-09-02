@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, JsonErrorRouteController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ClassLevelAuthenticateController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidClassLevelAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, JsonErrorRouteController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -1098,6 +1098,53 @@ final class RouteCompilerPassTest extends TestCase
 
         // The controller references PassAuthenticator, but it is not registered as a service.
         $this->discover($this->buildContainer(['auth_controller' => AuthenticatedController::class]));
+    }
+
+    #[Test]
+    public function fallsBackToTheClassLevelOrCombinedAuthenticatorsForMethodsWithoutTheirOwn(): void
+    {
+        $container = $this->buildContainer([
+            'class_auth_controller' => ClassLevelAuthenticateController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = $container->getDefinition(RouteRegistry::class)->getArgument('$authenticators');
+
+        self::assertSame([
+            ['service' => PassAuthenticator::class, 'options' => []],
+            ['service' => DenyAuthenticator::class, 'options' => ['role' => 'admin']],
+        ], $authenticators['auth_class_level']);
+    }
+
+    #[Test]
+    public function ownAuthenticateWinsEntirelyOverTheClassLevelFallback(): void
+    {
+        $container = $this->buildContainer([
+            'class_auth_controller' => ClassLevelAuthenticateController::class,
+            PassAuthenticator::class => PassAuthenticator::class,
+            DenyAuthenticator::class => DenyAuthenticator::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
+        $authenticators = $container->getDefinition(RouteRegistry::class)->getArgument('$authenticators');
+
+        // Not merged with the class-level DenyAuthenticator: only the method's own PassAuthenticator applies.
+        self::assertSame([
+            ['service' => PassAuthenticator::class, 'options' => []],
+        ], $authenticators['auth_method_level']);
+    }
+
+    #[Test]
+    public function throwsWhenAClassLevelAuthenticatorDoesNotImplementTheContract(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000010);
+
+        $this->discover($this->buildContainer(['broken_class' => InvalidClassLevelAuthenticatorController::class]));
     }
 
     #[Test]

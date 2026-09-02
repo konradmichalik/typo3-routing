@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, RateLimit, RequireRequestToken, Returns, Route};
-use KonradMichalik\Typo3Routing\Authentication\RouteAuthenticatorInterface;
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
 use Override;
@@ -64,6 +63,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     public function __construct(
         private ArgumentSpecFactory $argumentSpecs = new ArgumentSpecFactory(),
         private CorsResolver $corsResolver = new CorsResolver(),
+        private AuthenticateResolver $authenticateResolver = new AuthenticateResolver(),
         private ClassExistenceChecker $classExistenceChecker = new ClassExistenceChecker(),
         private CompilerWarnings $compilerWarnings = new CompilerWarnings(),
         private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
@@ -191,6 +191,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $collected->recordClassExclusivePrefix($classExclusivePrefix);
         $classDeprecation = $this->deprecationResolver->resolveClass($reflection);
         $classRateLimit = $this->rateLimitResolver->resolveClass($reflection);
+        $classAuth = $this->authenticateResolver->resolveClass($reflection);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -198,7 +199,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix, $classDeprecation, $classRateLimit) || $found;
+            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix, $classDeprecation, $classRateLimit, $classAuth) || $found;
         }
 
         return ['hasRoute' => $found, 'hasExclusiveClaim' => null !== $classExclusivePrefix];
@@ -223,7 +224,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         return $attributes[0]->newInstance();
     }
 
-    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix, ?DeprecatedRoute $classDeprecation, ?RateLimit $classRateLimit): bool
+    /**
+     * @param list<Authenticate> $classAuth
+     */
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix, ?DeprecatedRoute $classDeprecation, ?RateLimit $classRateLimit, array $classAuth): bool
     {
         $overriddenRouteMethod = $this->compilerWarnings->findOverriddenRouteMethod($method, Route::class);
         $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
@@ -237,7 +241,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
         $cache = $this->resolveCache($method);
         $rateLimit = $this->rateLimitResolver->resolveMethod($method, $classRateLimit);
-        $auth = $this->resolveAuthenticators($method, $serviceId, $container, $collected);
+        $auth = $this->authenticateResolver->resolveMethod($method, $serviceId, $container, $collected, $classAuth);
         $requestToken = $this->resolveRequestToken($method);
         $cors = $this->corsResolver->resolveMethod($method, $classCors);
         $this->compilerWarnings->warnIfAModifierWasDropped($overriddenRouteMethod, $method, $serviceId, self::MODIFIER_ATTRIBUTES);
@@ -407,35 +411,6 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         }
 
         $collected->requestTokenScopes[$name] = $requestToken->scope ?? 'routing/'.$name;
-    }
-
-    /**
-     * Resolves the route's #[Authenticate] attributes (OR-combined) and registers each referenced
-     * authenticator class in the locator. Fails the build on an unknown class, a class that does not
-     * implement the contract, or one that is not a registered service.
-     *
-     * @return list<array{service: string, options: array<string, mixed>}>
-     */
-    private function resolveAuthenticators(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected): array
-    {
-        $result = [];
-        foreach ($method->getAttributes(Authenticate::class) as $attribute) {
-            $authenticate = $attribute->newInstance();
-            $class = $authenticate->authenticator;
-
-            if (!$this->classExistenceChecker->exists($class) || !is_a($class, RouteAuthenticatorInterface::class, true)) {
-                throw new LogicException(sprintf('#[Authenticate] on "%s::%s()" references "%s", which does not implement %s.', $serviceId, $method->getName(), $class, RouteAuthenticatorInterface::class), 1750000010);
-            }
-
-            if (!$container->hasDefinition($class) && !$container->hasAlias($class)) {
-                throw new LogicException(sprintf('#[Authenticate] authenticator "%s" on "%s::%s()" is not a registered service. Register it (autoconfiguration in Services.yaml is enough).', $class, $serviceId, $method->getName()), 1750000011);
-            }
-
-            $collected->authenticatorReferences[$class] ??= new Reference($class);
-            $result[] = ['service' => $class, 'options' => $authenticate->options];
-        }
-
-        return $result;
     }
 
     private function resolveRequestToken(ReflectionMethod $method): ?RequireRequestToken

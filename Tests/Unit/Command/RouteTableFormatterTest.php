@@ -33,6 +33,13 @@ final class RouteTableFormatterTest extends TestCase
     }
 
     #[Test]
+    public function formatsABooleanAsYesOrNo(): void
+    {
+        self::assertSame('yes', RouteTableFormatter::yesNo(true));
+        self::assertSame('no', RouteTableFormatter::yesNo(false));
+    }
+
+    #[Test]
     public function formatsArgumentsWithTypeNullabilityAndSource(): void
     {
         $arguments = [

@@ -45,7 +45,7 @@ Two consequences follow directly from where that boundary sits:
 | 8 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
 | 9 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
 | 10 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
-| 11 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity |
+| 11 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/route-attribute.md#automatic-json-errors-for-jsonresponse-routes) |
 
 Several ordering decisions in there are deliberate rather than incidental:
 
@@ -57,7 +57,7 @@ Every response reaching this decoration stage — a matched dispatch, but also a
 
 ## What every response from this middleware carries
 
-`400`, `401`, `403`, `404`, `405`, `415` and `429` emitted by this middleware, and controller-thrown [`HttpProblemException`](../routes/route-attribute.md#error-responses-from-controllers), are all emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details: `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}`, where `detail` is omitted when it would only repeat the title. A path that falls through to page rendering (steps 1 and 3) is not this middleware's response, so it is not held to this format. The **success** response format is entirely the controller's choice.
+`400`, `401`, `403`, `404`, `405`, `415` and `429` emitted by this middleware, controller-thrown [`HttpProblemException`](../routes/route-attribute.md#error-responses-from-controllers), and the `500` from a route's [automatic JSON errors](../routes/route-attribute.md#automatic-json-errors-for-jsonresponse-routes), are all emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details: `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}`, where `detail` is omitted when it would only repeat the title — the `500` case always omits it, since the underlying exception's message is never surfaced. A path that falls through to page rendering (steps 1 and 3) is not this middleware's response, so it is not held to this format. The **success** response format is entirely the controller's choice.
 
 Every response reaching the decoration stage above, success or error, also carries an `X-Request-ID` header — echoed back when the client sent one, otherwise generated, so a single id correlates a request across logs and proxies.
 

@@ -125,6 +125,11 @@ final class RouteTableFormatter
         return [] === $legacyPaths ? '-' : implode(', ', $legacyPaths);
     }
 
+    public static function yesNo(bool $value): string
+    {
+        return $value ? 'yes' : 'no';
+    }
+
     /**
      * Keeps the table readable by truncating long descriptions; the full text is always available
      * via `routing:debug <name>` (detail view) or `--json`.

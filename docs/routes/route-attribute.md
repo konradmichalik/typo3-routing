@@ -300,4 +300,23 @@ public function cancel(Order $order): ResponseInterface
 
 The dispatcher maps it to `application/problem+json` — status `409`, title `Conflict`, and the message as `detail` (omitted when it only repeats the title). Only 4xx/5xx status codes are accepted; anything else raises a runtime `LogicException` when the exception is constructed.
 
-Every **other** exception stays untouched and reaches TYPO3's regular error handling (and its logging) as before — `HttpProblemException` is for *expected* error outcomes, not a replacement for exception handling.
+Every **other** exception stays untouched and reaches TYPO3's regular error handling (and its logging) as before — `HttpProblemException` is for *expected* error outcomes, not a replacement for exception handling. The one exception to that: a controller method declaring a bare `JsonResponse` return type opts in to automatic JSON errors, described next.
+
+### Automatic JSON errors for `JsonResponse` routes
+
+A controller method whose declared return type is a bare, non-nullable `\TYPO3\CMS\Core\Http\JsonResponse` — no explicit opt-in needed — gets every otherwise-uncaught exception converted to a generic `500` `application/problem+json` response instead of reaching TYPO3's regular (HTML) error handling:
+
+```php
+use TYPO3\CMS\Core\Http\JsonResponse;
+
+#[Route(path: '/api/orders/{id}', name: 'order_show')]
+public function show(Order $order): JsonResponse
+{
+    // Any exception thrown here — one nobody anticipated — still answers as JSON.
+    return new JsonResponse($order->toArray());
+}
+```
+
+The response body never includes the exception's own message or a stack trace, regardless of application context — only the fixed `title: 'Internal Server Error'` — since an unanticipated exception's detail is unvetted and possibly sensitive. `HttpProblemException`, `ArgumentResolutionException` (unresolvable argument) and a missing entity are still mapped to their own specific status exactly as before; this only adds a catch-all for everything else.
+
+A nullable (`?JsonResponse`) or union return type does **not** opt in: the method can legitimately answer with something other than JSON, so guessing "JSON errors" for it would be wrong as often as it is right. A method with no declared return type is likewise unaffected.

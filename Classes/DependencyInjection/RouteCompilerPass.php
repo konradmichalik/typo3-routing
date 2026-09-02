@@ -29,7 +29,6 @@ use function array_map;
 use function array_unique;
 use function array_values;
 use function count;
-use function in_array;
 use function is_a;
 use function is_string;
 use function sprintf;
@@ -47,16 +46,6 @@ use const E_USER_WARNING;
  */
 final readonly class RouteCompilerPass implements CompilerPassInterface
 {
-    /**
-     * @var list<string>
-     */
-    private const SUPPORTED_RATE_LIMIT_POLICIES = ['sliding_window', 'fixed_window'];
-
-    /**
-     * @var list<string>
-     */
-    private const SUPPORTED_RATE_LIMIT_KEYS = ['ip', 'user'];
-
     /**
      * Attributes that only take effect alongside a #[Route] on the same method.
      *
@@ -80,6 +69,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
         private ClassExclusiveResolver $classExclusiveResolver = new ClassExclusiveResolver(),
         private DeprecationResolver $deprecationResolver = new DeprecationResolver(),
+        private RateLimitResolver $rateLimitResolver = new RateLimitResolver(),
         private ReturnsResolver $returnsResolver = new ReturnsResolver(),
         private RouteCompileGuard $compileGuard = new RouteCompileGuard(),
         private RouteAliasCollector $aliasCollector = new RouteAliasCollector(),
@@ -198,6 +188,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $classExclusivePrefix = $this->classExclusiveResolver->resolvePrefix($classRoute, $serviceId);
         $collected->recordClassExclusivePrefix($classExclusivePrefix);
         $classDeprecation = $this->deprecationResolver->resolveClass($reflection);
+        $classRateLimit = $this->rateLimitResolver->resolveClass($reflection);
 
         $found = false;
         foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
@@ -205,7 +196,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix, $classDeprecation) || $found;
+            $found = $this->collectMethod($method, $serviceId, $container, $collected, $classRoute, $classCors, $classExclusivePrefix, $classDeprecation, $classRateLimit) || $found;
         }
 
         return ['hasRoute' => $found, 'hasExclusiveClaim' => null !== $classExclusivePrefix];
@@ -230,7 +221,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         return $attributes[0]->newInstance();
     }
 
-    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix, ?DeprecatedRoute $classDeprecation): bool
+    private function collectMethod(ReflectionMethod $method, string $serviceId, ContainerBuilder $container, CollectedRoutes $collected, ?Route $classRoute, ?Cors $classCors, ?string $classExclusivePrefix, ?DeprecatedRoute $classDeprecation, ?RateLimit $classRateLimit): bool
     {
         $overriddenRouteMethod = $this->compilerWarnings->findOverriddenRouteMethod($method, Route::class);
         $this->compilerWarnings->warnIfRouteWasDropped($overriddenRouteMethod, $method, $serviceId);
@@ -243,7 +234,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         }
 
         $cache = $this->resolveCache($method);
-        $rateLimit = $this->resolveRateLimit($method, $serviceId);
+        $rateLimit = $this->rateLimitResolver->resolveMethod($method, $classRateLimit);
         $auth = $this->resolveAuthenticators($method, $serviceId, $container, $collected);
         $requestToken = $this->resolveRequestToken($method);
         $cors = $this->corsResolver->resolveMethod($method, $classCors);
@@ -279,10 +270,9 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
     /**
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cache
-     * @param array{limit: int, interval: string, policy: string, keyBy: string}|null   $rateLimit
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
-    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?array $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, ?DeprecatedRoute $deprecation, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?RateLimit $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, ?DeprecatedRoute $deprecation, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
     {
         $this->classExclusiveResolver->assertNotOnMethod($route, $method, $serviceId);
 
@@ -352,9 +342,6 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $collected->arguments[$name] = $arguments;
         $this->aliasCollector->apply($route->aliases, $namePrefix, $name, $serviceId, $method->getName(), $collected);
 
-        if (null !== $rateLimit) {
-            $collected->rateLimits[$name] = $rateLimit;
-        }
         if ([] !== $auth) {
             $collected->authenticators[$name] = $auth;
         }
@@ -363,6 +350,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->applyRequestToken($requestToken, $methods, $name, $serviceId, $method, $collected);
         $this->corsResolver->apply($cors, $name, $serviceId, $method->getName(), $collected);
         $this->deprecationResolver->apply($deprecation, $name, $serviceId, $method->getName(), $collected);
+        $this->rateLimitResolver->apply($rateLimit, $name, $serviceId, $method->getName(), $collected);
         $this->returnsResolver->apply($method, $serviceId, $name, $collected);
     }
 
@@ -466,29 +454,6 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $cache = $attributes[0]->newInstance();
 
         return ['lifetime' => $cache->lifetime, 'tags' => $cache->tags, 'ignoreParams' => $cache->ignoreParams];
-    }
-
-    /**
-     * @return array{limit: int, interval: string, policy: string, keyBy: string}|null
-     */
-    private function resolveRateLimit(ReflectionMethod $method, string $serviceId): ?array
-    {
-        $attributes = $method->getAttributes(RateLimit::class);
-        if ([] === $attributes) {
-            return null;
-        }
-
-        $rateLimit = $attributes[0]->newInstance();
-
-        if (!in_array($rateLimit->policy, self::SUPPORTED_RATE_LIMIT_POLICIES, true)) {
-            throw new LogicException(sprintf('Unsupported #[RateLimit] policy "%s" on "%s::%s()". Supported policies are "%s".', $rateLimit->policy, $serviceId, $method->getName(), implode('", "', self::SUPPORTED_RATE_LIMIT_POLICIES)), 1750000001);
-        }
-
-        if (!in_array($rateLimit->keyBy, self::SUPPORTED_RATE_LIMIT_KEYS, true)) {
-            throw new LogicException(sprintf('Unsupported #[RateLimit] keyBy "%s" on "%s::%s()". Supported keys are "%s".', $rateLimit->keyBy, $serviceId, $method->getName(), implode('", "', self::SUPPORTED_RATE_LIMIT_KEYS)), 1750000024);
-        }
-
-        return ['limit' => $rateLimit->limit, 'interval' => $rateLimit->interval, 'policy' => $rateLimit->policy, 'keyBy' => $rateLimit->keyBy];
     }
 
     private function deriveRouteName(string $serviceId, string $method): string

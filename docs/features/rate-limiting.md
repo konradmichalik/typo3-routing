@@ -26,6 +26,27 @@ public function submit(ServerRequestInterface $request): ResponseInterface
 - Every response from a rate-limited route — accepted or blocked — carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (a Unix timestamp), so a client can see its quota without waiting for a `429`.
 - The client is keyed by the resolved remote address (`normalizedParams`, so reverse-proxy headers are honoured when configured). An unsupported `policy` or `keyBy` raises a build-time exception.
 
+## Class-level `#[RateLimit]`
+
+`#[RateLimit]` may also sit on the **controller class**, where it supplies the default for every method route that does not declare its own — the same fallback model as a class-level [`#[Cors]`](cors.md#per-route-overrides-with-cors).
+
+```php
+#[RateLimit(limit: 30, interval: '1 minute')]
+final class AccountController implements RouteControllerInterface
+{
+    // No own #[RateLimit]: falls back to the class-level 30/minute.
+    #[Route(path: '/api/account', name: 'account_show')]
+    public function show(): ResponseInterface { /* … */ }
+
+    // Own #[RateLimit] wins entirely over the class-level one — not merged.
+    #[Route(path: '/api/account/export', methods: ['POST'], name: 'account_export')]
+    #[RateLimit(limit: 5, interval: '1 hour', keyBy: 'user')]
+    public function export(ServerRequestInterface $request): ResponseInterface { /* … */ }
+}
+```
+
+A method's own `#[RateLimit]` always replaces the class-level one entirely rather than combining with it — the same rule as `#[Cors]`.
+
 ### Throttling per user
 
 `keyBy: 'user'` throttles each **logged-in frontend user** independently instead of by IP — the right choice for authenticated endpoints, where an office behind one NAT IP would otherwise share a single quota, and a single user across several IPs could otherwise slip the limit.

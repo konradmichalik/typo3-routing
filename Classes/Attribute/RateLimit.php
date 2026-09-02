@@ -22,7 +22,7 @@ use Attribute;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-#[Attribute(Attribute::TARGET_METHOD)]
+#[Attribute(Attribute::TARGET_CLASS | Attribute::TARGET_METHOD)]
 final readonly class RateLimit
 {
     /**

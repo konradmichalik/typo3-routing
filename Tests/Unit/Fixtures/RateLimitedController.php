@@ -34,7 +34,7 @@ final class RateLimitedController implements RouteControllerInterface
 
     // Own #[RateLimit] wins entirely over the class-level one.
     #[Route(path: '/api/rate-limit/method-level', name: 'rate_limit_method_level')]
-    #[RateLimit(limit: 5, interval: '10 seconds', policy: 'fixed_window')]
+    #[RateLimit(limit: 5, interval: '10 seconds', policy: 'fixed_window', keyBy: 'user')]
     public function methodLevel(): JsonResponse
     {
         return new JsonResponse([]);

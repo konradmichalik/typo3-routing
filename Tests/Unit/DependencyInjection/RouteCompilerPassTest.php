@@ -800,6 +800,8 @@ final class RouteCompilerPassTest extends TestCase
 
         self::assertSame(10, $rateLimits['rate_limit_class_level']['limit']);
         self::assertSame('1 minute', $rateLimits['rate_limit_class_level']['interval']);
+        self::assertSame('sliding_window', $rateLimits['rate_limit_class_level']['policy']);
+        self::assertSame('ip', $rateLimits['rate_limit_class_level']['keyBy']);
     }
 
     #[Test]
@@ -812,7 +814,9 @@ final class RouteCompilerPassTest extends TestCase
         $rateLimits = $container->getDefinition(RouteRegistry::class)->getArgument('$rateLimits');
 
         self::assertSame(5, $rateLimits['rate_limit_method_level']['limit']);
+        self::assertSame('10 seconds', $rateLimits['rate_limit_method_level']['interval']);
         self::assertSame('fixed_window', $rateLimits['rate_limit_method_level']['policy']);
+        self::assertSame('user', $rateLimits['rate_limit_method_level']['keyBy']);
     }
 
     #[Test]

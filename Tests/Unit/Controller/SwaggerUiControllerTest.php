@@ -141,8 +141,9 @@ final class SwaggerUiControllerTest extends TestCase
         // Pinned to an exact version with a matching SRI hash, not a floating major-version selector.
         self::assertMatchesRegularExpression('#swagger-ui-dist@\d+\.\d+\.\d+/swagger-ui\.css" integrity="sha384-#', $html);
         self::assertMatchesRegularExpression('#swagger-ui-dist@\d+\.\d+\.\d+/swagger-ui-bundle\.js" integrity="sha384-#', $html);
-        self::assertMatchesRegularExpression('#<link rel="icon" type="image/png" sizes="32x32" href="[^"]*swagger-ui-dist@\d+\.\d+\.\d+/favicon-32x32\.png" integrity="sha384-#', $html);
-        self::assertMatchesRegularExpression('#<link rel="icon" type="image/png" sizes="16x16" href="[^"]*swagger-ui-dist@\d+\.\d+\.\d+/favicon-16x16\.png" integrity="sha384-#', $html);
+        // crossorigin is bound to each favicon tag itself, not just present somewhere on the page.
+        self::assertMatchesRegularExpression('#<link rel="icon" type="image/png" sizes="32x32" href="[^"]*swagger-ui-dist@\d+\.\d+\.\d+/favicon-32x32\.png" integrity="sha384-[A-Za-z0-9+/]+" crossorigin="anonymous">#', $html);
+        self::assertMatchesRegularExpression('#<link rel="icon" type="image/png" sizes="16x16" href="[^"]*swagger-ui-dist@\d+\.\d+\.\d+/favicon-16x16\.png" integrity="sha384-[A-Za-z0-9+/]+" crossorigin="anonymous">#', $html);
         self::assertStringContainsString('crossorigin="anonymous"', $html);
     }
 

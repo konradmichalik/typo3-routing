@@ -104,6 +104,8 @@ final readonly class SwaggerUiController implements RouteControllerInterface
             <head>
             <meta charset="utf-8">
             <title>TYPO3 Routing API &mdash; Swagger UI</title>
+            <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.11/favicon-32x32.png" integrity="sha384-vCPruBEcPmxk2uv19KNJCkWttTDv8oQxBAzSuTndOepjsIyiKHSoLNlWOcQMpXdL" crossorigin="anonymous">
+            <link rel="icon" type="image/png" sizes="16x16" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.11/favicon-16x16.png" integrity="sha384-oDUaQMChCjWOp/XEgKGoKkbxI13qtC09h29tktgIqrVZSllgzHICA+tADxIplCMH" crossorigin="anonymous">
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.11/swagger-ui.css" integrity="sha384-9Q2fpS+xeS4ffJy6CagnwoUl+4ldAYhOs9pgZuEKxypVModhmZFzeMlvVsAjf7uT" crossorigin="anonymous">
             </head>
             <body>

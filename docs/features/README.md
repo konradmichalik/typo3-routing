@@ -43,8 +43,8 @@ The full pipeline, including matching and the environment filter, is in [How it 
 - **`keyBy: 'user'` wants an `#[Authenticate]` next to it.** Rate limiting runs before authentication, so an anonymous request has no user identity and falls back to being throttled by IP.
 - **A per-route `#[Cors]` replaces the global CORS configuration entirely** for that route, rather than merging with it field by field.
 
-## `#[Cors]` and `#[RateLimit]` are inheritable
+## `#[Cors]`, `#[RateLimit]` and `#[Authenticate]` are inheritable
 
-`#[Cors]` and `#[RateLimit]` may sit on the **controller class**, where each supplies the default for every method route that does not declare its own — the same inheritance model as a [class-level `#[Route]` prefix](../routes/route-groups.md). A method's own attribute always replaces the class-level one entirely rather than merging with it field by field.
+`#[Cors]`, `#[RateLimit]` and `#[Authenticate]` may sit on the **controller class**, where each supplies the default for every method route that does not declare its own — the same inheritance model as a [class-level `#[Route]` prefix](../routes/route-groups.md). A method's own attribute always replaces the class-level one entirely rather than merging with it field by field, so narrowing or replacing protection on a single method is always explicit. [`routing:debug --unprotected`](../operating/commands.md#filtering-and-inspecting) audits the *resolved* authenticator per route, so it reflects the class-level fallback automatically.
 
-`#[Authenticate]`, `#[Cache]` and `#[RequireRequestToken]` are method-only by design: a protection or a cache policy that silently applies to every method added to a class later is the wrong default, so each route restates it. PHP rejects a class-level use of them outright. Auditing the result is what [`routing:debug --unprotected`](../operating/commands.md#filtering-and-inspecting) is for.
+`#[Cache]` and `#[RequireRequestToken]` are method-only by design: a cache policy that silently applies to every method added to a class later is the wrong default, so each route restates it. PHP rejects a class-level use of them outright.

@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InvalidAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, JsonErrorRouteController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -817,6 +817,55 @@ final class RouteCompilerPassTest extends TestCase
         self::assertSame('10 seconds', $rateLimits['rate_limit_method_level']['interval']);
         self::assertSame('fixed_window', $rateLimits['rate_limit_method_level']['policy']);
         self::assertSame('user', $rateLimits['rate_limit_method_level']['keyBy']);
+    }
+
+    #[Test]
+    public function flagsARouteWhoseMethodDeclaresABareJsonResponseReturnType(): void
+    {
+        $container = $this->buildContainer(['json_error_controller' => JsonErrorRouteController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, bool> $jsonErrorRoutes */
+        $jsonErrorRoutes = $container->getDefinition(RouteRegistry::class)->getArgument('$jsonErrorRoutes');
+
+        self::assertArrayHasKey('json_errors_bare', $jsonErrorRoutes);
+        self::assertTrue($jsonErrorRoutes['json_errors_bare']);
+    }
+
+    #[Test]
+    public function doesNotFlagANullableJsonResponseReturnType(): void
+    {
+        $container = $this->buildContainer(['json_error_controller' => JsonErrorRouteController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, bool> $jsonErrorRoutes */
+        $jsonErrorRoutes = $container->getDefinition(RouteRegistry::class)->getArgument('$jsonErrorRoutes');
+
+        self::assertArrayNotHasKey('json_errors_nullable', $jsonErrorRoutes);
+    }
+
+    #[Test]
+    public function doesNotFlagADifferentReturnType(): void
+    {
+        $container = $this->buildContainer(['json_error_controller' => JsonErrorRouteController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, bool> $jsonErrorRoutes */
+        $jsonErrorRoutes = $container->getDefinition(RouteRegistry::class)->getArgument('$jsonErrorRoutes');
+
+        self::assertArrayNotHasKey('json_errors_other', $jsonErrorRoutes);
+    }
+
+    #[Test]
+    public function doesNotFlagAUnionReturnType(): void
+    {
+        $container = $this->buildContainer(['json_error_controller' => JsonErrorRouteController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, bool> $jsonErrorRoutes */
+        $jsonErrorRoutes = $container->getDefinition(RouteRegistry::class)->getArgument('$jsonErrorRoutes');
+
+        self::assertArrayNotHasKey('json_errors_union', $jsonErrorRoutes);
     }
 
     #[Test]

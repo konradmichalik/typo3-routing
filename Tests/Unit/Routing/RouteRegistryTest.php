@@ -729,6 +729,19 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesWhetherARouteConvertsUncaughtExceptionsToJson(): void
+    {
+        $registry = new RouteRegistry(
+            [],
+            new ServiceLocator([]),
+            jsonErrorRoutes: ['json' => true],
+        );
+
+        self::assertTrue($registry->isJsonErrorRoute('json'));
+        self::assertFalse($registry->isJsonErrorRoute('other'));
+    }
+
+    #[Test]
     public function exposesDeclaredReturnsPerRouteName(): void
     {
         $returns = [['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null]];

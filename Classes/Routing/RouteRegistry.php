@@ -60,6 +60,7 @@ final class RouteRegistry
      * @param array<string, list<array{status: int, schema: class-string|null, collection: bool, description: string|null}>>                                                                                                                                                                                                                                                                                                                                                                                                                                                      $returns
      * @param array<string, string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               $aliases
      * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $legacyPrefixes
+     * @param array<string, bool>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 $jsonErrorRoutes
      */
     public function __construct(
         private readonly array $routes,
@@ -81,6 +82,7 @@ final class RouteRegistry
         private readonly array $returns = [],
         private readonly array $aliases = [],
         private readonly array $legacyPrefixes = [],
+        private readonly array $jsonErrorRoutes = [],
     ) {}
 
     /**
@@ -435,6 +437,16 @@ final class RouteRegistry
     public function isCanonical(string $routeName): bool
     {
         return $this->routes[$routeName]['canonical'] ?? false;
+    }
+
+    /**
+     * Whether the route's controller method declares a bare `JsonResponse` return type: an otherwise
+     * uncaught exception is converted to a generic JSON error response instead of reaching TYPO3's
+     * regular (HTML) error handling. False by default.
+     */
+    public function isJsonErrorRoute(string $routeName): bool
+    {
+        return $this->jsonErrorRoutes[$routeName] ?? false;
     }
 
     /**

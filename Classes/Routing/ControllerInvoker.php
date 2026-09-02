@@ -15,7 +15,9 @@ namespace KonradMichalik\Typo3Routing\Routing;
 
 use KonradMichalik\Typo3Routing\Http\{HttpProblemException, JsonErrorResponse, RequestBody};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
+use Throwable;
 use TYPO3\CMS\Core\Core\Environment;
+use TYPO3\CMS\Core\Http\ImmediateResponseException;
 
 use function array_key_exists;
 use function assert;
@@ -43,8 +45,12 @@ final readonly class ControllerInvoker
 
     /**
      * Resolves the controller's arguments from the match and the request, calls it, and maps the
-     * exceptions that carry an HTTP meaning onto an error response. Every other exception stays
-     * untouched and reaches TYPO3's regular error handling (and its logging).
+     * exceptions that carry an HTTP meaning onto an error response. A route whose controller method
+     * declares a bare `JsonResponse` return type (see RouteRegistry::isJsonErrorRoute()) also converts
+     * every other exception into a generic JSON error; every other route leaves them untouched, to
+     * reach TYPO3's regular error handling (and its logging) exactly as before. TYPO3's own
+     * `ImmediateResponseException` is never converted either way: it is not an error, but a
+     * response-carrying control-flow signal that must reach `AbstractApplication` unchanged.
      *
      * @param array<string, mixed> $match
      */
@@ -70,6 +76,19 @@ final readonly class ControllerInvoker
             return JsonErrorResponse::create(404, 'Not Found');
         } catch (HttpProblemException $exception) {
             return JsonErrorResponse::create($exception->status, $exception->getMessage());
+        } catch (ImmediateResponseException $exception) {
+            // Not an error: TYPO3 core's own signal to short-circuit with a specific response
+            // (a redirect, for instance). Must reach AbstractApplication unconverted, JSON-error
+            // route or not.
+            throw $exception;
+        } catch (Throwable $exception) {
+            if (!$this->registry->isJsonErrorRoute($routeName)) {
+                throw $exception;
+            }
+
+            // Never the exception's own message or trace: this path exists specifically for
+            // exceptions nobody anticipated, so its detail is unvetted and possibly sensitive.
+            return JsonErrorResponse::create(500, 'Internal Server Error');
         }
     }
 

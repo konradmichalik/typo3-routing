@@ -73,6 +73,16 @@ final class CollectedRoutes
     public array $aliases = [];
 
     /**
+     * Routes whose controller method declares a bare `JsonResponse` return type: every exception
+     * thrown while invoking it is converted to a generic JSON error response rather than reaching
+     * TYPO3's regular (HTML) error handling. Only routes that opted in (implicitly, via their return
+     * type) are recorded — absence means false, same as $cacheConfigs/$rateLimits.
+     *
+     * @var array<string, bool>
+     */
+    public array $jsonErrorRoutes = [];
+
+    /**
      * Kept here rather than inlined at the call site: a compiler pass with dozens of small collection
      * steps stays within its own cognitive-complexity budget only by pushing each step's own branching
      * onto the object that owns the data, not by accumulating every "if resolved, record it" check.

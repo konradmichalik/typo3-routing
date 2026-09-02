@@ -19,11 +19,12 @@ use KonradMichalik\Ttt\Attribute\InApplicationContext;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteRegistry};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\EntityController;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, ThrowingController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
-use TYPO3\CMS\Core\Http\{ServerRequest, Stream};
+use TYPO3\CMS\Core\Http\{ImmediateResponseException, ServerRequest, Stream};
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
@@ -87,6 +88,36 @@ final class ControllerInvokerTest extends TestCase
 
         self::assertSame(409, $response->getStatusCode());
         self::assertJsonPath((string) $response->getBody(), 'detail', 'Item already processed');
+    }
+
+    #[Test]
+    public function convertsAnUncaughtExceptionToAGenericJsonErrorOnAFlaggedRoute(): void
+    {
+        $response = $this->invoker()->invoke($this->match('jsonError'), $this->request());
+
+        self::assertSame(500, $response->getStatusCode());
+        self::assertJsonPath((string) $response->getBody(), 'title', 'Internal Server Error');
+        // Never the exception's own message: that detail is unvetted and possibly sensitive.
+        self::assertJsonMissingPath((string) $response->getBody(), 'detail');
+    }
+
+    #[Test]
+    public function rethrowsAnUncaughtExceptionOnAnUnflaggedRoute(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('sensitive internal detail nobody should see in a response');
+
+        $this->invoker()->invoke($this->match('plainError'), $this->request());
+    }
+
+    #[Test]
+    public function neverConvertsAnImmediateResponseExceptionEvenOnAFlaggedRoute(): void
+    {
+        // TYPO3 core's own control-flow signal, not an error: must reach AbstractApplication
+        // unconverted regardless of the route's JSON-error flag.
+        $this->expectException(ImmediateResponseException::class);
+
+        $this->invoker()->invoke($this->match('shortCircuit'), $this->request());
     }
 
     #[Test]
@@ -265,6 +296,9 @@ final class ControllerInvokerTest extends TestCase
             'submit' => 'ctrl::submit',
             'problem' => 'ctrl::problem',
             'entity' => 'entityCtrl::show',
+            'jsonError' => 'throwingCtrl::boom',
+            'plainError' => 'throwingCtrl::boom',
+            'shortCircuit' => 'throwingCtrl::shortCircuit',
         ];
 
         return ['_route' => $routeName, '_controller' => $controllers[$routeName], '_requirements' => []];
@@ -281,15 +315,22 @@ final class ControllerInvokerTest extends TestCase
             'entity' => [['name' => 'item', 'type' => Item::class, 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
             'optional' => [['name' => 'page', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 1]],
             'legacy' => [['name' => 'page', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 1]],
+            'jsonError' => [],
+            'plainError' => [],
+            'shortCircuit' => [],
         ];
 
         $locator = new ServiceLocator([
             'ctrl' => static fn (): ExampleController => new ExampleController(),
             'entityCtrl' => static fn (): EntityController => new EntityController(),
+            'throwingCtrl' => static fn (): ThrowingController => new ThrowingController(),
         ]);
 
         // Only 'optional' has its requirement contributed by #[Param] on a defaulted parameter.
-        return new RouteRegistry([], $locator, arguments: $arguments, optionalInputs: ['optional' => ['page']]);
+        // 'jsonError' and 'shortCircuit' both opted into converting an uncaught exception to a
+        // generic JSON error — 'shortCircuit' proves an ImmediateResponseException is excluded
+        // from that conversion even so.
+        return new RouteRegistry([], $locator, arguments: $arguments, optionalInputs: ['optional' => ['page']], jsonErrorRoutes: ['jsonError' => true, 'shortCircuit' => true]);
     }
 
     /**

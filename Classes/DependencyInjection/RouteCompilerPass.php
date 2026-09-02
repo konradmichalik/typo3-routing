@@ -74,6 +74,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private RouteCompileGuard $compileGuard = new RouteCompileGuard(),
         private RouteAliasCollector $aliasCollector = new RouteAliasCollector(),
         private LegacyPathValidator $legacyPathValidator = new LegacyPathValidator(),
+        private JsonErrorResolver $jsonErrorResolver = new JsonErrorResolver(),
     ) {}
 
     #[Override]
@@ -120,6 +121,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$requestTokenScopes', $collected->requestTokenScopes);
         $registry->setArgument('$corsConfigs', $collected->corsConfigs);
         $registry->setArgument('$returns', $collected->returns);
+        $registry->setArgument('$jsonErrorRoutes', $collected->jsonErrorRoutes);
         // Routes contributing nothing are dropped rather than baked as empty arrays.
         $registry->setArgument('$paramDescriptions', array_filter($collected->paramDescriptions));
         $registry->setArgument('$optionalInputs', array_filter($collected->optionalInputs));
@@ -240,9 +242,10 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $cors = $this->corsResolver->resolveMethod($method, $classCors);
         $this->compilerWarnings->warnIfAModifierWasDropped($overriddenRouteMethod, $method, $serviceId, self::MODIFIER_ATTRIBUTES);
         $deprecation = $this->deprecationResolver->resolveMethod($method, $classDeprecation);
+        $jsonErrors = $this->jsonErrorResolver->resolvesToJsonResponse($method);
 
         foreach ($routeAttributes as $attribute) {
-            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $deprecation, $collected, $classRoute, $classExclusivePrefix);
+            $this->storeRoute($attribute->newInstance(), $method, $serviceId, $cache, $rateLimit, $auth, $requestToken, $cors, $deprecation, $jsonErrors, $collected, $classRoute, $classExclusivePrefix);
         }
 
         return true;
@@ -272,7 +275,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cache
      * @param list<array{service: string, options: array<string, mixed>}>               $auth
      */
-    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?RateLimit $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, ?DeprecatedRoute $deprecation, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
+    private function storeRoute(Route $route, ReflectionMethod $method, string $serviceId, ?array $cache, ?RateLimit $rateLimit, array $auth, ?RequireRequestToken $requestToken, ?Cors $cors, ?DeprecatedRoute $deprecation, bool $jsonErrors, CollectedRoutes $collected, ?Route $classRoute, ?string $classExclusivePrefix): void
     {
         $this->classExclusiveResolver->assertNotOnMethod($route, $method, $serviceId);
 
@@ -345,6 +348,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         if ([] !== $auth) {
             $collected->authenticators[$name] = $auth;
         }
+        $this->jsonErrorResolver->apply($jsonErrors, $name, $collected);
 
         $this->applyCache($cache, $auth, $name, $serviceId, $method, $collected);
         $this->applyRequestToken($requestToken, $methods, $name, $serviceId, $method, $collected);

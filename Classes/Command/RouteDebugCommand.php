@@ -99,7 +99,7 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>}>
+     * @return array<string, array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>, jsonErrors: bool}>
      */
     private function collectRows(): array
     {
@@ -133,6 +133,7 @@ final class RouteDebugCommand extends Command
                 'deprecated' => $this->registry->getDeprecation($name),
                 'aliases' => $this->registry->getAliasesFor($name),
                 'legacyPaths' => $route['legacyPaths'] ?? [],
+                'jsonErrors' => $this->registry->isJsonErrorRoute($name),
             ];
         }
 
@@ -142,7 +143,7 @@ final class RouteDebugCommand extends Command
     /**
      * Active filters as label => predicate. The labels double as the human-readable summary.
      *
-     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>}): bool>
+     * @return array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>, jsonErrors: bool}): bool>
      */
     private function activeFilters(InputInterface $input, ?string $name): array
     {
@@ -192,8 +193,8 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>}                                $row
-     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>}): bool> $filters
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>, jsonErrors: bool}                                $row
+     * @param array<string, callable(array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>, jsonErrors: bool}): bool> $filters
      */
     private function matches(array $row, array $filters): bool
     {
@@ -207,7 +208,7 @@ final class RouteDebugCommand extends Command
     }
 
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>} $row
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, caseInsensitive: bool, tags: list<string>, canonical: bool, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>, sites: list<string>, languages: list<int>, deprecated: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}|null, aliases: list<string>, legacyPaths: list<string>, jsonErrors: bool} $row
      */
     private function renderDetail(SymfonyStyle $io, array $row): void
     {
@@ -237,9 +238,10 @@ final class RouteDebugCommand extends Command
             ['Requirements' => RouteTableFormatter::requirements($row['requirements'])],
             ['Schemes' => [] === $row['schemes'] ? 'ANY' : implode(', ', $row['schemes'])],
             ['Host' => $row['host'] ?? '-'],
-            ['Case insensitive' => $row['caseInsensitive'] ? 'yes' : 'no'],
+            ['Case insensitive' => RouteTableFormatter::yesNo($row['caseInsensitive'])],
             ['Tags' => RouteTableFormatter::joinOrDash($row['tags'])],
-            ['Canonical redirect' => $row['canonical'] ? 'yes' : 'no'],
+            ['Canonical redirect' => RouteTableFormatter::yesNo($row['canonical'])],
+            ['JSON errors' => RouteTableFormatter::yesNo($row['jsonErrors'])],
             ['Auth' => RouteTableFormatter::joinOrDash($row['auth'])],
             ['CSRF' => $row['csrf'] ?? '-'],
             ['Cache' => $cache],

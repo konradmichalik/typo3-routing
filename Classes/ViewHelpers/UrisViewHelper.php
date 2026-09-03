@@ -28,6 +28,7 @@ final class UrisViewHelper extends AbstractRouteUriViewHelper
     public function initializeArguments(): void
     {
         $this->registerArgument('routes', 'array', 'Map of output key => route name', true);
+        $this->registerArgument('absolute', 'bool', 'Render full absolute URLs including scheme and host', false, false);
     }
 
     public function render(): string
@@ -38,9 +39,10 @@ final class UrisViewHelper extends AbstractRouteUriViewHelper
         }
 
         $generator = $this->urlGenerator();
+        $absolute = (bool) $this->arguments['absolute'];
         $map = [];
         foreach ((array) $this->arguments['routes'] as $key => $routeName) {
-            $map[(string) $key] = $generator->generate($request, (string) $routeName);
+            $map[(string) $key] = $generator->generate($request, (string) $routeName, [], $absolute);
         }
 
         // JSON_HEX_TAG escapes <, > so the output stays safe to embed directly in an inline <script>.

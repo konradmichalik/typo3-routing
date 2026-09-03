@@ -132,13 +132,14 @@ final readonly class RouteInvoker
     }
 
     /**
-     * The route path's placeholder names, in the same shape the compile-time argument specs use.
+     * The route path's placeholder names, in the same shape — and with the same character class,
+     * `\w` plus every non-ASCII byte — the compile-time argument specs use.
      *
      * @return list<string>
      */
     private function placeholders(string $path): array
     {
-        preg_match_all('/\{(\w+)\}/', $path, $matches);
+        preg_match_all('/\{([\w\x80-\xFF]+)\}/', $path, $matches);
 
         return $matches[1];
     }

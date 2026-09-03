@@ -19,6 +19,22 @@ use RuntimeException;
 /**
  * UrisViewHelper.
  *
+ * Renders a JSON map of several attribute route URLs, for embedding in an inline script.
+ *
+ * @example
+ * ```html
+ * <script>
+ *     window.routingUrls = {routing:uris(routes: {
+ *         count: 'course_search_count',
+ *         item:  'course_search_item'
+ *     })};
+ *     // → {"count":"/api/course-search/count","item":"/api/course-search/item"}
+ * </script>
+ *
+ * <!-- Absolute, prefixing the scheme and host of the current request -->
+ * {routing:uris(routes: {count: 'course_search_count'}, absolute: 1)}
+ * ```
+ *
  * @api
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>

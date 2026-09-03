@@ -19,7 +19,10 @@ use Throwable;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Http\ImmediateResponseException;
 
+use function array_flip;
+use function array_intersect_key;
 use function array_key_exists;
+use function array_map;
 use function assert;
 use function explode;
 use function in_array;
@@ -86,8 +89,13 @@ final readonly class ControllerInvoker
                 throw $exception;
             }
 
-            // Never the exception's own message or trace: this path exists specifically for
-            // exceptions nobody anticipated, so its detail is unvetted and possibly sensitive.
+            // Outside Development, never the exception's own message or trace: this path exists
+            // specifically for exceptions nobody anticipated, so its detail is unvetted and
+            // possibly sensitive. In Development, surfacing it is the whole point.
+            if (Environment::getContext()->isDevelopment()) {
+                return JsonErrorResponse::create(500, $exception->getMessage(), extra: $this->exceptionDebugExtra($exception));
+            }
+
             return JsonErrorResponse::create(500, 'Internal Server Error');
         }
     }
@@ -166,6 +174,27 @@ final readonly class ControllerInvoker
         $current = explode('/', (string) Environment::getContext())[0];
 
         return strtolower($current) === strtolower($env);
+    }
+
+    /**
+     * RFC 9457 extension members for a Development-context 500: exception class, code, origin and
+     * trace. Frame `args` are deliberately dropped — argument values can carry secrets (passwords,
+     * tokens) that Development doesn't excuse exposing in an HTTP response.
+     *
+     * @return array<string, mixed>
+     */
+    private function exceptionDebugExtra(Throwable $exception): array
+    {
+        return [
+            'exception' => $exception::class,
+            'code' => $exception->getCode(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => array_map(
+                static fn (array $frame): array => array_intersect_key($frame, array_flip(['file', 'line', 'function', 'class', 'type'])),
+                $exception->getTrace(),
+            ),
+        ];
     }
 
     /**

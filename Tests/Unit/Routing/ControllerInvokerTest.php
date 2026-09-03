@@ -27,6 +27,8 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Http\{ImmediateResponseException, ServerRequest, Stream};
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
+use function json_decode;
+
 /**
  * ControllerInvokerTest.
  *
@@ -97,8 +99,29 @@ final class ControllerInvokerTest extends TestCase
 
         self::assertSame(500, $response->getStatusCode());
         self::assertJsonPath((string) $response->getBody(), 'title', 'Internal Server Error');
-        // Never the exception's own message: that detail is unvetted and possibly sensitive.
-        self::assertJsonMissingPath((string) $response->getBody(), 'detail');
+        // Never the exception's own detail: that information is unvetted and possibly sensitive.
+        self::assertJsonMissingPaths((string) $response->getBody(), ['detail', 'exception', 'code', 'file', 'line', 'trace']);
+    }
+
+    #[Test]
+    #[InApplicationContext('Development')]
+    public function includesExceptionDetailsInDevelopmentContext(): void
+    {
+        $response = $this->invoker()->invoke($this->match('jsonError'), $this->request());
+        $body = (string) $response->getBody();
+
+        self::assertSame(500, $response->getStatusCode());
+        self::assertJsonPath($body, 'detail', 'sensitive internal detail nobody should see in a response');
+        self::assertJsonPath($body, 'exception', RuntimeException::class);
+        self::assertJsonPath($body, 'code', 6977582795);
+        self::assertJsonHasPaths($body, ['file', 'line', 'trace']);
+
+        // Frame arguments can carry secrets (passwords, tokens) even in Development.
+        $trace = json_decode($body, true, 512, \JSON_THROW_ON_ERROR)['trace'];
+        self::assertNotEmpty($trace);
+        foreach ($trace as $frame) {
+            self::assertArrayNotHasKey('args', $frame);
+        }
     }
 
     #[Test]

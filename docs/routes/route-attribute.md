@@ -9,7 +9,7 @@ public function show(int $id): ResponseInterface { /* … */ }
 
 | Parameter      | Type                    | Default   | Description                                                              |
 |----------------|-------------------------|-----------|--------------------------------------------------------------------------|
-| `path`         | `string`                | –         | Full request path, relative to the site base (e.g. `/api/...`). A trailing slash is tolerated in either direction unless that is switched off — see [Trailing slashes](../operating/configuration.md#trailing-slashes). |
+| `path`         | `string`                | –         | Full request path, relative to the site base (e.g. `/api/...`). Placeholders use the plain `{name}` form — see [Inline placeholder syntax](#inline-placeholder-syntax). A trailing slash is tolerated in either direction unless that is switched off — see [Trailing slashes](../operating/configuration.md#trailing-slashes). |
 | `methods`      | `list<string>`          | `['GET']` | Allowed HTTP methods.                                                    |
 | `name`         | `?string`               | `null`    | Route name; auto-derived from service id + method when omitted.          |
 | `env`          | `?string`               | `null`    | Bind the route to a top-level application context (e.g. `Development`).  |
@@ -280,6 +280,19 @@ use Symfony\Component\Routing\Requirement\Requirement;
 | `Requirement::CATCH_ALL` | Everything, including slashes (`.+`).              |
 
 Any plain regex string still works, so the enum is opt-in and freely mixable: `['id' => Requirement::DIGITS, 'q' => '']`.
+
+### Inline placeholder syntax
+
+Symfony's inline placeholder forms are deliberately **not** supported and are rejected at container build time:
+
+| Inline form   | What it means in Symfony                                              | Write instead                                                                             |
+| ------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `{id<\d+>}`   | Inline requirement                                                    | `requirements: ['id' => '\d+']`                                                            |
+| `{page?1}`    | Inline default                                                        | `defaults: ['page' => 1]`                                                                 |
+| `{!page}`     | "Important" parameter, always kept in generated URLs                  | No equivalent — drop the `!`                                                                |
+| `{user:id}`   | Inline entity mapping                                                 | Type-hint the entity on the parameter, see [Typed controller arguments](arguments.md)     |
+
+They compile and match, but argument binding only recognises the plain `{name}` form, so the controller argument would silently be read from the query or body instead of the path. Rather than parse the same information a second time, a path containing one raises a `LogicException` naming the route and the offending fragment. For a container compiled before this guard existed, [`routing:lint`](../operating/commands.md#routinglint) reports the same thing as `unsupported-placeholder-syntax` without a rebuild.
 
 ## Error responses from controllers
 

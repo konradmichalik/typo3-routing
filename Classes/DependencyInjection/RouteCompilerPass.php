@@ -67,6 +67,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private ClassExistenceChecker $classExistenceChecker = new ClassExistenceChecker(),
         private CompilerWarnings $compilerWarnings = new CompilerWarnings(),
         private EmptyPathGuard $emptyPathGuard = new EmptyPathGuard(),
+        private PlaceholderSyntaxGuard $placeholderSyntaxGuard = new PlaceholderSyntaxGuard(),
         private ClassExclusiveResolver $classExclusiveResolver = new ClassExclusiveResolver(),
         private DeprecationResolver $deprecationResolver = new DeprecationResolver(),
         private RateLimitResolver $rateLimitResolver = new RateLimitResolver(),
@@ -304,6 +305,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         // The method wins per requirement/default key; a method env overrides the class default.
         $path = $pathPrefix.$route->path;
         $this->emptyPathGuard->assertNotEmpty($path, $name, $serviceId, $method);
+        $this->placeholderSyntaxGuard->assertSupported($path, $name, $serviceId, $method);
         $requirements = [...$classRequirements, ...$route->requirements];
         $defaults = [...$classDefaults, ...$route->defaults];
 

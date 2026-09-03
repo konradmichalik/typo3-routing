@@ -16,7 +16,7 @@ public function show(int $id): ResponseInterface { /* … */ }
 | `requirements` | `array<string, string>` | `[]`      | Constraints by parameter name → regex (`''` = presence only). See below. |
 | `priority`     | `int`                   | `0`       | Match priority; higher is matched first when paths overlap. See below.   |
 | `defaults`     | `array<string, mixed>`  | `[]`      | Default values for path placeholders; a trailing placeholder with a default becomes optional. See below. |
-| `schemes`      | `list<string>`          | `[]`      | Allowed URI schemes (e.g. `['https']`); empty = any scheme. See below.  |
+| `schemes`      | `list<string>`          | `[]`      | Allowed URI schemes (e.g. `['https']`); empty = any scheme. A request on another scheme is redirected to the first one declared. See below. |
 | `host`         | `?string`               | `null`    | Restrict the route to a specific hostname (e.g. `'api.example.com'`); null = any host. See below. |
 | `description`  | `?string`               | `null`    | Human-readable summary of what the endpoint does; surfaced in `routing:debug` and the OpenAPI export. See below. |
 | `caseInsensitive` | `?bool`              | `null`    | Match the path's and host's literal segments regardless of case. See below. |
@@ -68,7 +68,21 @@ Restrict a route to one or more URI schemes — most commonly to force HTTPS-onl
 public function charge(): ResponseInterface { /* … */ }
 ```
 
-A request over a scheme not in the list gets the same `404 Not Found` as an unmatched path — the constraint is invisible rather than producing a scheme-specific error. `{routing:uri(route: 'payment_charge')}` generates a full absolute URL (`https://…`) instead of a site-relative path when the current request's scheme differs, since a relative path cannot target a different scheme.
+A request over a scheme not in the list gets a `308 Permanent Redirect` to the same URL under the **first** declared scheme, provided everything else about it matched (path, method, host, requirements). Path, query string and site base survive untouched — only the scheme changes — and `308` preserves the request method and body, so a `POST` is never downgraded:
+
+```text
+http://example.com/api/payment/charge  →  308 →  https://example.com/api/payment/charge
+```
+
+This is not opt-in and not tied to `canonical`: declaring `schemes` states which scheme the route answers on, so the correct target is unambiguous. Two caveats:
+
+- A route that is invisible in the current context — wrong `env`, out of [site or language scope](#site--and-language-bound-routes) — still answers `404`, since a redirect must never reveal it. So does a **host** mismatch: unlike a scheme, there is no single right host to send the client to.
+- The port is carried over unchanged, since nothing here knows which port the other scheme listens on.
+- The scheme comes from the request URI, which TYPO3 itself derives proxy-aware (`reverseProxySSL`, or `reverseProxyIP` plus the `X-Forwarded-Proto` header). A TLS-terminating proxy that is *not* declared in that configuration makes TYPO3 believe every request is plain `http`, and this redirect then loops. That configuration was always required for `schemes` to match correctly — the symptom just changes from a permanent `404` to a redirect loop.
+
+A redirect does not retroactively protect the request that triggered it: it already travelled in the clear, headers and body included, so treat any credentials it carried as compromised. The `404` protected them no better; only [HSTS](https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security) keeps a client from sending them over `http` in the first place.
+
+`{routing:uri(route: 'payment_charge')}` generates a full absolute URL (`https://…`) instead of a site-relative path when the current request's scheme differs, since a relative path cannot target a different scheme — the same URL the redirect points at.
 
 Not inherited from a class-level `#[Route]` — same rule as `methods`.
 

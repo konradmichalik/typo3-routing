@@ -50,18 +50,21 @@ final class ArgumentSpecFactory
     private const OVERRIDABLE_SOURCES = ['path', 'query', 'body', 'input'];
 
     /**
+     * @param string|null $host the route's #[Route(host:)] pattern, whose placeholders bind exactly
+     *                          like the path's — they reach the controller through the same match
+     *
      * @return list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>
      */
-    public function build(ReflectionMethod $method, string $path, string $serviceId): array
+    public function build(ReflectionMethod $method, string $path, string $serviceId, ?string $host = null): array
     {
-        preg_match_all('/\{(\w+)\}/', $path, $matches);
-        $placeholders = $matches[1];
+        $placeholders = self::placeholders($path);
+        $hostPlaceholders = self::placeholders($host ?? '');
 
         $where = sprintf('%s::%s()', $serviceId, $method->getName());
 
         $specs = [];
         foreach ($method->getParameters() as $parameter) {
-            $specs[] = $this->resolveArgument($parameter, $placeholders, $where);
+            $specs[] = $this->resolveArgument($parameter, $placeholders, $hostPlaceholders, $where);
         }
 
         return $specs;
@@ -71,7 +74,8 @@ final class ArgumentSpecFactory
      * Compile-time only: what the #[Param] attributes on this method contribute to the route itself.
      * All three keys are keyed by the wire name (so a #[Param(name:)] override applies): a
      * `requirement` regex, the PHP default of a #[Param]-carrying path placeholder — which is what
-     * makes a trailing placeholder optional — and a `description` for the OpenAPI export.
+     * makes a trailing placeholder optional — and a `description` for the OpenAPI export. A host
+     * placeholder contributes no default: a host pattern has no optional tail, so it stays required.
      * Parameters without #[Param] contribute nothing, so un-attributed signatures keep matching
      * exactly as before.
      *
@@ -122,6 +126,20 @@ final class ArgumentSpecFactory
         }
 
         return ['requirements' => $requirements, 'defaults' => $defaults, 'descriptions' => $descriptions, 'optional' => $optional];
+    }
+
+    /**
+     * The plain `{name}` placeholder names of a path or host pattern. The character class matches
+     * Symfony's own — `\w` plus every non-ASCII byte — so a placeholder named in a non-ASCII script
+     * binds from the match instead of silently falling back to the query.
+     *
+     * @return list<string>
+     */
+    private static function placeholders(string $pattern): array
+    {
+        preg_match_all('/\{([\w\x80-\xFF]+)\}/', $pattern, $matches);
+
+        return $matches[1];
     }
 
     /**
@@ -179,10 +197,11 @@ final class ArgumentSpecFactory
 
     /**
      * @param list<string> $placeholders
+     * @param list<string> $hostPlaceholders
      *
      * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
      */
-    private function resolveArgument(ReflectionParameter $parameter, array $placeholders, string $where): array
+    private function resolveArgument(ReflectionParameter $parameter, array $placeholders, array $hostPlaceholders, string $where): array
     {
         $type = $parameter->getType();
         if (null !== $type && !$type instanceof ReflectionNamedType) {
@@ -208,7 +227,7 @@ final class ArgumentSpecFactory
         }
 
         $hasDefault = $parameter->isDefaultValueAvailable();
-        $sourceAndType = $this->resolveSourceAndType($type, $key, $name, $placeholders, $where);
+        $sourceAndType = $this->resolveSourceAndType($type, $key, $name, $placeholders, $hostPlaceholders, $where);
 
         $spec = [
             'name' => $key,
@@ -225,19 +244,31 @@ final class ArgumentSpecFactory
     /**
      * Decides where a parameter's value comes from and which type to coerce it to: the PSR-7 request
      * for a request interface type-hint, a path placeholder when the **lookup key** is in the route
-     * path, otherwise a query/body input. Type errors still name the PHP parameter, not the key.
+     * path, a host placeholder when it is in the route host, otherwise a query/body input. Type errors
+     * still name the PHP parameter, not the key.
+     *
+     * `host` is kept apart from `path` although both resolve out of the same match: a host placeholder
+     * is not part of the path template, so it must never be exported as an OpenAPI path parameter, and
+     * the optional-trailing-placeholder rule does not apply to it.
      *
      * @param list<string> $placeholders
+     * @param list<string> $hostPlaceholders
      *
      * @return array{source: string, type: string|null}
      */
-    private function resolveSourceAndType(?ReflectionNamedType $type, string $key, string $parameterName, array $placeholders, string $where): array
+    private function resolveSourceAndType(?ReflectionNamedType $type, string $key, string $parameterName, array $placeholders, array $hostPlaceholders, string $where): array
     {
         if (null !== $type && !$type->isBuiltin() && is_a(ServerRequestInterface::class, $type->getName(), true)) {
             return ['source' => 'request', 'type' => null];
         }
 
-        return ['source' => in_array($key, $placeholders, true) ? 'path' : 'input', 'type' => $this->resolveValueType($type, $parameterName, $where)];
+        $source = match (true) {
+            in_array($key, $placeholders, true) => 'path',
+            in_array($key, $hostPlaceholders, true) => 'host',
+            default => 'input',
+        };
+
+        return ['source' => $source, 'type' => $this->resolveValueType($type, $parameterName, $where)];
     }
 
     /**
@@ -274,14 +305,14 @@ final class ArgumentSpecFactory
     /**
      * Whether this parameter's requirement may be relaxed to "validate if present". All three
      * conditions must hold: the requirement is the attribute's own contribution (a #[Route] one stays
-     * mandatory), the parameter has a PHP default to fall back to, and it is an input — a path
+     * mandatory), the parameter has a PHP default to fall back to, and it is an input — a path or host
      * placeholder is enforced by the matcher, never by the input check.
      *
      * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
      */
     private static function isOptionalInput(Param $param, array $spec): bool
     {
-        return null !== $param->requirement && $spec['hasDefault'] && 'path' !== $spec['source'];
+        return null !== $param->requirement && $spec['hasDefault'] && !in_array($spec['source'], ['path', 'host'], true);
     }
 
     /**

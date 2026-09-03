@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Http;
 
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\{ServerRequestInterface, UriInterface};
 use TYPO3\CMS\Core\Site\Entity\{SiteInterface, SiteLanguage};
 
 use function strlen;
@@ -48,18 +48,35 @@ final class SiteBasePathResolver
         return '' === $basePath ? $normalized : $basePath.$normalized;
     }
 
-    private function resolveBasePath(ServerRequestInterface $request): string
+    public function resolveBasePath(ServerRequestInterface $request): string
     {
         $language = $request->getAttribute('language');
         if ($language instanceof SiteLanguage) {
-            return rtrim($language->getBase()->getPath(), '/');
+            return $this->normalizeBasePath($language->getBase());
         }
 
         $site = $request->getAttribute('site');
         if ($site instanceof SiteInterface) {
-            return rtrim($site->getBase()->getPath(), '/');
+            return $this->normalizeBasePath($site->getBase());
         }
 
         return '';
+    }
+
+    /**
+     * The base URI of a site or one of its languages, its path already normalized to the same shape
+     * `resolveBasePath()` returns. This is what request-less callers (CLI, scheduler, mail rendering)
+     * have instead of a request: scheme, host and port come from the configured base, nothing else.
+     */
+    public function resolveBaseUri(SiteInterface $site, ?SiteLanguage $language = null): UriInterface
+    {
+        $base = $language instanceof SiteLanguage ? $language->getBase() : $site->getBase();
+
+        return $base->withPath($this->normalizeBasePath($base));
+    }
+
+    private function normalizeBasePath(UriInterface $base): string
+    {
+        return rtrim($base->getPath(), '/');
     }
 }

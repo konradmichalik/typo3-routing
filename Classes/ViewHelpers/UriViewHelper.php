@@ -29,6 +29,7 @@ final class UriViewHelper extends AbstractRouteUriViewHelper
     {
         $this->registerArgument('route', 'string', 'Name of the attribute route', true);
         $this->registerArgument('parameters', 'array', 'Route parameters', false, []);
+        $this->registerArgument('absolute', 'bool', 'Render a full absolute URL including scheme and host', false, false);
     }
 
     public function render(): string
@@ -38,6 +39,6 @@ final class UriViewHelper extends AbstractRouteUriViewHelper
             throw new RuntimeException('The routing:uri ViewHelper requires a frontend server request with a resolved site context.', 1750000001);
         }
 
-        return $this->urlGenerator()->generate($request, (string) $this->arguments['route'], (array) $this->arguments['parameters']);
+        return $this->urlGenerator()->generate($request, (string) $this->arguments['route'], (array) $this->arguments['parameters'], (bool) $this->arguments['absolute']);
     }
 }

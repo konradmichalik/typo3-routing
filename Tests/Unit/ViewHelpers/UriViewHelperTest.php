@@ -53,12 +53,26 @@ final class UriViewHelperTest extends TestCase
     }
 
     #[Test]
+    public function rendersAnAbsoluteUriWhenRequested(): void
+    {
+        $this->registerGenerator();
+        $GLOBALS['TYPO3_REQUEST'] = (new ServerRequest('https://example.com/sub/'))
+            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']));
+
+        $viewHelper = new UriViewHelper();
+        $viewHelper->setArguments(['route' => 'example_count', 'parameters' => [], 'absolute' => true]);
+
+        self::assertSame('https://example.com/sub/api/count', $viewHelper->render());
+    }
+
+    #[Test]
     public function registersRouteAndParameterArguments(): void
     {
         $arguments = (new UriViewHelper())->prepareArguments();
 
         self::assertArrayHasKey('route', $arguments);
         self::assertArrayHasKey('parameters', $arguments);
+        self::assertArrayHasKey('absolute', $arguments);
     }
 
     #[Test]

@@ -157,6 +157,13 @@ final class RouteMatchCommand extends Command
             ['Parameters' => $this->formatParameters($match)],
         ];
 
+        $scheme = $match['_schemeRedirect'] ?? null;
+        if (is_string($scheme)) {
+            // The matcher deliberately matches across the scheme constraint so the dispatcher can
+            // redirect rather than 404 — without this row the match would look like a plain hit.
+            $rows[] = ['Scheme' => $scheme.' (the simulated scheme does not match; the dispatcher answers 308 to this one)'];
+        }
+
         $env = $match['_env'] ?? null;
         if (is_string($env) && '' !== $env) {
             // The matcher ignores env; the dispatcher hides the route (404) outside this context.

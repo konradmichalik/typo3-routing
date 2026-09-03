@@ -99,8 +99,8 @@ final class ControllerInvokerTest extends TestCase
 
         self::assertSame(500, $response->getStatusCode());
         self::assertJsonPath((string) $response->getBody(), 'title', 'Internal Server Error');
-        // Never the exception's own message: that detail is unvetted and possibly sensitive.
-        self::assertJsonMissingPath((string) $response->getBody(), 'detail');
+        // Never the exception's own detail: that information is unvetted and possibly sensitive.
+        self::assertJsonMissingPaths((string) $response->getBody(), ['detail', 'exception', 'code', 'file', 'line', 'trace']);
     }
 
     #[Test]

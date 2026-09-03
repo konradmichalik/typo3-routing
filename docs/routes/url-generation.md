@@ -93,3 +93,15 @@ final readonly class CourseLinkProvider
     }
 }
 ```
+
+## The third ViewHelper
+
+`routing:requestToken` completes the set, and generates no URL. It issues the CSRF token that a route protected by [`#[RequireRequestToken]`](../features/authentication.md#requirerequesttoken-csrf) expects back on the call:
+
+```html
+<script>
+    const token = '{routing:requestToken(scope: "routing/account-update")}';
+</script>
+```
+
+[Issuing the token](../features/authentication.md#issuing-the-token) covers the scope, the header to send it in, and the nonce cookie that rendering it emits.

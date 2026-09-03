@@ -21,6 +21,22 @@ use TYPO3Fluid\Fluid\Core\ViewHelper\AbstractViewHelper;
 /**
  * RequestTokenViewHelper.
  *
+ * Renders a TYPO3 request token for a scope, so a client can call a route protected by `#[RequireRequestToken]`.
+ *
+ * Rendering the token also emits the signing nonce cookie its verification needs. Send the token back in the
+ * `X-TYPO3-RequestToken` header or the `__RequestToken` body parameter.
+ *
+ * @example
+ * ```html
+ * <script>
+ *     const token = '{routing:requestToken(scope: "routing/account-update")}';
+ *     fetch('{routing:uri(route: \'account_update\')}', {
+ *         method: 'POST',
+ *         headers: {'X-TYPO3-RequestToken': token},
+ *     });
+ * </script>
+ * ```
+ *
  * @api
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>

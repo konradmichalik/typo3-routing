@@ -512,6 +512,24 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function redirectsToTheDeclaredSchemeWhenOnlyTheSchemeIsWrong(): void
+    {
+        $response = $this->process($this->request('GET', 'http://example.com/api/example/restricted?foo=bar'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/api/example/restricted?foo=bar', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function keepsTheSiteBaseInTheSchemeRedirectLocation(): void
+    {
+        $response = $this->process($this->request('GET', 'http://example.com/sub/api/example/restricted', 'https://example.com/sub/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/sub/api/example/restricted', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
     public function dispatchesBearerProtectedRouteWithAMatchingToken(): void
     {
         $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');

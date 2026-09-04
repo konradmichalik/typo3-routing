@@ -79,12 +79,17 @@ final class ExclusivePrefixesTest extends FunctionalTestCase
         self::assertSame(404, $response->getStatusCode());
     }
 
+    /**
+     * A scheme mismatch is not a miss: the path matched, so even inside an exclusively claimed prefix
+     * the answer is a redirect to the declared scheme rather than the prefix's 404.
+     */
     #[Test]
-    public function returnsNotFoundWhenSchemeDoesNotMatch(): void
+    public function redirectsToTheDeclaredSchemeWhenTheSchemeDoesNotMatch(): void
     {
         $response = $this->process($this->request('GET', 'http://example.com/api/example/restricted'));
 
-        self::assertSame(404, $response->getStatusCode());
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/api/example/restricted', $response->getHeaderLine('Location'));
     }
 
     #[Test]

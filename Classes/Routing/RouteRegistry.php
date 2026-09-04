@@ -24,9 +24,11 @@ use function array_map;
 use function array_unique;
 use function array_values;
 use function bin2hex;
+use function in_array;
 use function preg_match;
 use function preg_replace_callback;
 use function rtrim;
+use function strtolower;
 use function strtoupper;
 
 /**
@@ -41,6 +43,7 @@ final class RouteRegistry
     private ?RouteCollection $collection = null;
     private ?RouteCollection $caseInsensitiveCollection = null;
     private ?RouteCollection $legacyCollection = null;
+    private ?RouteCollection $schemeRedirectCollection = null;
 
     /**
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, classExclusivePrefix?: string|null, canonical?: bool, sites?: list<string>, languages?: list<int>, deprecation?: array{since: int, sunset: int|null, successor: string|null, documentation: string|null}, legacyPaths?: list<string>, legacyAlias?: bool}> $routes
@@ -226,9 +229,7 @@ final class RouteRegistry
      */
     public function getCaseInsensitiveMatcher(RequestContext $context): ?UrlMatcherInterface
     {
-        $collection = $this->getCaseInsensitiveCollection();
-
-        return 0 === $collection->count() ? null : new UrlMatcher($collection, $context);
+        return self::matcherUnlessEmpty($this->getCaseInsensitiveCollection(), $context);
     }
 
     /**
@@ -338,9 +339,25 @@ final class RouteRegistry
      */
     public function getLegacyMatcher(RequestContext $context): ?UrlMatcherInterface
     {
-        $collection = $this->getLegacyCollection();
+        return self::matcherUnlessEmpty($this->getLegacyCollection(), $context);
+    }
 
-        return 0 === $collection->count() ? null : new UrlMatcher($collection, $context);
+    /**
+     * A second matcher over every scheme-constrained route with its `schemes` constraint dropped, or
+     * null when no route declared one — the default, so the whole feature costs nothing until it is
+     * used. RouteMatcher consults it last, once every other tier reported a plain miss: a match here
+     * therefore means path, method, host and requirements all hold and only the scheme did not.
+     *
+     * Re-matching against a stripped collection rather than reading the matcher's own
+     * `allowSchemes` state is what keeps this independent of which matcher ran: the compiled matcher
+     * resolves placeholder-free routes through an exact-match table, and its scheme bookkeeping lives
+     * in a protected property of two unrelated classes.
+     *
+     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     */
+    public function getSchemeRedirectMatcher(RequestContext $context): ?UrlMatcherInterface
+    {
+        return self::matcherUnlessEmpty($this->getSchemeRedirectCollection(), $context);
     }
 
     /**
@@ -643,5 +660,67 @@ final class RouteRegistry
     private function getLegacyCollection(): RouteCollection
     {
         return $this->legacyCollection ??= self::buildCollection(self::legacyRoutes($this->routes));
+    }
+
+    /**
+     * Null for an empty collection, so every secondary matcher costs nothing until a route opts into
+     * the feature it belongs to — RouteMatcher reads that null as "skip this tier".
+     */
+    private static function matcherUnlessEmpty(RouteCollection $collection, RequestContext $context): ?UrlMatcherInterface
+    {
+        return 0 === $collection->count() ? null : new UrlMatcher($collection, $context);
+    }
+
+    /**
+     * Legacy paths are folded in here as well, so a scheme mismatch answers the same way whichever path
+     * reached the route. Both sets keep their own names — a declared route's name so `_route` is right
+     * without any rewriting, a legacy entry's `_legacy_`-prefixed one so it stays distinct and its
+     * `_legacyOf` rewrite still applies.
+     *
+     * Never compiled with CaseInsensitiveRouteCompiler, unlike getCaseInsensitiveCollection() — a route
+     * combining `caseInsensitive` with `schemes` only redirects on the declared case, see
+     * docs/routes/route-attribute.md#schemes. Same limitation caseInsensitive already has with legacy
+     * paths.
+     */
+    private function getSchemeRedirectCollection(): RouteCollection
+    {
+        return $this->schemeRedirectCollection ??= self::buildCollection([
+            ...self::schemeRedirectRoutes($this->routes),
+            ...self::schemeRedirectRoutes(self::legacyRoutes($this->routes)),
+        ]);
+    }
+
+    /**
+     * Synthetic entries for every route that declared `schemes`: an exact copy with the constraint
+     * dropped, plus an internal `_schemeRedirect` default naming the scheme the client should have
+     * used. It rides along as an ordinary route default (like `_legacyOf`), so the dispatcher reads the
+     * required scheme straight off the match instead of looking the route up again.
+     *
+     * The scheme is lower-cased the way Symfony's own Route does, so a `schemes: ['HTTPS']` declaration
+     * cannot produce a redirect target that would immediately be redirected again. Anything but `http`
+     * or `https` is skipped entirely and keeps answering 404: there is no such thing as redirecting an
+     * HTTP request to a scheme it cannot speak, and TYPO3's Uri rejects the scheme outright.
+     *
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, sites?: list<string>, languages?: list<int>}> $routes
+     *
+     * @return array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, sites?: list<string>, languages?: list<int>}>
+     */
+    private static function schemeRedirectRoutes(array $routes): array
+    {
+        $entries = [];
+        foreach ($routes as $name => $route) {
+            $scheme = strtolower(($route['schemes'] ?? [])[0] ?? '');
+            if (!in_array($scheme, ['http', 'https'], true)) {
+                continue;
+            }
+
+            $entries[$name] = [
+                ...$route,
+                'schemes' => [],
+                'defaults' => [...($route['defaults'] ?? []), '_schemeRedirect' => $scheme],
+            ];
+        }
+
+        return $entries;
     }
 }

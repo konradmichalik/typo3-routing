@@ -13,9 +13,14 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use function array_map;
 use function preg_match_all;
-use function preg_replace;
+use function preg_replace_callback;
+use function str_repeat;
+use function strlen;
+use function usort;
 
+use const PREG_OFFSET_CAPTURE;
 use const PREG_SET_ORDER;
 
 /**
@@ -50,16 +55,26 @@ final readonly class PlaceholderSyntax
      */
     public static function unsupported(string $path): array
     {
-        $offenders = [];
-        preg_match_all(self::PLACEHOLDER_PATTERN, $path, $matches, PREG_SET_ORDER);
+        // Both passes capture offsets into the same string: strays are searched in a copy where every
+        // placeholder is blanked to spaces rather than removed, so a stray's offset still points at its
+        // position in $path and the two sets can be merged back into source order.
+        $found = [];
+
+        preg_match_all(self::PLACEHOLDER_PATTERN, $path, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
         foreach ($matches as $match) {
-            if ('{'.$match[1].'}' !== $match[0]) {
-                $offenders[] = $match[0];
+            if ('{'.$match[1][0].'}' !== $match[0][0]) {
+                $found[] = [$match[0][1], $match[0][0]];
             }
         }
 
-        preg_match_all(self::STRAY_BRACE_PATTERN, preg_replace(self::PLACEHOLDER_PATTERN, '', $path) ?? '', $strays);
+        $blanked = preg_replace_callback(self::PLACEHOLDER_PATTERN, static fn (array $match): string => str_repeat(' ', strlen($match[0])), $path) ?? '';
+        preg_match_all(self::STRAY_BRACE_PATTERN, $blanked, $strays, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+        foreach ($strays as $stray) {
+            $found[] = [$stray[0][1], $stray[0][0]];
+        }
 
-        return [...$offenders, ...$strays[0]];
+        usort($found, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+
+        return array_map(static fn (array $entry): string => $entry[1], $found);
     }
 }

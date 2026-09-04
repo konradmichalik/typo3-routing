@@ -287,7 +287,7 @@ final readonly class RouteLinter
                 'check' => 'unsupported-placeholder-syntax',
                 'route' => $name,
                 'controller' => $route['controller'],
-                'message' => sprintf('Path "%s" uses unsupported placeholder syntax ("%s"); it matches, but the controller argument is read from the query/body instead of the path. Use the #[Route] "requirements" and "defaults" parameters instead.', $route['path'], implode('", "', $offenders)),
+                'message' => sprintf('Path "%s" uses unsupported placeholder syntax ("%s"); it matches, but the controller argument is read from the query/body instead of the path. Write the plain "{name}" form and declare the rest explicitly; the replacement for each inline form is listed under "Inline placeholder syntax" in docs/routes/route-attribute.md.', $route['path'], implode('", "', $offenders)),
             ];
         }
 

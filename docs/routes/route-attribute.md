@@ -292,7 +292,7 @@ Symfony's inline placeholder forms are deliberately **not** supported and are re
 | `{!page}`     | "Important" parameter, always kept in generated URLs                  | No equivalent — drop the `!`                                                                |
 | `{user:id}`   | Inline entity mapping                                                 | Type-hint the entity on the parameter, see [Typed controller arguments](arguments.md)     |
 
-They compile and match, but argument binding only recognises the plain `{name}` form, so the controller argument would silently be read from the query or body instead of the path. Rather than parse the same information a second time, a path containing one raises a `LogicException` naming the route and the offending fragment. For a container compiled before this guard existed, [`routing:lint`](../operating/commands.md#routinglint) reports the same thing as `unsupported-placeholder-syntax` without a rebuild.
+They compile and match, but argument binding only recognises the plain `{name}` form, so the controller argument would silently be read from the query or body instead of the path. Rather than parse the same information a second time, a path containing one raises a `LogicException` naming the route and the offending fragment. Every entry in [`legacyPaths`](#legacy-paths-for-renamed-routes) is checked the same way, since a legacy path becomes a route of its own and binds its arguments through the same resolver. For a container compiled before this guard existed, [`routing:lint`](../operating/commands.md#routinglint) reports the same thing as `unsupported-placeholder-syntax` without a rebuild.
 
 ## Error responses from controllers
 

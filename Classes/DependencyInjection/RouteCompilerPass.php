@@ -306,6 +306,13 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $path = $pathPrefix.$route->path;
         $this->emptyPathGuard->assertNotEmpty($path, $name, $serviceId, $method);
         $this->placeholderSyntaxGuard->assertSupported($path, $name, $serviceId, $method);
+
+        // Legacy paths become their own synthetic routes and feed the same argument resolution, so they
+        // need the same syntax guard. LegacyPathValidator's placeholder-set comparison only catches the
+        // inline forms by accident, and not at all when the declared path has no placeholder either.
+        foreach ($route->legacyPaths as $legacyPath) {
+            $this->placeholderSyntaxGuard->assertSupported($legacyPath, $name, $serviceId, $method);
+        }
         $requirements = [...$classRequirements, ...$route->requirements];
         $defaults = [...$classDefaults, ...$route->defaults];
 

@@ -90,4 +90,10 @@ final class PlaceholderSyntaxTest extends TestCase
     {
         self::assertSame(['}'], PlaceholderSyntax::unsupported('/api/user/id}'));
     }
+
+    #[Test]
+    public function ordersAStrayBraceAndAnInlinePlaceholderBySourcePosition(): void
+    {
+        self::assertSame(['}', '{id<\d+>}'], PlaceholderSyntax::unsupported('/api/}/{id<\d+>}'));
+    }
 }

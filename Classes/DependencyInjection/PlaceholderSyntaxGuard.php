@@ -33,8 +33,8 @@ final readonly class PlaceholderSyntaxGuard
      * Symfony's inline placeholder forms (`{id<\d+>}`, `{page?1}`, `{!page}`, `{user:id}`) compile
      * and match, but `ArgumentSpecFactory` only recognises the plain `{name}` form as a path
      * placeholder — so the controller argument would silently be read from the query/body instead.
-     * `requirements` and `defaults` say the same thing explicitly, so the inline forms are rejected
-     * here rather than parsed a second time.
+     * Every form has an explicit equivalent (`requirements`, `defaults`, a plain `{name}`, or a typed
+     * parameter), so the inline forms are rejected here rather than parsed a second time.
      */
     public function assertSupported(string $path, string $name, string $serviceId, ReflectionMethod $method): void
     {
@@ -43,6 +43,6 @@ final readonly class PlaceholderSyntaxGuard
             return;
         }
 
-        throw new LogicException(sprintf('Route "%s" (%s::%s()) uses unsupported placeholder syntax in path "%s": "%s". Only the plain "{name}" form binds a controller argument; the inline forms match but would read the argument from the query/body instead of the path. Use the #[Route] "requirements" parameter for a constraint and "defaults" for a default value.', $name, $serviceId, $method->getName(), $path, implode('", "', $offenders)), 1750000039);
+        throw new LogicException(sprintf('Route "%s" (%s::%s()) uses unsupported placeholder syntax in path "%s": "%s". Only the plain "{name}" form binds a controller argument; the inline forms match but would read the argument from the query/body instead of the path. Write the plain "{name}" form and declare the rest explicitly; the replacement for each inline form is listed under "Inline placeholder syntax" in docs/routes/route-attribute.md.', $name, $serviceId, $method->getName(), $path, implode('", "', $offenders)), 1750000039);
     }
 }

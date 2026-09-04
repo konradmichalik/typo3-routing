@@ -676,6 +676,11 @@ final class RouteRegistry
      * reached the route. Both sets keep their own names — a declared route's name so `_route` is right
      * without any rewriting, a legacy entry's `_legacy_`-prefixed one so it stays distinct and its
      * `_legacyOf` rewrite still applies.
+     *
+     * Never compiled with CaseInsensitiveRouteCompiler, unlike getCaseInsensitiveCollection() — a route
+     * combining `caseInsensitive` with `schemes` only redirects on the declared case, see
+     * docs/routes/route-attribute.md#schemes. Same limitation caseInsensitive already has with legacy
+     * paths.
      */
     private function getSchemeRedirectCollection(): RouteCollection
     {

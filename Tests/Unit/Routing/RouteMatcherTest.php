@@ -355,6 +355,28 @@ final class RouteMatcherTest extends TestCase
         self::assertSame('https', $match['_schemeRedirect']);
     }
 
+    #[Test]
+    public function aCaseInsensitiveSchemeConstrainedRouteRedirectsOverTheDeclaredCase(): void
+    {
+        $match = $this->matcher()->match('/api/loose-secure', $this->context());
+
+        self::assertSame('looseSecure', $match['_route']);
+        self::assertSame('https', $match['_schemeRedirect']);
+    }
+
+    /**
+     * Known limitation, documented in docs/routes/route-attribute.md#schemes: the case-insensitive
+     * tolerance and the scheme-redirect tier are not combined, so a request that is both wrongly cased
+     * and on the wrong scheme finds no matcher tier that accepts it, rather than redirecting.
+     */
+    #[Test]
+    public function aCaseInsensitiveSchemeConstrainedRouteDoesNotRedirectOverAWronglyCasedPath(): void
+    {
+        $this->expectException(ResourceNotFoundException::class);
+
+        $this->matcher()->match('/api/LOOSE-SECURE', $this->context());
+    }
+
     /**
      * Without a single scheme-constrained route there is no fallback matcher at all, and the original
      * miss has to surface unchanged — this is the default installation.
@@ -406,6 +428,7 @@ final class RouteMatcherTest extends TestCase
             'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'looseItem' => ['path' => '/api/loose/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::looseItem', 'env' => null, 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
             'looseUnicode' => ['path' => '/api/loose-unicode/{name}', 'methods' => ['GET'], 'controller' => 'ctrl::looseUnicode', 'env' => null, 'requirements' => ['name' => '\p{L}+'], 'caseInsensitive' => true],
+            'looseSecure' => ['path' => '/api/loose-secure', 'methods' => ['GET'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'caseInsensitive' => true],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

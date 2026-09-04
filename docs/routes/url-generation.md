@@ -43,7 +43,7 @@ Both ViewHelpers take an `absolute` flag. It adds the scheme and host in front o
 
 Use it wherever the URL leaves the page it was rendered on: mail templates, JSON payloads consumed elsewhere, feeds.
 
-Scheme and host come from the current request, not from the site configuration, so a site reachable under several domains keeps producing links to the one the visitor is actually on. A route that constrains [`schemes`](route-attribute.md#schemes) or [`host`](route-attribute.md#host) still overrides both, with or without the flag: it already forces the absolute form on its own.
+Scheme and host come from the current request, not from the site configuration, so a site reachable under several domains keeps producing links to the one the visitor is actually on. A route that constrains [`schemes`](route-attribute.md#schemes) or [`host`](route-attribute.md#host) only overrides both without the flag when the current request does not already satisfy the constraint: a mismatch forces the absolute form on its own, exactly as it does for the redirect; a match generates a plain relative path like any other route.
 
 > [!NOTE]
 > Because the host is the request's, an absolute URL rendered this way is only as trustworthy as the incoming `Host` header — TYPO3's `trustedHostsPattern` is what keeps that honest. For a URL that has to outlive the request (a mail body, a stored payload), prefer the request-less form below, where the host comes from the site configuration.

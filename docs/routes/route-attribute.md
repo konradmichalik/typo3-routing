@@ -91,8 +91,10 @@ A request from a different host gets the same `404 Not Found` as an unmatched pa
 
 ```php
 #[Route(path: '/api/status', name: 'tenant_status', host: '{subdomain}.example.com', requirements: ['subdomain' => '\w+'])]
-public function status(): ResponseInterface { /* … */ }
+public function status(string $subdomain): ResponseInterface { /* … */ }
 ```
+
+A host placeholder binds to a [typed controller argument](arguments.md) of the same name, exactly like a path placeholder, and is equally available as a request attribute (`$request->getAttribute('subdomain')`). Two differences follow from a host pattern having no optional tail: a PHP default on such a parameter does not make the placeholder optional (it always matches, so it stays required), and the placeholder is not exported as an OpenAPI path parameter.
 
 There is no `hosts` (plural) parameter — a route has exactly one `host` pattern, matching Symfony's own `Route` API. To accept a fixed set of exact hostnames, match the whole host with a placeholder and constrain it with an alternation:
 

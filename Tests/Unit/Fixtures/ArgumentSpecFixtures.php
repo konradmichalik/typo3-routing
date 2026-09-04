@@ -74,6 +74,12 @@ final class ArgumentSpecFixtures
 
     public function renamedToPlaceholderWithDefault(#[Param(name: 'page')] int $number = 1): void {}
 
+    public function hostBound(string $subdomain, string $q): void {}
+
+    public function hostBoundWithDefault(#[Param(requirement: '\w+')] string $subdomain = 'www'): void {}
+
+    public function nonAsciiPlaceholder(string $münze): void {}
+
     public function unionType(int|string $value): void {}
 
     public function unsupportedObject(DateTimeImmutable $when): void {}

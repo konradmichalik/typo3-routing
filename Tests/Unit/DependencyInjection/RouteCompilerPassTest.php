@@ -1028,6 +1028,18 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesAHostPlaceholderAsAHostSourcedArgument(): void
+    {
+        $container = $this->buildContainer(['typed' => TypedArgumentController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
+        $arguments = $container->getDefinition(RouteRegistry::class)->getArgument('$arguments');
+
+        self::assertSame('host', $arguments['typed_host'][0]['source']);
+    }
+
+    #[Test]
     public function throwsOnUnsupportedObjectParameterType(): void
     {
         $this->expectException(LogicException::class);

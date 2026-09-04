@@ -22,7 +22,7 @@ Opt-in behaviour, declared as its own attribute next to `#[Route]`. Nothing here
 
 | Page | What's inside |
 |------|---------------|
-| [Authentication & CSRF](features/authentication.md) | `#[Authenticate]`, the built-in authenticators, `#[RequireRequestToken]`, and the Bearer deployment traps |
+| [Authentication & CSRF](features/authentication.md) | `#[Authenticate]`, the built-in authenticators, `#[RequireRequestToken]` with the `routing:requestToken` ViewHelper that issues its token, and the Bearer deployment traps |
 | [Caching](features/caching.md) | `#[Cache]`, tag-based invalidation, ETag / conditional GET, and what must never be cached |
 | [Rate limiting](features/rate-limiting.md) | `#[RateLimit]`, throttling per IP or per user, and the quota headers on every response |
 | [CORS](features/cors.md) | Global configuration, per-route `#[Cors]`, and automatic preflight handling |

@@ -85,6 +85,80 @@ final class SiteBasePathResolverTest extends TestCase
         self::assertSame('/api/count', $this->subject->prependSiteBase($request, 'api/count'));
     }
 
+    #[Test]
+    public function resolvesBasePathFromRequestSiteAttribute(): void
+    {
+        $request = $this->requestWithSiteBase('https://example.com/sub/api/count', 'https://example.com/sub/');
+
+        self::assertSame('/sub', $this->subject->resolveBasePath($request));
+    }
+
+    #[Test]
+    public function resolvesEmptyBasePathWithoutSiteContext(): void
+    {
+        $request = Requests::get('https://example.com/api/count')->build();
+
+        self::assertSame('', $this->subject->resolveBasePath($request));
+    }
+
+    #[Test]
+    public function resolvesBaseUriFromSite(): void
+    {
+        $site = new Site('main', 1, ['base' => 'https://example.com/sub/']);
+
+        $base = $this->subject->resolveBaseUri($site);
+
+        self::assertSame('https', $base->getScheme());
+        self::assertSame('example.com', $base->getHost());
+        self::assertSame('/sub', $base->getPath());
+    }
+
+    #[Test]
+    public function resolvesBaseUriWithoutTrailingSlashForRootSite(): void
+    {
+        $site = new Site('main', 1, ['base' => 'https://example.com/']);
+
+        self::assertSame('', $this->subject->resolveBaseUri($site)->getPath());
+    }
+
+    #[Test]
+    public function resolvesBaseUriFromLanguageWhenGiven(): void
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'languages' => [
+                [
+                    'languageId' => 0,
+                    'title' => 'English',
+                    'locale' => 'en_US.UTF-8',
+                    'base' => 'https://example.com/',
+                ],
+                [
+                    'languageId' => 1,
+                    'title' => 'German',
+                    'locale' => 'de_DE.UTF-8',
+                    'base' => 'https://example.de/de/',
+                ],
+            ],
+        ]);
+
+        $base = $this->subject->resolveBaseUri($site, $site->getLanguageById(1));
+
+        self::assertSame('example.de', $base->getHost());
+        self::assertSame('/de', $base->getPath());
+    }
+
+    #[Test]
+    public function resolvesBaseUriPreservingAnExplicitPort(): void
+    {
+        $site = new Site('main', 1, ['base' => 'https://example.com:8443/sub/']);
+
+        $base = $this->subject->resolveBaseUri($site);
+
+        self::assertSame(8443, $base->getPort());
+        self::assertSame('/sub', $base->getPath());
+    }
+
     private function makeLanguage(string $base): SiteLanguage
     {
         $site = new Site('main', 1, [

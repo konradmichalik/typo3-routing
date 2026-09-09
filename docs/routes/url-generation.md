@@ -30,8 +30,45 @@ Need several URLs in JavaScript at once? `routing:uris` renders a JSON map of th
 
 Generated URLs automatically include the current site/language base, so they are reachable as-is.
 
+## Absolute URLs
+
+Both ViewHelpers take an `absolute` flag. It adds the scheme and host in front of the very same path, base included:
+
+```html
+{routing:uri(route: 'course_search_count', absolute: 1)}
+<!-- → https://example.com/sub/api/course-search/count -->
+
+{routing:uris(routes: {count: 'course_search_count'}, absolute: 1)}
+```
+
+Use it wherever the URL leaves the page it was rendered on: mail templates, JSON payloads consumed elsewhere, feeds.
+
+Scheme and host come from the current request, not from the site configuration, so a site reachable under several domains keeps producing links to the one the visitor is actually on. A route that constrains [`schemes`](route-attribute.md#schemes) or [`host`](route-attribute.md#host) only overrides both without the flag when the current request does not already satisfy the constraint: a mismatch forces the absolute form on its own, exactly as it does for the redirect; a match generates a plain relative path like any other route.
+
+> [!NOTE]
+> Because the host is the request's, an absolute URL rendered this way is only as trustworthy as the incoming `Host` header — TYPO3's `trustedHostsPattern` is what keeps that honest. For a URL that has to outlive the request (a mail body, a stored payload), prefer the request-less form below, where the host comes from the site configuration.
+
+## Without a request
+
+`generateForSite()` resolves the context from a TYPO3 `Site` instead of a request, for CLI commands, scheduler tasks, queue workers and mail rendered outside a frontend request:
+
+```php
+$this->urlGenerator->generateForSite($site, 'course_show', ['id' => 5], absolute: true);
+// → "https://example.com/sub/api/courses/5"
+```
+
+There is no current request to read a scheme and host from in that context, so **the site's configured base is the sole authority** for both. Pass a `SiteLanguage` to generate against that language's base instead:
+
+```php
+$this->urlGenerator->generateForSite($site, 'course_show', ['id' => 5], absolute: true, language: $site->getLanguageById(1));
+```
+
+A site base configured as a bare path (`base: /`) carries neither scheme nor host, so nothing can be made absolute from it — such a base can only ever yield a path.
+
+## In PHP
+
 > [!TIP]
-> In PHP, inject [`RouteUrlGenerator`](../../Classes/Http/RouteUrlGenerator.php) and call `generate($request, $routeName, $parameters)`.
+> Inject [`RouteUrlGenerator`](../../Classes/Http/RouteUrlGenerator.php) and call `generate($request, $routeName, $parameters, $absolute)`.
 
 ```php
 use KonradMichalik\Typo3Routing\Http\RouteUrlGenerator;
@@ -47,6 +84,12 @@ final readonly class CourseLinkProvider
     {
         // e.g. "/api/courses/5" — already includes the current site/language base.
         return $this->urlGenerator->generate($request, 'course_show', ['id' => $id]);
+    }
+
+    public function absoluteCourseUrl(ServerRequestInterface $request, int $id): string
+    {
+        // e.g. "https://example.com/api/courses/5".
+        return $this->urlGenerator->generate($request, 'course_show', ['id' => $id], true);
     }
 }
 ```

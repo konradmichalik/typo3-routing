@@ -56,11 +56,28 @@ final class UrisViewHelperTest extends TestCase
     }
 
     #[Test]
+    public function rendersAbsoluteUrisWhenRequested(): void
+    {
+        $this->registerGenerator();
+        $GLOBALS['TYPO3_REQUEST'] = (new ServerRequest('https://example.com/sub/'))
+            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']));
+
+        $viewHelper = new UrisViewHelper();
+        $viewHelper->setArguments(['routes' => ['count' => 'example_count'], 'absolute' => true]);
+
+        self::assertJsonStringEqualsJsonString(
+            '{"count":"https://example.com/sub/api/count"}',
+            $viewHelper->render(),
+        );
+    }
+
+    #[Test]
     public function registersTheRoutesArgument(): void
     {
         $arguments = (new UrisViewHelper())->prepareArguments();
 
         self::assertArrayHasKey('routes', $arguments);
+        self::assertArrayHasKey('absolute', $arguments);
     }
 
     #[Test]

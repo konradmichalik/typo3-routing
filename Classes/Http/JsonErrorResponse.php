@@ -64,7 +64,10 @@ final class JsonErrorResponse
         $problem = array_merge($problem, $extra);
 
         $response = new Response('php://temp', $status, array_merge(['Content-Type' => 'application/problem+json'], $headers));
-        $response->getBody()->write(json_encode($problem, \JSON_THROW_ON_ERROR));
+        // JSON_INVALID_UTF8_SUBSTITUTE: an exception message or trace frame is arbitrary,
+        // unvalidated data — invalid UTF-8 in it must not turn error handling itself into an
+        // uncaught JsonException.
+        $response->getBody()->write(json_encode($problem, \JSON_THROW_ON_ERROR | \JSON_INVALID_UTF8_SUBSTITUTE));
 
         return $response;
     }

@@ -317,6 +317,30 @@ public function show(Order $order): JsonResponse
 }
 ```
 
-The response body never includes the exception's own message or a stack trace, regardless of application context — only the fixed `title: 'Internal Server Error'` — since an unanticipated exception's detail is unvetted and possibly sensitive. `HttpProblemException`, `ArgumentResolutionException` (unresolvable argument) and a missing entity are still mapped to their own specific status exactly as before; this only adds a catch-all for everything else.
+Outside the `Development` application context, the response body never includes the exception's own message or a stack trace — only the fixed `title: 'Internal Server Error'` — since an unanticipated exception's detail is unvetted and possibly sensitive. In `Development`, the response includes the exception's message as `detail`, plus `exception`, `code`, `file`, `line` and `trace` as RFC 9457 extension members:
+
+```json
+{
+    "type": "about:blank",
+    "title": "Internal Server Error",
+    "status": 500,
+    "detail": "Call to a member function getId() on null",
+    "exception": "Error",
+    "code": 0,
+    "file": "/var/www/html/src/Controller/ExampleController.php",
+    "line": 42,
+    "trace": [
+        {
+            "file": "/var/www/html/src/Service/ExampleService.php",
+            "line": 123,
+            "function": "doSomething",
+            "class": "Vendor\\Extension\\Service\\ExampleService",
+            "type": "->"
+        }
+    ]
+}
+```
+
+Trace frames never include their `args`: argument values can carry secrets (passwords, tokens) that `Development` doesn't excuse exposing in an HTTP response. `HttpProblemException`, `ArgumentResolutionException` (unresolvable argument) and a missing entity are still mapped to their own specific status exactly as before, regardless of application context; this only adds a catch-all for everything else.
 
 A nullable (`?JsonResponse`) or union return type does **not** opt in: the method can legitimately answer with something other than JSON, so guessing "JSON errors" for it would be wrong as often as it is right. A method with no declared return type is likewise unaffected.

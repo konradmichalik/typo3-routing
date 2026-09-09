@@ -19,6 +19,19 @@ use RuntimeException;
 /**
  * UriViewHelper.
  *
+ * Renders the URL of a single attribute route, including the current site/language base.
+ *
+ * @example
+ * ```html
+ * <a href="{routing:uri(route: 'course_search_count')}">Count</a>
+ *
+ * <!-- With path parameters -->
+ * {routing:uri(route: 'course_search_item', parameters: '{id: 5}')}
+ *
+ * <!-- Absolute, prefixing the scheme and host of the current request -->
+ * {routing:uri(route: 'course_search_count', absolute: 1)}
+ * ```
+ *
  * @api
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>

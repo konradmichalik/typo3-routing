@@ -17,6 +17,7 @@ use function array_diff;
 use function array_intersect;
 use function array_map;
 use function count;
+use function implode;
 use function preg_match;
 use function sprintf;
 use function str_starts_with;
@@ -49,6 +50,7 @@ final readonly class RouteLinter
             ...$this->noStaticPrefixFindings($routes),
             ...$this->duplicatePathFindings($routes),
             ...$this->missingDigitsRequirementFindings($registry, $routes),
+            ...$this->unsupportedPlaceholderFindings($routes),
             ...$this->unusedExclusivePrefixFindings($routes, $exclusivePrefixes),
         ];
     }
@@ -259,6 +261,37 @@ final readonly class RouteLinter
         }
 
         return true;
+    }
+
+    /**
+     * Symfony's inline placeholder forms (`{id<\d+>}`, `{page?1}`, `{!page}`, `{user:id}`) are rejected
+     * at build time, but a container compiled before that guard existed still carries them — and there
+     * the argument is read from the query/body instead of the path. Reported here so the mis-binding
+     * surfaces without a container rebuild.
+     *
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}> $routes
+     *
+     * @return list<array{severity: 'warning'|'info', check: string, route: string|null, controller: string|null, message: string}>
+     */
+    private function unsupportedPlaceholderFindings(array $routes): array
+    {
+        $findings = [];
+        foreach ($routes as $name => $route) {
+            $offenders = PlaceholderSyntax::unsupported($route['path']);
+            if ([] === $offenders) {
+                continue;
+            }
+
+            $findings[] = [
+                'severity' => 'warning',
+                'check' => 'unsupported-placeholder-syntax',
+                'route' => $name,
+                'controller' => $route['controller'],
+                'message' => sprintf('Path "%s" uses unsupported placeholder syntax ("%s"); it matches, but the controller argument is read from the query/body instead of the path. Write the plain "{name}" form and declare the rest explicitly; the replacement for each inline form is listed under "Inline placeholder syntax" in docs/routes/route-attribute.md.', $route['path'], implode('", "', $offenders)),
+            ];
+        }
+
+        return $findings;
     }
 
     /**

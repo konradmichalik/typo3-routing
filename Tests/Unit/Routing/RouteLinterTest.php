@@ -277,6 +277,21 @@ final class RouteLinterTest extends TestCase
     }
 
     #[Test]
+    public function flagsAPathUsingInlinePlaceholderSyntax(): void
+    {
+        $registry = $this->registry(['show' => ['path' => '/api/user/{id<\d+>}', 'methods' => ['GET'], 'controller' => 'ctrl::show', 'env' => null, 'requirements' => []]]);
+
+        $findings = (new RouteLinter())->lint($registry);
+
+        self::assertCount(1, $findings);
+        self::assertSame('unsupported-placeholder-syntax', $findings[0]['check']);
+        self::assertSame('warning', $findings[0]['severity']);
+        self::assertSame('show', $findings[0]['route']);
+        self::assertSame('ctrl::show', $findings[0]['controller']);
+        self::assertStringContainsString('{id<\d+>}', $findings[0]['message']);
+    }
+
+    #[Test]
     public function ignoresABlankExclusivePrefixConfiguration(): void
     {
         $registry = $this->registry(['count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]]);

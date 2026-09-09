@@ -134,6 +134,7 @@ vendor/bin/typo3 routing:lint --strict   # exit 1 when any finding exists, not o
 | Two routes with an identical path and overlapping methods, equal priority | warning  | Match order follows registration order, which is stable but not something the author controls or can see           |
 | A route fully shadowed by an identical-path route at a higher priority   | warning  | Every method it declares is already claimed first — a dead endpoint                                                |
 | An `int`-typed path argument with no digits requirement                  | warning  | The path matches, then argument coercion fails, so the client gets `400` where `404` was meant                     |
+| A path using inline placeholder syntax (e.g. `{id<\d+>}`)               | warning  | Rejected at build time; a container compiled before that guard binds the argument from the query/body instead of the path |
 | An exclusive prefix (`ext_conf_template.txt`) with no route inside it    | info     | Turns every path under it into a JSON `404` instead of falling through to page rendering                            |
 
 A clean route set exits `0` with no findings. No check currently reaches `error` severity — until one does, `--strict` is the only way to fail a CI build on a finding; without it, the command always exits `0` unless a future error-level check fires.

@@ -81,7 +81,8 @@ final readonly class ControllerArgumentResolver
 
             $arguments[] = match ($spec['source']) {
                 'request' => $request,
-                'path' => $this->coerce($match[$spec['name']] ?? null, $spec),
+                // A host placeholder travels in the same match array as a path one.
+                'path', 'host' => $this->coerce($match[$spec['name']] ?? null, $spec),
                 'query' => $this->resolveInput($query, $spec),
                 'body' => $this->resolveInput($body, $spec),
                 default => $this->resolveInput($inputs, $spec),

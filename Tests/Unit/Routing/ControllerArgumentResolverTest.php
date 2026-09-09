@@ -63,6 +63,15 @@ final class ControllerArgumentResolverTest extends TestCase
     }
 
     #[Test]
+    public function readsAHostPlaceholderFromTheMatchNotFromTheQuery(): void
+    {
+        $specs = [$this->spec('subdomain', 'host', 'string')];
+        $request = $this->request()->withQueryParams(['subdomain' => 'from-query']);
+
+        self::assertSame(['acme'], $this->resolver->resolve($specs, ['subdomain' => 'acme'], $request));
+    }
+
+    #[Test]
     public function pullsAndCastsInputFromQuery(): void
     {
         $specs = [$this->spec('q', 'input', 'int')];

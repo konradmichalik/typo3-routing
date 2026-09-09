@@ -294,21 +294,48 @@ final class ArgumentSpecFactoryTest extends TestCase
         $this->contributions('presenceOnlyWithDefault', '/api/x');
     }
 
+    #[Test]
+    public function derivesTheHostSourceForAHostPlaceholder(): void
+    {
+        $specs = $this->build('hostBound', '/api/status', '{subdomain}.example.com');
+
+        self::assertSame(['name' => 'subdomain', 'type' => 'string', 'source' => 'host', 'nullable' => false, 'hasDefault' => false, 'default' => null], $specs[0]);
+        self::assertSame('input', $specs[1]['source']);
+    }
+
+    #[Test]
+    public function derivesThePathSourceForANonAsciiPlaceholderName(): void
+    {
+        self::assertSame('path', $this->build('nonAsciiPlaceholder', '/api/coins/{münze}')[0]['source']);
+    }
+
+    #[Test]
+    public function keepsAHostPlaceholderRequiredDespiteAParameterDefault(): void
+    {
+        $contributions = $this->contributions('hostBoundWithDefault', '/api/status', '{subdomain}.example.com');
+
+        self::assertSame(['subdomain' => '\w+'], $contributions['requirements']);
+        // The optional-trailing-placeholder rule is a path concept: a host placeholder always matches,
+        // so its PHP default never turns it into an optional route default or an optional input.
+        self::assertSame([], $contributions['defaults']);
+        self::assertSame([], $contributions['optional']);
+    }
+
     /**
      * @return list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>
      */
-    private function build(string $method, string $path): array
+    private function build(string $method, string $path, ?string $host = null): array
     {
-        return $this->factory->build(new ReflectionMethod(ArgumentSpecFixtures::class, $method), $path, 'fixtures');
+        return $this->factory->build(new ReflectionMethod(ArgumentSpecFixtures::class, $method), $path, 'fixtures', $host);
     }
 
     /**
      * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>, optional: list<string>}
      */
-    private function contributions(string $method, string $path): array
+    private function contributions(string $method, string $path, ?string $host = null): array
     {
         $reflection = new ReflectionMethod(ArgumentSpecFixtures::class, $method);
 
-        return $this->factory->paramContributions($reflection, $this->build($method, $path), $path, [], [], 'fixtures');
+        return $this->factory->paramContributions($reflection, $this->build($method, $path, $host), $path, [], [], 'fixtures');
     }
 }

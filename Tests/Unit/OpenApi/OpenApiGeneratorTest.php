@@ -102,6 +102,20 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function neverEmitsAHostPlaceholderAsAPathParameter(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, host?: string|null}> $routes */
+        $routes = ['tenant' => ['path' => '/api/status', 'methods' => ['GET'], 'controller' => 'ctrl::status', 'env' => null, 'requirements' => ['subdomain' => '\w+'], 'host' => '{subdomain}.example.com']];
+        $arguments = ['tenant' => [['name' => 'subdomain', 'type' => 'string', 'source' => 'host', 'nullable' => false, 'hasDefault' => false, 'default' => null]]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), arguments: $arguments);
+
+        $operation = $this->generator($registry)->generate('My API', '2.0.0', '/api/')['paths']['/api/status']['get'];
+
+        // A host placeholder is not part of the path template, so OpenAPI has no place for it.
+        self::assertArrayNotHasKey('parameters', $operation);
+    }
+
+    #[Test]
     public function usesTheRoutesOwnTagsInsteadOfTheServiceIdWhenSet(): void
     {
         $operation = $this->generate()['paths']['/api/v1/items-tagged']['get'];

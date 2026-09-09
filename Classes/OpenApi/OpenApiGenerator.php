@@ -144,7 +144,8 @@ final readonly class OpenApiGenerator
                 'path' => $parameters[] = $this->parameter($argument['name'], 'path', true, $schema, $description),
                 'query' => $parameters[] = $this->parameter($argument['name'], 'query', !$argument['nullable'] && !$argument['hasDefault'], $schema, $description),
                 'body' => $this->collectBody($argument, $schema, $bodyProperties, $bodyRequired, $description),
-                default => null, // 'request' — the PSR-7 request is not an API parameter.
+                // 'request' and 'host': neither the PSR-7 request nor a host placeholder is an API parameter.
+                default => null,
             };
         }
 
@@ -215,12 +216,14 @@ final readonly class OpenApiGenerator
     /**
      * Maps the argument spec source to where it appears in OpenAPI. The catch-all "input" source
      * (query + body) becomes a request-body property for methods that carry a body, else a query
-     * parameter.
+     * parameter. A "host" placeholder has no OpenAPI counterpart — it is not part of the path
+     * template — so it maps to itself and is dropped by the caller.
      */
     private function target(string $source, bool $hasBody): string
     {
         return match ($source) {
             'path' => 'path',
+            'host' => 'host',
             'query' => 'query',
             'body' => 'body',
             'variadic' => 'query',

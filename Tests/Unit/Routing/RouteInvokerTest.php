@@ -199,6 +199,24 @@ final class RouteInvokerTest extends TestCase
     }
 
     #[Test]
+    public function carriesANonAsciiPlaceholderInTheSyntheticPath(): void
+    {
+        $response = $this->invoker()->invoke('coins', ['münze' => 'taler'], $this->request());
+
+        self::assertJsonPath((string) $response->getBody(), 'path', '/api/coins/taler');
+    }
+
+    #[Test]
+    public function answers404ForARouteWhoseHostCarriesAPlaceholder(): void
+    {
+        // The route's own URL cannot be generated without a value for the host placeholder, and this
+        // seam has no host to take one from — the same answer an unmatched path gets over HTTP.
+        $response = $this->invoker()->invoke('tenant', ['subdomain' => 'acme'], $this->request());
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
     public function exposesPathPlaceholdersAsRequestAttributes(): void
     {
         $response = $this->invoker()->invoke('probe', ['id' => 7], $this->request());
@@ -432,6 +450,8 @@ final class RouteInvokerTest extends TestCase
             'aliased' => ['path' => '/api/aliased', 'methods' => ['GET'], 'controller' => 'ctrl::aliased', 'env' => null, 'requirements' => []],
             'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []],
             'restricted' => ['path' => '/api/restricted', 'methods' => ['GET'], 'controller' => 'probe::probe', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'host' => 'api.example.com'],
+            'tenant' => ['path' => '/api/tenant', 'methods' => ['GET'], 'controller' => 'probe::probe', 'env' => null, 'requirements' => ['subdomain' => '\w+'], 'host' => '{subdomain}.example.com'],
+            'coins' => ['path' => '/api/coins/{münze}', 'methods' => ['GET'], 'controller' => 'probe::probe', 'env' => null, 'requirements' => []],
             'probe' => ['path' => '/api/probe/{id}', 'methods' => ['POST'], 'controller' => 'probe::probe', 'env' => null, 'requirements' => []],
             'body' => ['path' => '/api/body', 'methods' => ['POST'], 'controller' => 'probe::body', 'env' => null, 'requirements' => []],
             'putBody' => ['path' => '/api/put-body', 'methods' => ['PUT'], 'controller' => 'probe::body', 'env' => null, 'requirements' => []],
@@ -487,6 +507,7 @@ final class RouteInvokerTest extends TestCase
             'submit' => [$request],
             'restricted' => [$request],
             'probe' => [$request],
+            'coins' => [$request],
             'body' => [
                 ['name' => 'title', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => true, 'default' => 'none'],
                 ['name' => 'priority', 'type' => 'int', 'source' => 'body', 'nullable' => false, 'hasDefault' => true, 'default' => 0],

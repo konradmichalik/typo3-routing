@@ -30,4 +30,10 @@ final class TypedArgumentController implements RouteControllerInterface
     {
         return new JsonResponse(['id' => $id, 'q' => $q, 'active' => $active]);
     }
+
+    #[Route(path: '/api/typed/status', name: 'typed_host', host: '{subdomain}.example.com', requirements: ['subdomain' => '\w+'])]
+    public function tenantStatus(string $subdomain): JsonResponse
+    {
+        return new JsonResponse(['subdomain' => $subdomain]);
+    }
 }

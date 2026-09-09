@@ -5,7 +5,8 @@ Instead of reading values off the request by hand, declare them as **typed metho
 | Parameter shape                   | Resolved from                          |
 |-----------------------------------|----------------------------------------|
 | `ServerRequestInterface $request` | The PSR-7 request itself.              |
-| A name matching a `{placeholder}` | The matched path segment.              |
+| A name matching a path `{placeholder}` | The matched path segment.         |
+| A name matching a [`host`](route-attribute.md#wildcards-and-multiple-hosts) `{placeholder}` | The matched host label. |
 | Any other scalar name             | Query string, then request body.       |
 
 Values are coerced to the declared type (`int`, `float`, `bool`, `string`, `array`, `mixed`; untyped = raw string) — including **backed enums**. A value that cannot be coerced, or a missing parameter without a default, yields a **400** before the controller runs. Optional parameters use their PHP default; nullable parameters become `null` when absent.

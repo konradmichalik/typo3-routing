@@ -41,15 +41,17 @@ Two consequences follow directly from where that boundary sits:
 | 4 | [Environment filter](../operating/configuration.md#environment-bound-routes) — is the route's `env` the current context? | `404`, as if the route did not exist |
 | 5 | [Site/language scope](../routes/route-attribute.md#site--and-language-bound-routes) — is the route reachable from the request's site/language? | `404`, as if the route did not exist |
 | 6 | [Canonical redirect](../routes/route-attribute.md#redirecting-instead-of-tolerating) (opt-in) — did the request only match a tolerated path variant? | `308` to the declared path |
-| 7 | Request body shape (malformed JSON / unsupported content type) | `400` / `415` |
-| 8 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
-| 9 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
-| 10 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
-| 11 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/route-attribute.md#automatic-json-errors-for-jsonresponse-routes) |
+| 7 | [Scheme redirect](../routes/route-attribute.md#schemes) — did the request match everything but the route's declared `schemes`? | `308` to the same URL under the declared scheme |
+| 8 | Request body shape (malformed JSON / unsupported content type) | `400` / `415` |
+| 9 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
+| 10 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
+| 11 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
+| 12 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/route-attribute.md#automatic-json-errors-for-jsonresponse-routes) |
 
 Several ordering decisions in there are deliberate rather than incidental:
 
 - **The env filter and site/language scope run before the canonical redirect**, so a redirect never reveals a route that is otherwise invisible in the current context.
+- **The scheme redirect runs after the canonical and legacy-path ones**, because both of those regenerate their target through `RouteUrlGenerator`, which already points at the declared scheme. A request that is wrong in two ways at once therefore still costs exactly one redirect.
 - **Rate limiting runs before authentication**, so a coarse per-IP limit absorbs token brute-force attempts before any authentication logic executes.
 - **The response cache is consulted after the rate limit**, so a cacheable response cannot be used to bypass the limit.
 

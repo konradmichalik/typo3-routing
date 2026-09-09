@@ -648,6 +648,118 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function redirectsARequestOnTheWrongSchemeToTheDeclaredOne(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/api/secure'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/api/secure', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function doesNotRedirectARequestOnTheDeclaredScheme(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/secure'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertFalse($response->hasHeader('Location'));
+    }
+
+    #[Test]
+    public function preservesTheQueryStringAcrossTheSchemeRedirect(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/api/secure?foo=bar'));
+
+        self::assertSame('https://example.com/api/secure?foo=bar', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function keepsTheSiteBaseInTheSchemeRedirectLocation(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/sub/api/secure', 'https://example.com/sub/'));
+
+        self::assertSame('https://example.com/sub/api/secure', $response->getHeaderLine('Location'));
+    }
+
+    #[Test]
+    public function usesA308SchemeRedirectSoAPostIsNotDowngraded(): void
+    {
+        $response = $this->dispatch($this->request('POST', 'http://example.com/api/secure'));
+
+        self::assertSame(308, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function methodNotAllowedTakesPrecedenceOverASchemeRedirect(): void
+    {
+        $response = $this->dispatch($this->request('DELETE', 'http://example.com/api/secure'));
+
+        self::assertSame(405, $response->getStatusCode());
+    }
+
+    #[Test]
+    #[WithEnvironment(context: 'Production')]
+    public function hidesAnEnvBoundRouteInsteadOfRedirectingItsScheme(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/api/secure-dev'));
+
+        self::assertSame(404, $response->getStatusCode());
+    }
+
+    /**
+     * Two things wrong at once (scheme and trailing slash) must still cost exactly one redirect: the
+     * canonical redirect regenerates the URL through RouteUrlGenerator, which targets the declared
+     * scheme on its own, so the location is already final. Following it lands on a 200.
+     */
+    #[Test]
+    public function fixesTheSchemeAndTheTrailingSlashInASingleRedirect(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/api/secure-canonical/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/api/secure-canonical', $response->getHeaderLine('Location'));
+        self::assertSame(200, $this->dispatch($this->request('GET', $response->getHeaderLine('Location')))->getStatusCode());
+    }
+
+    /**
+     * The same for a non-canonical route: nothing else redirects, so the scheme redirect keeps the
+     * tolerated trailing slash and the target is served directly rather than redirected again.
+     */
+    #[Test]
+    public function aToleratedTrailingSlashSurvivesTheSchemeRedirectWithoutASecondHop(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/api/secure/'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/api/secure/', $response->getHeaderLine('Location'));
+        self::assertSame(200, $this->dispatch($this->request('GET', $response->getHeaderLine('Location')))->getStatusCode());
+    }
+
+    #[Test]
+    public function redirectsALegacyPathOnTheWrongSchemeStraightToTheDeclaredUrl(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/api/secure-old-name'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/api/secure-renamed', $response->getHeaderLine('Location'));
+        self::assertSame(200, $this->dispatch($this->request('GET', $response->getHeaderLine('Location')))->getStatusCode());
+    }
+
+    /**
+     * A legacy alias exists to keep answering on its own path, so the scheme redirect must not quietly
+     * turn it into a redirect to the declared path — only the scheme changes.
+     */
+    #[Test]
+    public function anAliasedLegacyPathKeepsItsOwnPathAcrossTheSchemeRedirect(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'http://example.com/api/secure-old-aliased'));
+
+        self::assertSame(308, $response->getStatusCode());
+        self::assertSame('https://example.com/api/secure-old-aliased', $response->getHeaderLine('Location'));
+        self::assertSame(200, $this->dispatch($this->request('GET', $response->getHeaderLine('Location')))->getStatusCode());
+    }
+
+    #[Test]
     public function fallsBackToDefaultPrefixWhenExtensionConfigurationThrows(): void
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -1283,8 +1395,13 @@ final class RouteDispatcherTest extends TestCase
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, sites?: list<string>, languages?: list<int>, legacyPaths?: list<string>, legacyAlias?: bool}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, sites?: list<string>, languages?: list<int>, legacyPaths?: list<string>, legacyAlias?: bool, schemes?: list<string>}> $routes */
         $routes = [
+            'secure' => ['path' => '/api/secure', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'schemes' => ['https']],
+            'secureCanonical' => ['path' => '/api/secure-canonical', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'canonical' => true],
+            'secureRenamed' => ['path' => '/api/secure-renamed', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'legacyPaths' => ['/api/secure-old-name']],
+            'secureAliased' => ['path' => '/api/secure-aliased', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'legacyPaths' => ['/api/secure-old-aliased'], 'legacyAlias' => true],
+            'secureDev' => ['path' => '/api/secure-dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => [], 'schemes' => ['https']],
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'vaCount' => ['path' => '/va/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []],
@@ -1338,6 +1455,11 @@ final class RouteDispatcherTest extends TestCase
 
         /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> $arguments */
         $arguments = [
+            'secure' => [],
+            'secureCanonical' => [],
+            'secureRenamed' => [],
+            'secureAliased' => [],
+            'secureDev' => [],
             'count' => [],
             'vaCount' => [],
             'submit' => [$request],

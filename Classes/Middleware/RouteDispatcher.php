@@ -171,6 +171,16 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $redirect;
         }
 
+        // 3e. Scheme redirect: the path matched, only the route's declared `schemes` did not. Answered
+        //     with the same URL under the declared scheme instead of the 404 a plain miss would get.
+        //     Reached last of the three redirects because both of those already generate their target
+        //     through RouteUrlGenerator, which targets the declared scheme on its own — so a request
+        //     that is wrong in two ways at once still costs exactly one redirect.
+        $redirect = $this->schemeRedirect($match, $request);
+        if (null !== $redirect) {
+            return $redirect;
+        }
+
         // 4. Request body shape (malformed JSON / unsupported content type) → 400/415, on routes that
         //    actually read from the body. Checked before requirements so the cause is named correctly
         //    instead of surfacing as a derived "missing parameter".
@@ -249,6 +259,29 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
+     * Null unless this match came through the matcher's scheme tier — everything about the request held
+     * except the scheme (see RouteMatcher::matchWrongScheme()). Unconditional, unlike the canonical
+     * redirect: `schemes` declares which scheme a route answers on, so a request on another one has an
+     * unambiguous correct target, and this is what Symfony's own RedirectableUrlMatcher answers too.
+     *
+     * The target is the request's own URI with only the scheme replaced, rather than a regenerated URL:
+     * that keeps the site base, the query and — for a `legacyAlias` path — the very path the client
+     * asked for, which is the whole point of an alias. The port rides along untouched: nothing here
+     * knows which port the other scheme listens on.
+     *
+     * @param array<string, mixed> $match
+     */
+    private function schemeRedirect(array $match, ServerRequestInterface $request): ?ResponseInterface
+    {
+        $scheme = $match['_schemeRedirect'] ?? null;
+        if (!is_string($scheme)) {
+            return null;
+        }
+
+        return new Response('php://temp', 308, ['Location' => (string) $request->getUri()->withScheme($scheme)]);
+    }
+
+    /**
      * The target is regenerated via RouteUrlGenerator rather than reusing the declared path verbatim, so
      * a placeholder route redirects to the concrete path (with the site/language base applied) instead
      * of the literal `{id}` template; the query string carries over unchanged. A fragment is never sent
@@ -299,6 +332,15 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         return $this->services->corsPreflight()->resolve($request, $path, $this->requestContext($request));
     }
 
+    /**
+     * The scheme is taken from the request URI rather than from `normalizedParams`, and that is
+     * deliberate: TYPO3 builds the request URI proxy-aware itself — v14 from
+     * `NormalizedParams::createFromServerParams()->getRequestUrl()`, v13 from
+     * `GeneralUtility::getIndpEnv('TYPO3_REQUEST_URL')`, both honouring `reverseProxySSL` and
+     * `reverseProxyIP` + `X-Forwarded-Proto` — so the two sources cannot disagree. A TLS-terminating
+     * proxy missing from that configuration fools both alike, which is why the scheme redirect
+     * documents it rather than trying to detect it here.
+     */
     private function requestContext(ServerRequestInterface $request): RequestContext
     {
         $context = new RequestContext();

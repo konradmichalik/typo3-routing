@@ -50,7 +50,9 @@ final readonly class RouteMatcher
      * miss: exact path, trailing-slash variant, the same pair against the case-insensitive matcher
      * (#[Route(caseInsensitive: true)]), then the same pair again against the legacy-path matcher
      * (#[Route(legacyPaths: [...])]) — which rewrites `_route` back to the owning route's real name, so
-     * every consumer downstream sees the same identity regardless of which path reached it.
+     * every consumer downstream sees the same identity regardless of which path reached it — and
+     * finally against the scheme-redirect matcher (#[Route(schemes: [...])]), which is why a scheme
+     * mismatch surfaces as a match carrying `_schemeRedirect` rather than as a miss.
      *
      * @return array<string, mixed> the matched route attributes
      *
@@ -64,6 +66,7 @@ final readonly class RouteMatcher
         } catch (ResourceNotFoundException $exception) {
             return $this->matchCaseInsensitively($path, $context)
                 ?? $this->matchLegacyPath($path, $context)
+                ?? $this->matchWrongScheme($path, $context)
                 ?? throw $exception;
         }
     }
@@ -115,12 +118,52 @@ final readonly class RouteMatcher
             return null;
         }
 
-        // `_legacyOf` rode in as an ordinary route default (see RouteRegistry::legacyRoutes()); rewrite
-        // `_route` to it so the dispatcher, rate limiting, caching and deprecation headers all resolve
-        // against the route this legacy path belongs to, not the internal synthetic entry name.
-        $match['_route'] = $match['_legacyOf'];
+        return self::withOwningRouteName($match);
+    }
 
-        return $match;
+    /**
+     * Null means: no route declared `schemes`, or none of them matched this path. A match here means
+     * everything but the scheme held — path, method, host and requirements alike — so it is stamped
+     * with `_schemeRedirect` (see RouteRegistry::schemeRedirectRoutes()) and the dispatcher answers a
+     * redirect to that scheme instead of a 404.
+     *
+     * Last of all the tiers deliberately: only once the exact path, its trailing-slash variant, the
+     * case-insensitive matcher and the legacy paths have all reported a plain miss is the scheme the
+     * only remaining explanation. A MethodNotAllowedException propagates as everywhere else — the
+     * method is wrong on the correct scheme too, so redirecting first would only postpone the 405.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function matchWrongScheme(string $path, RequestContext $context): ?array
+    {
+        $matcher = $this->registry->getSchemeRedirectMatcher($context);
+        if (null === $matcher) {
+            return null;
+        }
+
+        try {
+            $match = $this->matchTolerantly($matcher, $path, alreadyVariant: false);
+        } catch (ResourceNotFoundException) {
+            return null;
+        }
+
+        return self::withOwningRouteName($match);
+    }
+
+    /**
+     * `_legacyOf` rode in as an ordinary route default (see RouteRegistry::legacyRoutes()); where it is
+     * present, `_route` is rewritten to it so the dispatcher, rate limiting, caching and deprecation
+     * headers all resolve against the route the path belongs to, not the internal synthetic entry name.
+     *
+     * @param array<string, mixed> $match
+     *
+     * @return array<string, mixed>
+     */
+    private static function withOwningRouteName(array $match): array
+    {
+        $legacyOf = $match['_legacyOf'] ?? null;
+
+        return null === $legacyOf ? $match : [...$match, '_route' => $legacyOf];
     }
 
     /**

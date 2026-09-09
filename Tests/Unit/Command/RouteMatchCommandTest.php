@@ -170,6 +170,19 @@ final class RouteMatchCommandTest extends TestCase
     }
 
     #[Test]
+    public function notesTheDeclaredSchemeWhenOnlyTheSimulatedSchemeMisses(): void
+    {
+        $tester = $this->tester();
+
+        $exitCode = $tester->execute(['path' => '/api/example/secure', '--method' => 'POST', '--scheme' => 'http', '--host' => 'api.example.com']);
+        $display = $tester->getDisplay();
+
+        self::assertSame(0, $exitCode);
+        self::assertStringContainsString('Matched route "example_secure"', $display);
+        self::assertStringContainsString('308', $display);
+    }
+
+    #[Test]
     public function notesASiteAndLanguageScopedRouteWhenUnsimulated(): void
     {
         $tester = $this->tester();

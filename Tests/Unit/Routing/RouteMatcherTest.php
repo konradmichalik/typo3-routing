@@ -284,6 +284,118 @@ final class RouteMatcherTest extends TestCase
         $matcher->match('/api/legacy-count', $this->context());
     }
 
+    /**
+     * The declared scheme is not a matching constraint the way a wrong path is: everything else about
+     * the request is right, so the match has to survive and carry the scheme the client should have
+     * used — a 404 would hide a route that plainly exists.
+     */
+    #[Test]
+    public function aSchemeConstrainedRouteStillMatchesOverTheWrongSchemeAndNamesTheDeclaredScheme(): void
+    {
+        $match = $this->matcher()->match('/api/secure', $this->context());
+
+        self::assertSame('secure', $match['_route']);
+        self::assertSame('https', $match['_schemeRedirect']);
+        self::assertFalse($match['_canonicalVariant']);
+    }
+
+    #[Test]
+    public function aSchemeConstrainedRouteOverItsOwnSchemeIsNeverFlaggedForRedirect(): void
+    {
+        $match = $this->matcher()->match('/api/secure', $this->context(scheme: 'https'));
+
+        self::assertSame('secure', $match['_route']);
+        self::assertArrayNotHasKey('_schemeRedirect', $match);
+    }
+
+    #[Test]
+    public function theSchemeFallbackStillToleratesATrailingSlash(): void
+    {
+        $match = $this->matcher()->match('/api/secure/', $this->context());
+
+        self::assertSame('secure', $match['_route']);
+        self::assertTrue($match['_canonicalVariant']);
+    }
+
+    /**
+     * A scheme declared in any casing is the same scheme; lowercasing it here is what keeps the
+     * dispatcher's redirect target from pointing back at a URL that would be redirected again.
+     */
+    #[Test]
+    public function theNamedSchemeIsNormalisedToLowerCase(): void
+    {
+        $match = $this->matcher()->match('/api/secure-upper', $this->context());
+
+        self::assertSame('https', $match['_schemeRedirect']);
+    }
+
+    #[Test]
+    public function aPlaceholderRequirementIsStillEnforcedOnASchemeMismatch(): void
+    {
+        $this->expectException(ResourceNotFoundException::class);
+
+        $this->matcher()->match('/api/secure-item/abc', $this->context());
+    }
+
+    #[Test]
+    public function aWrongMethodOnASchemeMismatchIsMethodNotAllowed(): void
+    {
+        $this->expectException(MethodNotAllowedException::class);
+
+        $this->matcher()->match('/api/secure-submit', $this->context('GET'));
+    }
+
+    #[Test]
+    public function aLegacyPathOfASchemeConstrainedRouteIsFlaggedForRedirectToo(): void
+    {
+        $match = $this->matcher()->match('/api/secure-old', $this->context());
+
+        self::assertSame('secure', $match['_route']);
+        self::assertSame('secure', $match['_legacyOf']);
+        self::assertSame('https', $match['_schemeRedirect']);
+    }
+
+    #[Test]
+    public function aCaseInsensitiveSchemeConstrainedRouteRedirectsOverTheDeclaredCase(): void
+    {
+        $match = $this->matcher()->match('/api/loose-secure', $this->context());
+
+        self::assertSame('looseSecure', $match['_route']);
+        self::assertSame('https', $match['_schemeRedirect']);
+    }
+
+    /**
+     * Known limitation, documented in docs/routes/route-attribute.md#schemes: the case-insensitive
+     * tolerance and the scheme-redirect tier are not combined, so a request that is both wrongly cased
+     * and on the wrong scheme finds no matcher tier that accepts it, rather than redirecting.
+     */
+    #[Test]
+    public function aCaseInsensitiveSchemeConstrainedRouteDoesNotRedirectOverAWronglyCasedPath(): void
+    {
+        $this->expectException(ResourceNotFoundException::class);
+
+        $this->matcher()->match('/api/LOOSE-SECURE', $this->context());
+    }
+
+    /**
+     * Without a single scheme-constrained route there is no fallback matcher at all, and the original
+     * miss has to surface unchanged — this is the default installation.
+     */
+    #[Test]
+    public function aRegistryWithoutASchemeConstrainedRouteReportsTheOriginalMiss(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn('1');
+
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+
+        $this->expectException(ResourceNotFoundException::class);
+
+        $matcher->match('/api/secure', $this->context());
+    }
+
     private function matcher(string $trailingSlash = '1'): RouteMatcher
     {
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
@@ -292,18 +404,23 @@ final class RouteMatcherTest extends TestCase
         return new RouteMatcher($this->registry(), $extensionConfiguration);
     }
 
-    private function context(string $method = 'GET'): RequestContext
+    private function context(string $method = 'GET', string $scheme = 'http'): RequestContext
     {
         $context = new RequestContext();
         $context->setMethod($method);
+        $context->setScheme($scheme);
 
         return $context;
     }
 
     private function registry(): RouteRegistry
     {
-        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, legacyPaths?: list<string>}> $routes */
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, caseInsensitive?: bool, canonical?: bool, legacyPaths?: list<string>, schemes?: list<string>}> $routes */
         $routes = [
+            'secure' => ['path' => '/api/secure', 'methods' => ['GET'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'legacyPaths' => ['/api/secure-old']],
+            'secureUpper' => ['path' => '/api/secure-upper', 'methods' => ['GET'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['HTTPS']],
+            'secureItem' => ['path' => '/api/secure-item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => ['id' => '\d+'], 'schemes' => ['https']],
+            'secureSubmit' => ['path' => '/api/secure-submit', 'methods' => ['POST'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https']],
             'count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/legacy-count']],
             'slashed' => ['path' => '/api/slashed/', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'submit' => ['path' => '/api/submit', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/legacy-submit']],
@@ -311,6 +428,7 @@ final class RouteMatcherTest extends TestCase
             'loose' => ['path' => '/api/loose', 'methods' => ['GET'], 'controller' => 'ctrl::loose', 'env' => null, 'requirements' => [], 'caseInsensitive' => true],
             'looseItem' => ['path' => '/api/loose/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::looseItem', 'env' => null, 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
             'looseUnicode' => ['path' => '/api/loose-unicode/{name}', 'methods' => ['GET'], 'controller' => 'ctrl::looseUnicode', 'env' => null, 'requirements' => ['name' => '\p{L}+'], 'caseInsensitive' => true],
+            'looseSecure' => ['path' => '/api/loose-secure', 'methods' => ['GET'], 'controller' => 'ctrl::secure', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'caseInsensitive' => true],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

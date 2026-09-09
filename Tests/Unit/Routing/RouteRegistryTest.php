@@ -421,6 +421,56 @@ final class RouteRegistryTest extends TestCase
         self::assertNull($this->createRegistry()->getLegacyMatcher($this->getContext()));
     }
 
+    /**
+     * The constraint is dropped, not honoured, in this collection: matching here is what tells the
+     * dispatcher that only the scheme was wrong. The scheme the client should have used rides along as
+     * an ordinary route default.
+     */
+    #[Test]
+    public function theSchemeRedirectMatcherMatchesRegardlessOfTheContextSchemeAndNamesTheDeclaredScheme(): void
+    {
+        $matcher = $this->schemeRegistry()->getSchemeRedirectMatcher($this->getContext());
+
+        self::assertNotNull($matcher);
+        $match = $matcher->match('/api/secure');
+
+        self::assertSame('fixture_secure', $match['_route']);
+        self::assertSame('https', $match['_schemeRedirect']);
+    }
+
+    #[Test]
+    public function theSchemeRedirectMatcherCoversLegacyPathsOfASchemeConstrainedRouteToo(): void
+    {
+        $matcher = $this->schemeRegistry()->getSchemeRedirectMatcher($this->getContext());
+
+        self::assertNotNull($matcher);
+        $match = $matcher->match('/api/legacy-secure');
+
+        self::assertSame('fixture_secure', $match['_legacyOf']);
+        self::assertSame('https', $match['_schemeRedirect']);
+    }
+
+    #[Test]
+    public function aRegistryWithoutASchemeConstrainedRouteHasNoSchemeRedirectMatcher(): void
+    {
+        self::assertNull($this->createRegistry()->getSchemeRedirectMatcher($this->getContext()));
+    }
+
+    /**
+     * An HTTP request cannot be redirected to a scheme it does not speak, and TYPO3's Uri rejects one
+     * outright — such a route keeps answering 404 rather than crashing the redirect.
+     */
+    #[Test]
+    public function aRouteDeclaringANonHttpSchemeIsLeftOutOfTheSchemeRedirectMatcher(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>}> $routes */
+        $routes = [
+            'fixture_ftp' => ['path' => '/api/ftp', 'methods' => ['GET'], 'controller' => 'fixture_controller::count', 'env' => null, 'requirements' => [], 'schemes' => ['ftp']],
+        ];
+
+        self::assertNull((new RouteRegistry($routes, new ServiceLocator([])))->getSchemeRedirectMatcher($this->getContext()));
+    }
+
     #[Test]
     public function derivesTheLegacyPrefixesFromTheDeclaredLegacyPathsOnly(): void
     {
@@ -873,6 +923,17 @@ final class RouteRegistryTest extends TestCase
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, legacyPaths?: list<string>}> $routes */
         $routes = [
             'fixture_count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'fixture_controller::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/legacy-count']],
+        ];
+
+        return new RouteRegistry($routes, new ServiceLocator([]));
+    }
+
+    private function schemeRegistry(): RouteRegistry
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes?: list<string>, legacyPaths?: list<string>}> $routes */
+        $routes = [
+            'fixture_count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'fixture_controller::count', 'env' => null, 'requirements' => []],
+            'fixture_secure' => ['path' => '/api/secure', 'methods' => ['GET'], 'controller' => 'fixture_controller::count', 'env' => null, 'requirements' => [], 'schemes' => ['https'], 'legacyPaths' => ['/api/legacy-secure']],
         ];
 
         return new RouteRegistry($routes, new ServiceLocator([]));

@@ -25,7 +25,6 @@ use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Http\ServerRequest;
-use TYPO3\CMS\Core\Site\Entity\Site;
 
 /**
  * SwaggerUiControllerTest.
@@ -84,7 +83,7 @@ final class SwaggerUiControllerTest extends TestCase
     {
         $controller = $this->controller('1');
         $request = Requests::get('https://example.com/sub/')
-            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']))
+            ->withSite('main', 1, ['base' => 'https://example.com/sub/'])
             ->build();
 
         $response = $controller->openApiJson($request);
@@ -172,7 +171,7 @@ final class SwaggerUiControllerTest extends TestCase
     private function request(): ServerRequest
     {
         return Requests::get('https://example.com/')
-            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/']))
+            ->withSite('main', 1, ['base' => 'https://example.com/'])
             ->build();
     }
 

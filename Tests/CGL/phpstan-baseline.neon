@@ -1,2 +1,13 @@
 parameters:
-	ignoreErrors: []
+	ignoreErrors:
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{n\: 1\} and array\{n\: 1\} will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: ../Unit/Http/RequestBodyTest.php
+
+		-
+			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with KonradMichalik\\Typo3Routing\\Cache\\CacheBypassGuard and KonradMichalik\\Typo3Routing\\Cache\\CacheBypassGuard will always evaluate to true\.$#'
+			identifier: staticMethod.alreadyNarrowedType
+			count: 1
+			path: ../Unit/Middleware/DispatcherServicesTest.php

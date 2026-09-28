@@ -9,7 +9,7 @@ on:
 
 jobs:
   scorecard:
-    uses: konradmichalik/reusable-github-actions/.github/workflows/scorecard.yml@main
+    uses: konradmichalik/reusable-github-actions/.github/workflows/scorecard.yml@c460c0166a646cb65fd059c8d2f7d895ff3c787b # 0.1.0
     permissions:
       contents: read
       security-events: write

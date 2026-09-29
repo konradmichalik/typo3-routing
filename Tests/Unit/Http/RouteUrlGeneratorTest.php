@@ -295,6 +295,6 @@ final class RouteUrlGeneratorTest extends TestCase
 
     private function request(string $url, string $base): ServerRequest
     {
-        return Requests::get($url)->withAttribute('site', new Site('main', 1, ['base' => $base]))->build();
+        return Requests::get($url)->withSite('main', 1, ['base' => $base])->build();
     }
 }

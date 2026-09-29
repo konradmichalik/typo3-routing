@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\ViewHelpers;
 
+use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Http\{RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\ViewHelpers\UrisViewHelper;
@@ -21,8 +22,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
-use TYPO3\CMS\Core\Http\ServerRequest;
-use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -43,8 +42,10 @@ final class UrisViewHelperTest extends TestCase
     public function rendersAJsonMapOfTheNamedRoutes(): void
     {
         $this->registerGenerator();
-        $GLOBALS['TYPO3_REQUEST'] = (new ServerRequest('https://example.com/'))
-            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/']));
+        $GLOBALS['TYPO3_REQUEST'] = Requests::get('https://example.com/')
+            ->withSite('main', 1, ['base' => 'https://example.com/'])
+            ->withoutNormalizedParams()
+            ->build();
 
         $viewHelper = new UrisViewHelper();
         $viewHelper->setArguments(['routes' => ['count' => 'example_count', 'list' => 'example_list']]);
@@ -59,8 +60,10 @@ final class UrisViewHelperTest extends TestCase
     public function rendersAbsoluteUrisWhenRequested(): void
     {
         $this->registerGenerator();
-        $GLOBALS['TYPO3_REQUEST'] = (new ServerRequest('https://example.com/sub/'))
-            ->withAttribute('site', new Site('main', 1, ['base' => 'https://example.com/sub/']));
+        $GLOBALS['TYPO3_REQUEST'] = Requests::get('https://example.com/sub/')
+            ->withSite('main', 1, ['base' => 'https://example.com/sub/'])
+            ->withoutNormalizedParams()
+            ->build();
 
         $viewHelper = new UrisViewHelper();
         $viewHelper->setArguments(['routes' => ['count' => 'example_count'], 'absolute' => true]);

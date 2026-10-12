@@ -59,6 +59,16 @@ Keys starting with `_` are reserved for internal metadata and are rejected at bu
 
 Instead of repeating the placeholder name in `defaults`, a [`#[Param]`](arguments.md#declaring-the-constraint-at-the-parameter) on the parameter contributes its PHP default — `public function blog(#[Param] int $page = 1)` makes the trailing `{page}` optional without a `defaults` entry.
 
+## Matched route name
+
+A controller that takes the request can read the name of the route that matched, for logging, metrics or a self-referencing link:
+
+```php
+$request->getAttribute('routing.route'); // 'blog'
+```
+
+The value is always a string and is the route's real name, also when the request came in through one of its `legacyPaths`. It is set for HTTP requests and for [programmatic invocation](../background/extending.md) alike. The key `routing.route` is part of the public API and falls under the [BC promise](../background/extending.md#bc-promise).
+
 ## Schemes
 
 Restrict a route to one or more URI schemes — most commonly to force HTTPS-only access:

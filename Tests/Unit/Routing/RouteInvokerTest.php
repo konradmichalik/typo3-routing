@@ -225,6 +225,14 @@ final class RouteInvokerTest extends TestCase
     }
 
     #[Test]
+    public function exposesTheRouteNameAsRequestAttribute(): void
+    {
+        $response = $this->invoker()->invoke('probe', ['id' => 7], $this->request());
+
+        self::assertJsonPath((string) $response->getBody(), 'routeAttribute', 'probe');
+    }
+
+    #[Test]
     public function doesNotLeakTheCallingRequestsBodyIntoBodySourcedArguments(): void
     {
         $caller = (new RequestBuilder('POST', 'https://example.com/mcp'))

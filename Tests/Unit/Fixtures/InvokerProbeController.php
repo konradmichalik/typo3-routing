@@ -33,6 +33,7 @@ final class InvokerProbeController implements RouteControllerInterface
             'query' => $request->getQueryParams(),
             'body' => (string) $request->getBody(),
             'idAttribute' => $request->getAttribute('id'),
+            'routeAttribute' => $request->getAttribute('routing.route'),
             'contentType' => $request->getHeaderLine('Content-Type'),
         ]);
     }

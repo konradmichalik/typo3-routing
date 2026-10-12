@@ -25,6 +25,12 @@ parameters:
 		requestGetAttributeMapping:
 			id: 'string'
 
+	# tomasvotruba/cognitive-complexity 1.3.0 counts more than 1.1.1 did, so the preset limits (function 10,
+	# class 40) now flag existing code. Set to the current maxima instead of refactoring working code.
+	cognitive_complexity:
+		class: 47
+		function: 13
+
 	# The preset enables every ergebnis/phpstan-rules check it doesn't explicitly disable. These four
 	# conflict with this extension's core design rather than flagging real issues: #[Route]/#[Cache]/
 	# #[Cors] and RouteRegistry are named-arg, optional-param APIs by design; the OpenApi generator

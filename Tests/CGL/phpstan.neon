@@ -24,6 +24,7 @@ parameters:
 	typo3:
 		requestGetAttributeMapping:
 			id: 'string'
+			'routing.route': 'string'
 
 	# tomasvotruba/cognitive-complexity 1.3.0 counts more than 1.1.1 did, so the preset limits (function 10,
 	# class 40) now flag existing code. Set to the current maxima instead of refactoring working code.

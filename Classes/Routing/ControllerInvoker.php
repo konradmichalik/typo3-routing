@@ -64,7 +64,7 @@ final readonly class ControllerInvoker
         $controller = $this->registry->getControllerLocator()->get($serviceId);
         assert(is_object($controller));
 
-        $request = $this->withPathAttributes($match, $request);
+        $request = $this->withPathAttributes($match, $request)->withAttribute('routing.route', $routeName);
 
         try {
             $arguments = $this->argumentResolver->resolve($this->registry->getArguments($routeName), $match, $request);

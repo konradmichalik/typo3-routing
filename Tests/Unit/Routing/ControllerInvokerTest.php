@@ -19,7 +19,7 @@ use KonradMichalik\Ttt\Attribute\InApplicationContext;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteRegistry};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, ThrowingController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, RouteNameController, ThrowingController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -64,6 +64,14 @@ final class ControllerInvokerTest extends TestCase
         // ExampleController::submit() only reports the method — that the invocation succeeds at all
         // proves the internal "_" keys were not passed on as arguments.
         self::assertJsonStringEqualsJsonString('{"submitted":true,"method":"GET"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function exposesTheMatchedRouteNameAsRequestAttribute(): void
+    {
+        $response = $this->invoker()->invoke($this->match('routeName'), $this->request());
+
+        self::assertJsonStringEqualsJsonString('{"route":"routeName"}', (string) $response->getBody());
     }
 
     #[Test]
@@ -322,6 +330,7 @@ final class ControllerInvokerTest extends TestCase
             'jsonError' => 'throwingCtrl::boom',
             'plainError' => 'throwingCtrl::boom',
             'shortCircuit' => 'throwingCtrl::shortCircuit',
+            'routeName' => 'routeNameCtrl::show',
         ];
 
         return ['_route' => $routeName, '_controller' => $controllers[$routeName], '_requirements' => []];
@@ -341,12 +350,14 @@ final class ControllerInvokerTest extends TestCase
             'jsonError' => [],
             'plainError' => [],
             'shortCircuit' => [],
+            'routeName' => [['name' => 'request', 'type' => null, 'source' => 'request', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
         ];
 
         $locator = new ServiceLocator([
             'ctrl' => static fn (): ExampleController => new ExampleController(),
             'entityCtrl' => static fn (): EntityController => new EntityController(),
             'throwingCtrl' => static fn (): ThrowingController => new ThrowingController(),
+            'routeNameCtrl' => static fn (): RouteNameController => new RouteNameController(),
         ]);
 
         // Only 'optional' has its requirement contributed by #[Param] on a defaulted parameter.

@@ -23,7 +23,7 @@ TYPO3 extension `typo3_routing` (`konradmichalik/typo3-routing`). It registers f
 - `ext_conf_template.txt`: `exclusivePrefixes` (404 semantics only) and `trailingSlash`
 - `docs/`: user documentation
 - `Tests/Unit/`, `Tests/Functional/`: PHPUnit tests, fixture extensions `routing_test` and `routing_benchmark` under `Tests/Functional/Fixtures/Extensions/`
-- `Tests/CGL/`: isolated Composer project with the code style and analysis tooling
+- `Tests/CGL/`: isolated Composer project with the code style and analysis tooling. Its `composer.lock` is committed and updated by Renovate, so tool releases only reach CI through a Renovate PR
 
 Routes are discovered at container compile time. There is no runtime scanning and no second cache, invalidation rides on the DI container cache. Route definitions are injected as a plain array so they bake into the compiled container.
 

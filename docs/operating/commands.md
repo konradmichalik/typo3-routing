@@ -50,6 +50,7 @@ The table shows path, methods, controller, environment binding and requirements:
         "auth": [],
         "csrf": null,
         "cache": {"lifetime": 3600, "tags": ["pages"], "ignoreParams": []},
+        "invalidatesCache": [],
         "rateLimit": null,
         "arguments": [
             {"name": "id", "type": "int", "source": "path", "nullable": false, "hasDefault": false, "default": null}

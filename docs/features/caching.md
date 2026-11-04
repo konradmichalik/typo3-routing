@@ -51,12 +51,15 @@ public function create(string $title): JsonResponse
 
 | Parameter | Type           | Description |
 |-----------|----------------|-------------|
-| `tags`    | `list<string>` | `#[Cache]` tags to flush. An empty list fails the build. |
+| `tags`    | `list<string>` | `#[Cache]` tags to flush. An empty list, or a tag the TYPO3 cache rejects (anything but letters, digits, `_`, `%`, `-` and `&`, or longer than 250 characters), fails the build. A tag that no `#[Cache]` declares raises a build-time warning, because it can never match a cached response. |
 
-- The tags are flushed **after** the controller returned a `2xx` response. An error response or an exception flushes nothing, since a rejected write changed nothing.
+- The tags are flushed **after** the controller returned a `2xx` or `3xx` response, so a write answering with a POST-redirect-GET `303` invalidates too. An error response (`4xx`, `5xx`, including an `HttpProblemException` turned into one) flushes nothing, since a rejected write changed nothing.
+- An `ImmediateResponseException` thrown from the controller propagates past the flush, so nothing is flushed in that case either. Return the response instead if the write should invalidate.
 - It is a separate attribute rather than an option of `#[Cache]`, so it combines freely with `#[Authenticate]` (which disables `#[Cache]` on the same route).
+- Anyone who can call the route can empty the tagged cache, as often as they like. Protect a write route with `#[Authenticate]` or at least a `#[RateLimit]`.
 - It applies to every method the route answers. A route that also answers `GET` or `HEAD` (or any method) raises a build-time warning: crawlers and browsers send those freely, so every visitor could empty the cache. Restrict the route's `methods` to the writing ones.
-- [`RouteInvoker`](../background/extending.md#invoking-a-route-without-an-http-request) flushes the tags as well, because the write happened regardless of the transport.
+- [`RouteInvoker`](../background/extending.md#invoking-a-route-without-an-http-request) flushes the tags as well, because the write happened regardless of the transport. An instance built by hand without the optional `CacheInvalidator` skips the flush.
+- `routing:debug <name>` lists the tags under "Invalidates cache".
 
 ## ETag / conditional GET
 

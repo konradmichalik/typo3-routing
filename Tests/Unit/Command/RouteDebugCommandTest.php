@@ -265,6 +265,43 @@ final class RouteDebugCommandTest extends TestCase
     }
 
     #[Test]
+    public function detailListsTheCacheTagsTheRouteInvalidates(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['news_create' => ['path' => '/api/news', 'methods' => ['POST'], 'controller' => 'ctrl::create', 'env' => null, 'requirements' => []]];
+        $tester = $this->tester(new RouteRegistry($routes, new ServiceLocator([]), cacheInvalidations: ['news_create' => ['tx_news_domain_model_news', 'news_list']]));
+
+        $tester->execute(['name' => 'news_create']);
+
+        self::assertMatchesRegularExpression('/Invalidates cache\s+tx_news_domain_model_news, news_list/', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function detailFallsBackForARouteThatInvalidatesNothing(): void
+    {
+        $tester = $this->tester($this->registry());
+
+        $tester->execute(['name' => 'example_count']);
+
+        self::assertMatchesRegularExpression('/Invalidates cache\s+-/', $tester->getDisplay());
+    }
+
+    #[Test]
+    public function includesTheInvalidatedCacheTagsInJsonOutput(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['news_create' => ['path' => '/api/news', 'methods' => ['POST'], 'controller' => 'ctrl::create', 'env' => null, 'requirements' => []]];
+        $tester = $this->tester(new RouteRegistry($routes, new ServiceLocator([]), cacheInvalidations: ['news_create' => ['news_list']]));
+
+        $tester->execute(['--json' => true]);
+
+        /** @var list<array{name: string, invalidatesCache: list<string>}> $data */
+        $data = json_decode(trim($tester->getDisplay()), true, 512, \JSON_THROW_ON_ERROR);
+
+        self::assertSame(['news_list'], $data[0]['invalidatesCache']);
+    }
+
+    #[Test]
     public function detailRendersCacheAndAnyMethodsAndEmptyFallbacks(): void
     {
         $tester = $this->tester($this->registry());

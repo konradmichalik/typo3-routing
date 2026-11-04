@@ -74,6 +74,12 @@ final class ArgumentSpecFixtures
 
     public function renamedToPlaceholderWithDefault(#[Param(name: 'page')] int $number = 1): void {}
 
+    public function rangedInput(#[Param(min: 1, max: 100)] int $limit = 20): void {}
+
+    public function rangedVariadic(#[Param(min: 1)] int ...$ids): void {}
+
+    public function rangedPathDefault(#[Param(max: 100)] int $limit = 500): void {}
+
     public function hostBound(string $subdomain, string $q): void {}
 
     public function hostBoundWithDefault(#[Param(requirement: '\w+')] string $subdomain = 'www'): void {}

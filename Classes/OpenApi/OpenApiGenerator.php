@@ -248,10 +248,10 @@ final readonly class OpenApiGenerator
     }
 
     /**
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $argument
-     * @param array<string, mixed>                                                                                     $schema
-     * @param array<string, array<string, mixed>>                                                                      $properties
-     * @param list<string>                                                                                             $required
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $argument
+     * @param array<string, mixed>                                                                                                                                                         $schema
+     * @param array<string, array<string, mixed>>                                                                                                                                          $properties
+     * @param list<string>                                                                                                                                                                 $required
      */
     private function collectBody(array $argument, array $schema, array &$properties, array &$required, ?string $description): void
     {

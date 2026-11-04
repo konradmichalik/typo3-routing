@@ -19,7 +19,7 @@ public function __construct(
 | Method | Returns |
 |---|---|
 | `getRoutes(): array<string, array{path, methods, controller, env, requirements, priority?, defaults?, schemes?, host?, description?}>` | Every compiled route, keyed by name |
-| `getArguments(string $routeName): list<array{name, type, source, nullable, hasDefault, default}>` | The controller method's parameters, in declaration order |
+| `getArguments(string $routeName): list<array{name, type, source, nullable, hasDefault, default, min?, max?, minLength?, maxLength?}>` | The controller method's parameters, in declaration order. The four optional keys carry a [`#[Param]` value constraint](../routes/arguments.md#value-constraints) and are present only when it was set |
 | `getAuthenticators(string $routeName): list<array{service, options}>` | OR-combined authenticators; empty means public |
 | `getRequestTokenScope(string $routeName): ?string` | The expected CSRF scope, or `null` |
 | `getCacheConfig(string $routeName): ?array{lifetime, tags, ignoreParams}` | Response-cache config, or `null` |

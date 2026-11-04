@@ -177,6 +177,37 @@ final class ArgumentSpecFactoryTest extends TestCase
     }
 
     #[Test]
+    public function appendsTheParamRangeToTheSpec(): void
+    {
+        self::assertSame(['name' => 'limit', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 20, 'min' => 1, 'max' => 100], $this->build('rangedInput', '/api/x')[0]);
+    }
+
+    #[Test]
+    public function appendsTheParamRangeToAVariadicForEachElement(): void
+    {
+        self::assertSame(['name' => 'ids', 'type' => 'int', 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'min' => 1], $this->build('rangedVariadic', '/api/x')[0]);
+    }
+
+    #[Test]
+    public function rejectsAPathDefaultBreakingItsParamRange(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000050);
+        $this->expectExceptionMessage('"$limit" of "fixtures::rangedPathDefault()": the default 500');
+
+        $this->build('rangedPathDefault', '/list/{limit}');
+    }
+
+    #[Test]
+    public function acceptsAnInputDefaultOutsideItsParamRange(): void
+    {
+        // Only a placeholder default is ever fed back through the check, so an input default like `''` stays legal.
+        $spec = $this->build('rangedPathDefault', '/list')[0];
+
+        self::assertSame(['input', 500], [$spec['source'], $spec['default']]);
+    }
+
+    #[Test]
     public function hoistsParamRequirementForPathPlaceholder(): void
     {
         self::assertSame(['requirements' => ['id' => '\d+'], 'defaults' => [], 'descriptions' => [], 'optional' => []], $this->contributions('constrainedPath', '/api/x/{id}'));

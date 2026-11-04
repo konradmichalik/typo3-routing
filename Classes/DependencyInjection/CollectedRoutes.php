@@ -33,7 +33,7 @@ final class CollectedRoutes
     /** @var array<string, array{limit: int, interval: string, policy: string, keyBy: string}> */
     public array $rateLimits = [];
 
-    /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>> */
+    /** @var array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}>> */
     public array $arguments = [];
 
     /** @var array<string, array<string, string>> Route name → wire name → #[Param] description */

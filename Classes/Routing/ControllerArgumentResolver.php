@@ -57,8 +57,8 @@ final readonly class ControllerArgumentResolver
     ) {}
 
     /**
-     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs the controller method's parameters, in declaration order
-     * @param array<string, mixed>                                                                                           $match the matcher result (path placeholders live here, meta keys are prefixed with "_")
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs the controller method's parameters, in declaration order
+     * @param array<string, mixed>                                                                                                                                                               $match the matcher result (path placeholders live here, meta keys are prefixed with "_")
      *
      * @return list<mixed> positional arguments to spread into the controller call
      */
@@ -93,8 +93,8 @@ final readonly class ControllerArgumentResolver
     }
 
     /**
-     * @param array<string, mixed>                                                                                     $inputs
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
+     * @param array<string, mixed>                                                                                                                                                         $inputs
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      *
      * @return list<mixed>
      */
@@ -111,8 +111,8 @@ final readonly class ControllerArgumentResolver
     }
 
     /**
-     * @param array<string, mixed>                                                                                     $inputs
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
+     * @param array<string, mixed>                                                                                                                                                         $inputs
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      */
     private function resolveInput(array $inputs, array $spec): mixed
     {
@@ -124,7 +124,7 @@ final readonly class ControllerArgumentResolver
     }
 
     /**
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      */
     private function coerce(mixed $value, array $spec): mixed
     {
@@ -140,7 +140,7 @@ final readonly class ControllerArgumentResolver
             return $this->toEntity($value, $type, $spec['name']);
         }
 
-        return match ($type) {
+        $coerced = match ($type) {
             'int' => $this->toInt($value, $spec['name']),
             'float' => $this->toFloat($value, $spec['name']),
             'bool' => $this->toBool($value, $spec['name']),
@@ -149,12 +149,19 @@ final readonly class ControllerArgumentResolver
             // Untyped or mixed: pass through untouched.
             default => $value,
         };
+
+        // Checked on the coerced value, so "010" is compared as 10. A fallback default is never checked.
+        if (ArgumentConstraints::violates($coerced, $spec)) {
+            throw $this->invalid($spec['name']);
+        }
+
+        return $coerced;
     }
 
     /**
      * Resolves an absent value: its default, null when nullable, otherwise a 400.
      *
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      */
     private function fallbackForMissing(array $spec): mixed
     {

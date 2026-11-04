@@ -174,7 +174,7 @@ final readonly class OpenApiGenerator
         }
 
         if ([] !== $bodyProperties) {
-            $operation['requestBody'] = $this->requestBody($bodyProperties, $bodyRequired);
+            $operation['requestBody'] = $this->requestBody($bodyProperties, $bodyRequired, $this->bodyMediaType($arguments, $hasBody));
         }
 
         $security = $this->security($name, $usedSchemes);
@@ -248,8 +248,27 @@ final readonly class OpenApiGenerator
             'body' => 'body',
             'variadic' => 'query',
             'input' => $hasBody ? 'body' : 'query',
+            // A file cannot travel in a query, so a body-less operation does not describe it at all.
+            'upload' => $hasBody ? 'body' : 'request',
             default => 'request',
         };
+    }
+
+    /**
+     * A file can only travel as a multipart part, so one upload argument turns the whole body into a
+     * form, its other body properties becoming form fields.
+     *
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
+     */
+    private function bodyMediaType(array $arguments, bool $hasBody): string
+    {
+        foreach ($arguments as $argument) {
+            if ($hasBody && 'upload' === $argument['source']) {
+                return 'multipart/form-data';
+            }
+        }
+
+        return 'application/json';
     }
 
     /**
@@ -292,7 +311,7 @@ final readonly class OpenApiGenerator
      *
      * @return array<string, mixed>
      */
-    private function requestBody(array $properties, array $required): array
+    private function requestBody(array $properties, array $required, string $mediaType): array
     {
         $schema = ['type' => 'object', 'properties' => $properties];
         if ([] !== $required) {
@@ -301,7 +320,7 @@ final readonly class OpenApiGenerator
 
         return [
             'required' => [] !== $required,
-            'content' => ['application/json' => ['schema' => $schema]],
+            'content' => [$mediaType => ['schema' => $schema]],
         ];
     }
 

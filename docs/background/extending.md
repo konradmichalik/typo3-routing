@@ -102,6 +102,7 @@ $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? nul
 | `string`, `null` (untyped), or any unrecognised type | `{"type": "string"}` |
 | A **backed** enum's class name | `{"type": …, "enum": [<backing values accepted by `$pattern`>]}`, `integer` for an `int` backing type, `string` otherwise |
 | An Extbase domain object's class name | `{"type": "integer"}` — the record UID |
+| `Psr\Http\Message\UploadedFileInterface` | `{"type": "string", "format": "binary"}` |
 
 Five details are part of the contract rather than incidental:
 

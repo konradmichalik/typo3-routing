@@ -105,7 +105,7 @@ public function upload(UploadedFileInterface $file, string $title, ?UploadedFile
 - Only the interface itself is resolvable, not a concrete implementation class.
 - A `#[Param(source:)]`, a `{placeholder}` of the same name and a requirement (on `#[Route]` or `#[Param]`) are rejected at compile time.
 
-The extension validates neither size nor media type. Check `getSize()` and `getClientMediaType()` in the controller, and treat `getClientFilename()` as untrusted input.
+The extension validates neither size nor media type. Check `getSize()` and `getClientMediaType()` in the controller, and treat `getClientFilename()` as untrusted input. The [OpenAPI export](../operating/openapi.md) describes such a route with a `multipart/form-data` request body in which the file is `{"type": "string", "format": "binary"}`.
 
 ## Overriding the source with `#[Param]`
 

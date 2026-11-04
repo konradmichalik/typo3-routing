@@ -126,6 +126,11 @@ final readonly class ResponsesBuilder
         // Derived exactly like the `$ref` JsonSchemaMapper emits for a cycle, so both always name the same entry.
         $shortName = (new ReflectionClass($class))->getShortName();
 
+        // The generator adds the problem+json schema under this name, and a DTO would silently replace it.
+        if ('Error' === $shortName) {
+            throw new LogicException(sprintf('The schema name "Error" is reserved for the problem+json error response, but "%s" resolves to it. Rename the class.', $class), 1750000063);
+        }
+
         if (isset($usedSchemas[$shortName]) && $usedSchemas[$shortName]['class'] !== $class) {
             throw new LogicException(sprintf('#[Returns] schemas "%s" and "%s" both resolve to the OpenAPI schema name "%s". Rename one of the classes so their short names differ.', $usedSchemas[$shortName]['class'], $class, $shortName), 1750000038);
         }

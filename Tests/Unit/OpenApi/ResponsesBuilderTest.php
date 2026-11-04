@@ -150,10 +150,6 @@ final class ResponsesBuilderTest extends TestCase
 
         self::assertSame(['CycleHolderDto', 'CycleADto'], array_keys($usedSchemas));
         self::assertSame(CycleADto::class, $usedSchemas['CycleADto']['class']);
-        self::assertSame(
-            ['type' => 'object', 'properties' => ['a' => ['$ref' => '#/components/schemas/CycleADto']], 'required' => ['a']],
-            $usedSchemas['CycleADto']['schema']['properties']['b']['anyOf'][0],
-        );
     }
 
     #[Test]

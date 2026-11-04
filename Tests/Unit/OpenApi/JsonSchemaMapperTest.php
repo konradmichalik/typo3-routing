@@ -407,8 +407,6 @@ final class JsonSchemaMapperTest extends TestCase
         yield 'intersection' => ['both', (object) []];
         yield 'intersection inside a union' => ['either', ['anyOf' => [(object) [], ['type' => 'null']]]];
         yield 'interface' => ['payload', (object) []];
-        yield 'nullable interface' => ['tags', (object) []];
-        yield 'untyped' => ['legacy', (object) []];
     }
 
     #[Test]

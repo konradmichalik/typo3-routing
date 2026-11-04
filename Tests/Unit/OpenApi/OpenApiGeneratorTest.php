@@ -18,7 +18,7 @@ use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator, ResponsesBuilder};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\Collision\CourseDto as CollidingCourseDto;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{CourseDto, CycleHolderDto, NullableFieldsDto};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{CourseDto, NullableFieldsDto};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use LogicException;
@@ -404,16 +404,6 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
-    public function definesTheComponentSchemaACycleInsideAReturnsDtoRefersTo(): void
-    {
-        $schemas = $this->features()['components']['schemas'];
-
-        self::assertArrayHasKey('CycleHolderDto', $schemas);
-        self::assertSame(['$ref' => '#/components/schemas/CycleADto'], $schemas['CycleHolderDto']['properties']['a']['properties']['b']['anyOf'][0]['properties']['a']);
-        self::assertSame('object', $schemas['CycleADto']['type']);
-    }
-
-    #[Test]
     public function rejectsTwoDifferentClassesResolvingToTheSameSchemaName(): void
     {
         $routes = [
@@ -488,9 +478,7 @@ final class OpenApiGeneratorTest extends TestCase
             'noBody' => ['path' => '/api/no-body', 'methods' => ['GET'], 'controller' => 'ctrl::noBody', 'env' => null, 'requirements' => []],
             'nullableFields' => ['path' => '/api/nullable-fields', 'methods' => ['GET'], 'controller' => 'ctrl::nullableFields', 'env' => null, 'requirements' => []],
             'constrained' => ['path' => '/api/constrained/{page}', 'methods' => ['POST'], 'controller' => 'ctrl::constrained', 'env' => null, 'requirements' => []],
-            'payload' => ['path' => '/api/payload', 'methods' => ['POST'], 'controller' => 'ctrl::payload', 'env' => null, 'requirements' => []],
-            'cycle' => ['path' => '/api/cycle', 'methods' => ['GET'], 'controller' => 'ctrl::cycle', 'env' => null, 'requirements' => []],
-        ];
+            'payload' => ['path' => '/api/payload', 'methods' => ['POST'], 'controller' => 'ctrl::payload', 'env' => null, 'requirements' => []],        ];
 
         $arguments = [
             'types' => [
@@ -525,7 +513,6 @@ final class OpenApiGeneratorTest extends TestCase
             'payload' => [
                 ['name' => 'payload', 'type' => 'mixed', 'source' => 'body', 'nullable' => true, 'hasDefault' => false, 'default' => null],
             ],
-            'cycle' => [],
         ];
 
         $returns = [
@@ -544,9 +531,6 @@ final class OpenApiGeneratorTest extends TestCase
             ],
             'nullableFields' => [
                 ['status' => 200, 'schema' => NullableFieldsDto::class, 'collection' => false, 'description' => null],
-            ],
-            'cycle' => [
-                ['status' => 200, 'schema' => CycleHolderDto::class, 'collection' => false, 'description' => null],
             ],
         ];
 

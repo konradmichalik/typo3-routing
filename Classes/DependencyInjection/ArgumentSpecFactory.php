@@ -53,7 +53,7 @@ final class ArgumentSpecFactory
      * @param string|null $host the route's #[Route(host:)] pattern, whose placeholders bind exactly
      *                          like the path's — they reach the controller through the same match
      *
-     * @return list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>
+     * @return list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}>
      */
     public function build(ReflectionMethod $method, string $path, string $serviceId, ?string $host = null): array
     {
@@ -81,9 +81,9 @@ final class ArgumentSpecFactory
      *
      * Specs are paired with the reflected parameters by position, as produced by build().
      *
-     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs
-     * @param array<string, string>                                                                                          $routeRequirements Requirements from the method's own #[Route], to reject a key constrained twice
-     * @param array<string, mixed>                                                                                           $routeDefaults     Defaults from the method's own #[Route], to reject a key defaulted twice
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs
+     * @param array<string, string>                                                                                                                                                              $routeRequirements Requirements from the method's own #[Route], to reject a key constrained twice
+     * @param array<string, mixed>                                                                                                                                                               $routeDefaults     Defaults from the method's own #[Route], to reject a key defaulted twice
      *
      * @return array{requirements: array<string, string>, defaults: array<string, mixed>, descriptions: array<string, string>, optional: list<string>}
      */
@@ -199,7 +199,7 @@ final class ArgumentSpecFactory
      * @param list<string> $placeholders
      * @param list<string> $hostPlaceholders
      *
-     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
+     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}
      */
     private function resolveArgument(ReflectionParameter $parameter, array $placeholders, array $hostPlaceholders, string $where): array
     {
@@ -223,7 +223,7 @@ final class ArgumentSpecFactory
             }
             $spec = ['name' => $key, 'type' => $variadicType, 'source' => 'variadic', 'nullable' => false, 'hasDefault' => false, 'default' => null];
 
-            return $this->applySourceOverride($spec, $param, $name, $where);
+            return [...$this->applySourceOverride($spec, $param, $name, $where), ...ParamConstraintGuard::constraints($param, $variadicType, null, $name, $where)];
         }
 
         $hasDefault = $parameter->isDefaultValueAvailable();
@@ -238,7 +238,11 @@ final class ArgumentSpecFactory
             'default' => $hasDefault ? $parameter->getDefaultValue() : null,
         ];
 
-        return $this->applySourceOverride($spec, $param, $name, $where);
+        $spec = $this->applySourceOverride($spec, $param, $name, $where);
+        // Only a placeholder default comes back through the matcher and gets checked at request time.
+        $checkedDefault = in_array($spec['source'], ['path', 'host'], true) ? $spec['default'] : null;
+
+        return [...$spec, ...ParamConstraintGuard::constraints($param, $spec['type'], $checkedDefault, $name, $where)];
     }
 
     /**
@@ -308,7 +312,7 @@ final class ArgumentSpecFactory
      * mandatory), the parameter has a PHP default to fall back to, and it is an input — a path or host
      * placeholder is enforced by the matcher, never by the input check.
      *
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      */
     private static function isOptionalInput(Param $param, array $spec): bool
     {
@@ -330,9 +334,9 @@ final class ArgumentSpecFactory
      * Applies an explicit #[Param(source:)] on top of the derived source. The lookup key is already
      * resolved by the caller, because source inference depends on it.
      *
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $spec
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      *
-     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
+     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}
      */
     private function applySourceOverride(array $spec, Param $param, string $parameterName, string $where): array
     {

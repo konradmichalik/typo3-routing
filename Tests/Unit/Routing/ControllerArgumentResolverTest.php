@@ -372,6 +372,50 @@ final class ControllerArgumentResolverTest extends TestCase
         self::assertSame(['as-is'], $this->resolver->resolve($specs, [], $request));
     }
 
+    #[Test]
+    public function rejectsAnInputOutsideItsRangeNamingTheWireParameter(): void
+    {
+        $specs = [[...$this->spec('limit', 'input', 'int'), 'min' => 1, 'max' => 100]];
+        $request = $this->request()->withQueryParams(['limit' => '101']);
+
+        $this->expectException(ArgumentResolutionException::class);
+        $this->expectExceptionMessage('Invalid value for parameter: limit');
+
+        $this->resolver->resolve($specs, [], $request);
+    }
+
+    #[Test]
+    public function rejectsAnInputThatOverflowsToInfinityPastItsMinimum(): void
+    {
+        $specs = [[...$this->spec('ratio', 'input', 'float'), 'min' => 0]];
+        $request = $this->request()->withQueryParams(['ratio' => '1e999']);
+
+        $this->expectException(ArgumentResolutionException::class);
+        $this->expectExceptionMessage('Invalid value for parameter: ratio');
+
+        $this->resolver->resolve($specs, [], $request);
+    }
+
+    #[Test]
+    public function rejectsAVariadicElementOutsideItsRange(): void
+    {
+        $specs = [[...$this->spec('ids', 'variadic', 'int'), 'min' => 1]];
+        $request = $this->request()->withQueryParams(['ids' => ['3', '0']]);
+
+        $this->expectException(ArgumentResolutionException::class);
+        $this->expectExceptionMessage('Invalid value for parameter: ids');
+
+        $this->resolver->resolve($specs, [], $request);
+    }
+
+    #[Test]
+    public function doesNotCheckAFallbackDefaultAgainstTheConstraints(): void
+    {
+        $specs = [[...$this->spec('limit', 'input', 'int', hasDefault: true, default: 0), 'min' => 1]];
+
+        self::assertSame([0], $this->resolver->resolve($specs, [], $this->request()));
+    }
+
     /**
      * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
      */

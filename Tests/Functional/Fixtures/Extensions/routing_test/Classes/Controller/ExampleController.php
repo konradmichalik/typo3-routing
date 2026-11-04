@@ -137,6 +137,12 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['term' => $term]);
     }
 
+    #[Route(path: '/api/example/paged', name: 'example_paged')]
+    public function paged(#[Param(min: 1, max: 100)] int $limit = 20, #[Param(name: 'q', maxLength: 5)] string $term = ''): JsonResponse
+    {
+        return new JsonResponse(['limit' => $limit, 'q' => $term]);
+    }
+
     #[Route(path: '/api/example/cached', name: 'example_cached')]
     #[Cache(lifetime: 3600, tags: ['pages'])]
     public function cached(): JsonResponse

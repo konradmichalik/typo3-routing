@@ -333,6 +333,24 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function returnsBadRequestNamingTheWireParameterWhenAParamRangeIsViolated(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/paged?limit=101'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Invalid value for parameter: limit"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function countsAParamLengthInCharactersNotBytes(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/paged?limit=100&q='.rawurlencode('äöüßé')));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"limit":100,"q":"äöüßé"}', (string) $response->getBody());
+    }
+
+    #[Test]
     public function resolvesBackedEnumFromPathPlaceholder(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/status/active'));

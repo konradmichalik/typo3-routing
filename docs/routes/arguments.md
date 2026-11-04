@@ -155,6 +155,7 @@ public function search(
 - **Only a received value is checked at request time.** A missing parameter falls back to its PHP default unchecked, so `string $q = ''` with `minLength: 2` keeps `?q` optional. A path placeholder is the exception, see below.
 - **Path placeholders answer `400` too.** A `requirement` decides whether the route matches at all, so its violation is a `404`. A constraint is checked once the route is known, like the type of the value, so `/api/blog/0` with `#[Param(min: 1)] int $page` is a `400`, the same as `/api/blog/abc` for an `int $page` without a requirement.
 - **A variadic is checked per element**: `#[Param(min: 1)] int ...$ids` rejects `?ids[]=3&ids[]=0`.
+- **The [OpenAPI export](../operating/openapi.md)** states them as `minimum`, `maximum`, `minLength` and `maxLength` on the schema of the path or query parameter, or of the request-body property.
 
 Rejected at build time, so the route definition never contradicts itself:
 

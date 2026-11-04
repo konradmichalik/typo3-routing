@@ -42,11 +42,11 @@ final class ExceptionCodeUniquenessTest extends TestCase
         foreach ($files as $file) {
             preg_match_all('/\b1750\d{6}\b/', (string) file_get_contents($file->getPathname()), $matches);
             foreach ($matches[0] as $code) {
-                $sites[$code][] = $file->getFilename();
+                $sites[$code][] = $file->getPathname();
             }
         }
 
         self::assertNotEmpty($sites);
-        self::assertSame([], array_filter($sites, static fn (array $files): bool => count($files) > 1));
+        self::assertSame([], array_filter($sites, static fn (array $paths): bool => count($paths) > 1));
     }
 }

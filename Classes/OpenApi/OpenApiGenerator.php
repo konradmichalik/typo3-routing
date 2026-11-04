@@ -259,7 +259,8 @@ final readonly class OpenApiGenerator
      */
     private function parameter(string $name, string $in, bool $required, array $schema, ?string $description): array
     {
-        $parameter = ['name' => $name, 'in' => $in, 'required' => $required, 'schema' => $schema];
+        // A `mixed` argument maps to [], which json_encode() would write as a JSON array.
+        $parameter = ['name' => $name, 'in' => $in, 'required' => $required, 'schema' => [] === $schema ? (object) [] : $schema];
         if (null !== $description) {
             $parameter['description'] = $description;
         }
@@ -270,7 +271,7 @@ final readonly class OpenApiGenerator
     /**
      * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $argument
      * @param array<string, mixed>                                                                                                                                                         $schema
-     * @param array<string, array<string, mixed>>                                                                                                                                          $properties
+     * @param array<string, array<string, mixed>|object>                                                                                                                                   $properties
      * @param list<string>                                                                                                                                                                 $required
      */
     private function collectBody(array $argument, array $schema, array &$properties, array &$required, ?string $description): void
@@ -279,15 +280,15 @@ final readonly class OpenApiGenerator
             $schema['description'] = $description;
         }
 
-        $properties[$argument['name']] = $schema;
+        $properties[$argument['name']] = [] === $schema ? (object) [] : $schema;
         if (!$argument['nullable'] && !$argument['hasDefault']) {
             $required[] = $argument['name'];
         }
     }
 
     /**
-     * @param array<string, array<string, mixed>> $properties
-     * @param list<string>                        $required
+     * @param array<string, array<string, mixed>|object> $properties
+     * @param list<string>                               $required
      *
      * @return array<string, mixed>
      */

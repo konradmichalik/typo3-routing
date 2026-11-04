@@ -64,6 +64,7 @@ final class RouteRegistry
      * @param array<string, string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               $aliases
      * @param list<string>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        $legacyPrefixes
      * @param array<string, bool>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 $jsonErrorRoutes
+     * @param array<string, list<string>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         $cacheInvalidations
      */
     public function __construct(
         private readonly array $routes,
@@ -86,6 +87,7 @@ final class RouteRegistry
         private readonly array $aliases = [],
         private readonly array $legacyPrefixes = [],
         private readonly array $jsonErrorRoutes = [],
+        private readonly array $cacheInvalidations = [],
     ) {}
 
     /**
@@ -464,6 +466,17 @@ final class RouteRegistry
     public function isJsonErrorRoute(string $routeName): bool
     {
         return $this->jsonErrorRoutes[$routeName] ?? false;
+    }
+
+    /**
+     * The #[Cache] tags the route flushes after answering with a 2xx or 3xx status. An empty list means the
+     * route declares no #[InvalidatesCache].
+     *
+     * @return list<string>
+     */
+    public function getInvalidatedCacheTags(string $routeName): array
+    {
+        return $this->cacheInvalidations[$routeName] ?? [];
     }
 
     /**

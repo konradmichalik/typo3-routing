@@ -33,6 +33,31 @@ public function list(int $page = 1): ResponseInterface
 > This safeguard only triggers on `#[Authenticate]`. A **public** `#[Cache]` route whose controller inspects the frontend-user context itself (e.g. via the `frontend.user` aspect) shares one cache entry across all visitors — the first user's personalized response would be served to everyone. Don't combine `#[Cache]` with identity-dependent output; protect such routes with `#[Authenticate]` (which disables the cache) instead.
 - The cache is bypassed entirely — neither read nor written — for a **logged-in backend user** (so editors always see live content while previewing) and for a request sending `Cache-Control: no-store`. A plain `Cache-Control: no-cache` only skips **reading** the stored entry; the fresh response still refreshes the cache for later requests.
 
+## Invalidating from a write route
+
+The DataHandler hook only sees writes that go through the DataHandler. A route persisting through an Extbase repository or the QueryBuilder never reaches it, so the cached `GET` response stays stale until `lifetime` expires. Declare the tags the write route invalidates with `#[InvalidatesCache]`:
+
+```php
+use KonradMichalik\Typo3Routing\Attribute\InvalidatesCache;
+
+#[Route(path: '/api/news', name: 'news_create', methods: ['POST'])]
+#[Authenticate(FrontendUserAuthenticator::class)]
+#[InvalidatesCache(tags: ['tx_news_domain_model_news'])]
+public function create(string $title): JsonResponse
+{
+    // $this->newsRepository->add(…) and persistAll()
+}
+```
+
+| Parameter | Type           | Description |
+|-----------|----------------|-------------|
+| `tags`    | `list<string>` | `#[Cache]` tags to flush. An empty list fails the build. |
+
+- The tags are flushed **after** the controller returned a `2xx` response. An error response or an exception flushes nothing, since a rejected write changed nothing.
+- It is a separate attribute rather than an option of `#[Cache]`, so it combines freely with `#[Authenticate]` (which disables `#[Cache]` on the same route).
+- It applies to every method the route answers. A route that also answers `GET` or `HEAD` (or any method) raises a build-time warning: crawlers and browsers send those freely, so every visitor could empty the cache. Restrict the route's `methods` to the writing ones.
+- [`RouteInvoker`](../background/extending.md#invoking-a-route-without-an-http-request) flushes the tags as well, because the write happened regardless of the transport.
+
 ## ETag / conditional GET
 
 Cached `200` GET responses automatically carry a strong `ETag` — a SHA-256 hash of the **response body**. Because it hashes the payload (not the request), the validator changes whenever the content does, e.g. after a tag flush regenerates a different response.

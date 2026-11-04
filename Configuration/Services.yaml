@@ -40,6 +40,7 @@ services:
                 KonradMichalik\Typo3Routing\Http\CorsHandler: '@KonradMichalik\Typo3Routing\Http\CorsHandler'
                 KonradMichalik\Typo3Routing\Http\CorsPreflightResolver: '@KonradMichalik\Typo3Routing\Http\CorsPreflightResolver'
                 KonradMichalik\Typo3Routing\Cache\CacheBypassGuard: '@KonradMichalik\Typo3Routing\Cache\CacheBypassGuard'
+                KonradMichalik\Typo3Routing\Cache\CacheInvalidator: '@KonradMichalik\Typo3Routing\Cache\CacheInvalidator'
                 KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver: '@KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver'
                 KonradMichalik\Typo3Routing\Http\RouteUrlGenerator: '@KonradMichalik\Typo3Routing\Http\RouteUrlGenerator'
                 KonradMichalik\Typo3Routing\Routing\SiteLanguageScope: '@KonradMichalik\Typo3Routing\Routing\SiteLanguageScope'

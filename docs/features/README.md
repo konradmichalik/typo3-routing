@@ -15,7 +15,7 @@ public function export(ServerRequestInterface $request): ResponseInterface { /* 
 | Page | Attribute | What it does |
 |------|-----------|--------------|
 | [Authentication & CSRF](authentication.md) | `#[Authenticate]`, `#[RequireRequestToken]` | Require a bearer token, an FE user or a BE user; verify TYPO3's request token on state-changing calls |
-| [Caching](caching.md) | `#[Cache]` | Cache successful `GET` responses, invalidated by cache tag or lifetime |
+| [Caching](caching.md) | `#[Cache]`, `#[InvalidatesCache]` | Cache successful `GET` responses, invalidated by cache tag, write route or lifetime |
 | [Rate limiting](rate-limiting.md) | `#[RateLimit]` | Throttle per client IP or per logged-in user |
 | [CORS](cors.md) | `#[Cors]` | Allow cross-origin browser access, globally or per route |
 
@@ -47,4 +47,4 @@ The full pipeline, including matching and the environment filter, is in [How it 
 
 `#[Cors]`, `#[RateLimit]` and `#[Authenticate]` may sit on the **controller class**, where each supplies the default for every method route that does not declare its own — the same inheritance model as a [class-level `#[Route]` prefix](../routes/route-groups.md). A method's own attribute always replaces the class-level one entirely rather than merging with it field by field, so narrowing or replacing protection on a single method is always explicit. [`routing:debug --unprotected`](../operating/commands.md#filtering-and-inspecting) audits the *resolved* authenticator per route, so it reflects the class-level fallback automatically.
 
-`#[Cache]` and `#[RequireRequestToken]` are method-only by design: a cache policy that silently applies to every method added to a class later is the wrong default, so each route restates it. PHP rejects a class-level use of them outright.
+`#[Cache]`, `#[InvalidatesCache]` and `#[RequireRequestToken]` are method-only by design: a cache policy that silently applies to every method added to a class later is the wrong default, so each route restates it. PHP rejects a class-level use of them outright.

@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, RateLimit, RequireRequestToken, Returns, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, InvalidatesCache, RateLimit, RequireRequestToken, Returns, Route};
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
 use Override;
@@ -52,6 +52,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
      */
     private const MODIFIER_ATTRIBUTES = [
         Cache::class => '#[Cache]',
+        InvalidatesCache::class => '#[InvalidatesCache]',
         RateLimit::class => '#[RateLimit]',
         Authenticate::class => '#[Authenticate]',
         RequireRequestToken::class => '#[RequireRequestToken]',
@@ -76,6 +77,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         private RouteAliasCollector $aliasCollector = new RouteAliasCollector(),
         private LegacyPathValidator $legacyPathValidator = new LegacyPathValidator(),
         private JsonErrorResolver $jsonErrorResolver = new JsonErrorResolver(),
+        private InvalidatesCacheResolver $invalidatesCacheResolver = new InvalidatesCacheResolver(),
     ) {}
 
     #[Override]
@@ -108,6 +110,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->deprecationResolver->assertSuccessorsExist($collected);
         $this->aliasCollector->assertNoCollisionWithRoutes($collected);
         $this->legacyPathValidator->assertNoCollisions($collected);
+        $this->invalidatesCacheResolver->warnAboutUndeclaredTags($collected);
 
         $registry = $container->getDefinition(RouteRegistry::class);
         $registry->setArgument('$routes', $collected->routes);
@@ -123,6 +126,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$corsConfigs', $collected->corsConfigs);
         $registry->setArgument('$returns', $collected->returns);
         $registry->setArgument('$jsonErrorRoutes', $collected->jsonErrorRoutes);
+        $registry->setArgument('$cacheInvalidations', $collected->cacheInvalidations);
         // Routes contributing nothing are dropped rather than baked as empty arrays.
         $registry->setArgument('$paramDescriptions', array_filter($collected->paramDescriptions));
         $registry->setArgument('$optionalInputs', array_filter($collected->optionalInputs));
@@ -372,6 +376,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->deprecationResolver->apply($deprecation, $name, $serviceId, $method->getName(), $collected);
         $this->rateLimitResolver->apply($rateLimit, $name, $serviceId, $method->getName(), $collected);
         $this->returnsResolver->apply($method, $serviceId, $name, $collected);
+        $this->invalidatesCacheResolver->apply($method, $methods, $serviceId, $name, $collected);
     }
 
     /**

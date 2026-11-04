@@ -13,7 +13,7 @@ TYPO3 extension `typo3_routing` (`konradmichalik/typo3-routing`). It registers f
 
 ## Structure
 
-- `Classes/Attribute/`: `#[Route]` (repeatable), `#[Authenticate]`, `#[Cache]`, `#[Cors]`, `#[RateLimit]`, `#[Param]`, `#[Returns]`, `#[RequireRequestToken]`, `#[DeprecatedRoute]`
+- `Classes/Attribute/`: `#[Route]` (repeatable), `#[Authenticate]`, `#[Cache]`, `#[InvalidatesCache]`, `#[Cors]`, `#[RateLimit]`, `#[Param]`, `#[Returns]`, `#[RequireRequestToken]`, `#[DeprecatedRoute]`
 - `Classes/DependencyInjection/RouteCompilerPass`: reflects `#[Route]` attributes of `RouteControllerInterface` services at container compile time into a plain array injected into `RouteRegistry`. Duplicate route names fail the build
 - `Classes/Routing/`: `RouteRegistry`, `RouteMatcher` (trailing-slash retry, opt-in case-insensitive matching, scheme redirects), `PathPrefixGate`, `RouteControllerInterface`
 - `Classes/Middleware/RouteDispatcher`: frontend middleware. Order: path gate, match, env filter, rate limit, response cache, dispatch. Registered in `Configuration/RequestMiddlewares.php` after `typo3/cms-frontend/site` and before `typo3/cms-frontend/page-resolver`

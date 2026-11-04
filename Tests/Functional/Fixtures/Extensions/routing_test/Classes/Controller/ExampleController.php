@@ -16,7 +16,7 @@ namespace KonradMichalik\RoutingTest\Controller;
 use KonradMichalik\RoutingTest\Domain\Model\Item;
 use KonradMichalik\RoutingTest\Dto\ItemDto;
 use KonradMichalik\RoutingTest\Enum\Status;
-use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, Param, RateLimit, RequireRequestToken, Returns, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, InvalidatesCache, Param, RateLimit, RequireRequestToken, Returns, Route};
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
@@ -156,6 +156,21 @@ final class ExampleController implements RouteControllerInterface
     {
         // A fresh token each call — identical across requests proves a cache hit.
         return new JsonResponse(['token' => bin2hex(random_bytes(8))]);
+    }
+
+    #[Route(path: '/api/example/invalidate', methods: ['POST'], name: 'example_invalidate')]
+    #[InvalidatesCache(tags: ['pages'])]
+    public function invalidate(): JsonResponse
+    {
+        // Stands in for a write through Extbase or the QueryBuilder, which never reaches the DataHandler hook.
+        return new JsonResponse(['invalidated' => true]);
+    }
+
+    #[Route(path: '/api/example/invalidate-rejected', methods: ['POST'], name: 'example_invalidate_rejected')]
+    #[InvalidatesCache(tags: ['pages'])]
+    public function invalidateRejected(): never
+    {
+        throw new HttpProblemException(422, 'Validation failed');
     }
 
     #[Route(path: '/api/example/deprecated', name: 'example_deprecated')]

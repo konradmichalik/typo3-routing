@@ -96,7 +96,8 @@ final readonly class SwaggerUiController implements RouteControllerInterface
 
     private function renderHtml(string $specUrl): string
     {
-        $encodedSpecUrl = json_encode($specUrl, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES);
+        // JSON_HEX_TAG escapes <, > so the value cannot close the inline <script>, whatever its source.
+        $encodedSpecUrl = json_encode($specUrl, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_SLASHES | \JSON_HEX_TAG);
 
         return <<<HTML
             <!doctype html>

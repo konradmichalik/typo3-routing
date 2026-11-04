@@ -562,7 +562,7 @@ final class RouteCompilerPassTest extends TestCase
     public function throwsWhenDeprecationSunsetPrecedesSince(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionCode(1750000057);
 
         $this->discover($this->buildContainer(['backwards' => DeprecationSunsetBeforeSinceController::class]));
     }
@@ -571,7 +571,7 @@ final class RouteCompilerPassTest extends TestCase
     public function throwsOnAnUnparseableDeprecationDate(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionCode(1750000059);
 
         $this->discover($this->buildContainer(['bogus' => UnparseableDeprecationDateController::class]));
     }
@@ -611,7 +611,7 @@ final class RouteCompilerPassTest extends TestCase
     public function throwsWhenAnAliasCollidesWithAnExistingRouteName(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionCode(1750000058);
         $this->expectExceptionMessageMatches('/^Route alias "real_route" declared by "aliased_route" collides with an existing route of the same name\.$/');
 
         $this->discover($this->buildContainer(['collides' => AliasCollidesWithRouteController::class]));
@@ -631,7 +631,7 @@ final class RouteCompilerPassTest extends TestCase
     public function throwsWhenTwoRoutesDeclareTheSameAlias(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionCode(1750000060);
         $this->expectExceptionMessageMatches('/^Route alias "shared_alias" is declared by both "route_a" and "route_b" \(dup_alias::b\(\)\)\./');
 
         $this->discover($this->buildContainer(['dup_alias' => DuplicateAliasController::class]));
@@ -949,7 +949,7 @@ final class RouteCompilerPassTest extends TestCase
     public function throwsOnUnsupportedRateLimitPolicy(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000001);
+        $this->expectExceptionCode(1750000053);
 
         $this->discover($this->buildContainer(['bogus' => InvalidRateLimitPolicyController::class]));
     }
@@ -967,7 +967,7 @@ final class RouteCompilerPassTest extends TestCase
     public function throwsOnUnsupportedRateLimitPolicyDeclaredAtClassLevel(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000001);
+        $this->expectExceptionCode(1750000053);
 
         $this->discover($this->buildContainer(['bogus_class' => InvalidClassLevelRateLimitController::class]));
     }
@@ -1221,7 +1221,7 @@ final class RouteCompilerPassTest extends TestCase
     public function throwsWhenExclusiveIsSetOnAMethodLevelRoute(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionCode(1750000056);
         $this->expectExceptionMessageMatches('/has no effect on a method route/');
 
         $this->discover($this->buildContainer(['method_exclusive' => MethodLevelExclusiveController::class]));

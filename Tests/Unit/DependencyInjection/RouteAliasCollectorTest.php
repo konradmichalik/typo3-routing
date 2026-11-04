@@ -77,7 +77,7 @@ final class RouteAliasCollectorTest extends TestCase
         $collector->apply(['legacy'], '', 'fixture_count', 'ctrl', 'count', $collected);
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionCode(1750000060);
         $this->expectExceptionMessageMatches('/^Route alias "legacy" is declared by both "fixture_count" and "fixture_other" \(ctrl::other\(\)\)\./');
 
         $collector->apply(['legacy'], '', 'fixture_other', 'ctrl', 'other', $collected);
@@ -106,7 +106,7 @@ final class RouteAliasCollectorTest extends TestCase
         $collected->aliases = ['legacy_count' => 'fixture_count'];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionCode(1750000058);
         $this->expectExceptionMessageMatches('/^Route alias "legacy_count" declared by "fixture_count" collides with an existing route of the same name\.$/');
 
         (new RouteAliasCollector())->assertNoCollisionWithRoutes($collected);
@@ -120,7 +120,7 @@ final class RouteAliasCollectorTest extends TestCase
         $collected->aliases = ['fixture_count' => 'fixture_count'];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionCode(1750000058);
 
         (new RouteAliasCollector())->assertNoCollisionWithRoutes($collected);
     }

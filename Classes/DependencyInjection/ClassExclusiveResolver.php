@@ -64,6 +64,6 @@ final readonly class ClassExclusiveResolver
             return;
         }
 
-        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s::%s()" has no effect on a method route; "exclusive" is a class-level-only setting. Move it to the class-level #[Route].', $serviceId, $method->getName()), 1750000032);
+        throw new LogicException(sprintf('#[Route(exclusive: true)] on "%s::%s()" has no effect on a method route; "exclusive" is a class-level-only setting. Move it to the class-level #[Route].', $serviceId, $method->getName()), 1750000056);
     }
 }

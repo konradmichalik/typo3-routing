@@ -134,7 +134,7 @@ final class ClassExclusiveResolverTest extends TestCase
         $route = $method->getAttributes(Route::class)[0]->newInstance();
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionCode(1750000056);
         $this->expectExceptionMessageMatches('/has no effect on a method route/');
 
         $resolver->assertNotOnMethod($route, $method, 'service_id');

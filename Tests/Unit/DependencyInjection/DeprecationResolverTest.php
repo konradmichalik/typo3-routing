@@ -127,7 +127,7 @@ final class DeprecationResolverTest extends TestCase
         $collected = new CollectedRoutes();
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000032);
+        $this->expectExceptionCode(1750000057);
         $this->expectExceptionMessageMatches('/^#\[DeprecatedRoute\] on "ctrl::method\(\)" \(route "v1"\) has a "sunset" earlier than "since"/');
 
         (new DeprecationResolver())->apply(new DeprecatedRoute(since: '2026-12-31', sunset: '2026-01-01'), 'v1', 'ctrl', 'method', $collected);
@@ -139,7 +139,7 @@ final class DeprecationResolverTest extends TestCase
         $collected = new CollectedRoutes();
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionCode(1750000059);
         $this->expectExceptionMessageMatches('/^#\[DeprecatedRoute\] on "ctrl::method\(\)" \(route "v1"\) has an unparseable "since" value: "not-a-date"\./');
 
         (new DeprecationResolver())->apply(new DeprecatedRoute(since: 'not-a-date'), 'v1', 'ctrl', 'method', $collected);
@@ -151,7 +151,7 @@ final class DeprecationResolverTest extends TestCase
         $collected = new CollectedRoutes();
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000033);
+        $this->expectExceptionCode(1750000059);
         $this->expectExceptionMessageMatches('/"sunset" value: "also-not-a-date"/');
 
         (new DeprecationResolver())->apply(new DeprecatedRoute(since: '2026-01-01', sunset: 'also-not-a-date'), 'v1', 'ctrl', 'method', $collected);

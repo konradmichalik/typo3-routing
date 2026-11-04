@@ -153,7 +153,7 @@ final class ArgumentSpecFactoryTest extends TestCase
     public function rejectsUnionType(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000003);
+        $this->expectExceptionCode(1750000054);
 
         $this->build('unionType', '/api/x');
     }

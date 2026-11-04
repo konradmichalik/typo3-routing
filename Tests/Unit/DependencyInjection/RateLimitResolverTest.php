@@ -107,7 +107,7 @@ final class RateLimitResolverTest extends TestCase
         $rateLimit = new RateLimit(policy: 'token_bucket');
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000001);
+        $this->expectExceptionCode(1750000053);
         $this->expectExceptionMessageMatches('/Unsupported #\[RateLimit\] policy/');
 
         $resolver->apply($rateLimit, 'route_name', 'service_id', 'action', new CollectedRoutes());

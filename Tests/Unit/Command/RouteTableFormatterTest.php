@@ -55,6 +55,17 @@ final class RouteTableFormatterTest extends TestCase
     }
 
     #[Test]
+    public function appendsTheParamConstraintsOfAnArgument(): void
+    {
+        $arguments = [
+            ['name' => 'limit', 'type' => 'int', 'source' => 'input', 'nullable' => false, 'hasDefault' => true, 'default' => 20, 'min' => 1, 'max' => 100],
+            ['name' => 'q', 'type' => 'string', 'source' => 'input', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'maxLength' => 200],
+        ];
+
+        self::assertSame('$limit (int, from input, min: 1, max: 100)'.\PHP_EOL.'$q (string, from input, maxLength: 200)', RouteTableFormatter::arguments($arguments));
+    }
+
+    #[Test]
     public function formatsADeprecationWithSinceSunsetAndSuccessor(): void
     {
         $formatted = RouteTableFormatter::deprecation(['since' => 1735689600, 'sunset' => 1767225599, 'successor' => 'v2', 'documentation' => null]);

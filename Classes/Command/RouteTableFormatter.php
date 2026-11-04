@@ -78,7 +78,13 @@ final class RouteTableFormatter
         foreach ($arguments as $argument) {
             $type = $argument['type'] ?? 'mixed';
             $suffix = $argument['nullable'] ? '?' : '';
-            $parts[] = sprintf('$%s (%s%s, from %s)', $argument['name'], $suffix, $type, $argument['source']);
+            $constraints = '';
+            foreach (['min', 'max', 'minLength', 'maxLength'] as $key) {
+                if (isset($argument[$key])) {
+                    $constraints .= sprintf(', %s: %s', $key, $argument[$key]);
+                }
+            }
+            $parts[] = sprintf('$%s (%s%s, from %s%s)', $argument['name'], $suffix, $type, $argument['source'], $constraints);
         }
 
         return implode(\PHP_EOL, $parts);

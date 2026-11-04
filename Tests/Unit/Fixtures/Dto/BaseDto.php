@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto;
 
-namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto;
-
 /**
  * BaseDto.
  *

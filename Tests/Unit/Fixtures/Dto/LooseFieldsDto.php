@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto;
 
+use BackedEnum;
 use Countable;
 use JsonSerializable;
 use Traversable;
+use UnitEnum;
 
 /**
  * LooseFieldsDto.
@@ -31,6 +33,14 @@ final class LooseFieldsDto
     public string|false $label = false;
 
     public int|true $flag = true;
+
+    public ?false $off = null;
+
+    public ?true $on = null;
+
+    public ?BackedEnum $backed = null;
+
+    public ?UnitEnum $unit = null;
 
     public object $meta;
 

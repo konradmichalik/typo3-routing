@@ -27,6 +27,7 @@ use UnitEnum;
 use function array_filter;
 use function array_values;
 use function class_exists;
+use function enum_exists;
 use function in_array;
 use function interface_exists;
 use function is_a;
@@ -239,14 +240,15 @@ final readonly class JsonSchemaMapper
             'true' => ['const' => true],
             'false' => ['const' => false],
             'object' => ['type' => 'object'],
-            'iterable' => ['type' => 'array'],
+            // A Traversable is encoded as an object and an array as a list, so no shape fits both.
+            'iterable' => [],
             default => $this->propertySchema($typeName, $stack, $referenced),
         };
     }
 
     /**
      * A named type that is neither a backed enum nor an Extbase domain object but does resolve to a
-     * class is treated as a nested DTO and mapped recursively, an interface is unconstrained; everything else defers to
+     * class is treated as a nested DTO and mapped recursively; everything else defers to
      * schemaForType(), so the two mappers never diverge on a scalar, enum, or entity property.
      *
      * @param list<class-string> $stack
@@ -256,7 +258,8 @@ final readonly class JsonSchemaMapper
      */
     private function propertySchema(string $typeName, array $stack, array &$referenced): array
     {
-        if (is_a($typeName, UnitEnum::class, true) || is_a($typeName, DomainObjectInterface::class, true)) {
+        // enum_exists() rather than is_a(): the `UnitEnum` and `BackedEnum` interfaces are no enums.
+        if (enum_exists($typeName) || is_a($typeName, DomainObjectInterface::class, true)) {
             return $this->schemaForType($typeName);
         }
 
@@ -293,7 +296,7 @@ final readonly class JsonSchemaMapper
     }
 
     /**
-     * A DTO's object schema or a `$ref` cannot widen its `type`, so it becomes an `anyOf`; a schema
+     * A DTO's object schema, a `$ref` or a `const` cannot widen its `type`, so it becomes an `anyOf`; a schema
      * without `type` (`mixed`) already accepts `null`.
      *
      * @param array<string, mixed> $schema
@@ -304,7 +307,7 @@ final readonly class JsonSchemaMapper
     {
         $type = $schema['type'] ?? null;
 
-        if (isset($schema['properties']) || isset($schema['$ref'])) {
+        if (isset($schema['properties']) || isset($schema['$ref']) || isset($schema['const'])) {
             return ['anyOf' => [$schema, ['type' => 'null']]];
         }
 

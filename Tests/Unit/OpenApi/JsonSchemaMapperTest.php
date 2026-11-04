@@ -396,9 +396,14 @@ final class JsonSchemaMapperTest extends TestCase
         yield 'union' => ['code', ['anyOf' => [['type' => 'string'], ['type' => 'integer']]]];
         yield 'false member is a constant' => ['label', ['anyOf' => [['type' => 'string'], ['const' => false]]]];
         yield 'true member is a constant' => ['flag', ['anyOf' => [['type' => 'integer'], ['const' => true]]]];
+        yield 'nullable false' => ['off', ['anyOf' => [['const' => false], ['type' => 'null']]]];
+        yield 'nullable true' => ['on', ['anyOf' => [['const' => true], ['type' => 'null']]]];
+        yield 'BackedEnum interface' => ['backed', (object) []];
+        yield 'UnitEnum interface' => ['unit', (object) []];
         yield 'object' => ['meta', ['type' => 'object']];
         yield 'nullable object' => ['extra', ['type' => ['object', 'null']]];
-        yield 'iterable' => ['items', ['type' => 'array']];
+        // A Traversable is encoded as an object, an array as a list, so nothing is known.
+        yield 'iterable' => ['items', (object) []];
         yield 'intersection' => ['both', (object) []];
         yield 'intersection inside a union' => ['either', ['anyOf' => [(object) [], ['type' => 'null']]]];
         yield 'interface' => ['payload', (object) []];

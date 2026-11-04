@@ -20,7 +20,8 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use TYPO3\CMS\Core\Http\{ServerRequest, Stream};
+use Psr\Http\Message\UploadedFileInterface;
+use TYPO3\CMS\Core\Http\{ServerRequest, Stream, UploadedFile};
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
@@ -416,12 +417,52 @@ final class ControllerArgumentResolverTest extends TestCase
         self::assertSame([0], $this->resolver->resolve($specs, [], $this->request()));
     }
 
+    #[Test]
+    public function resolvesAnUploadedFileByItsWireName(): void
+    {
+        $file = $this->uploadedFile();
+        $request = $this->request('POST')->withUploadedFiles(['file' => $file]);
+
+        self::assertSame([$file], $this->resolver->resolve([$this->uploadSpec('file')], [], $request));
+    }
+
+    #[Test]
+    public function yieldsNullForAnAbsentOptionalUpload(): void
+    {
+        self::assertSame([null], $this->resolver->resolve([$this->uploadSpec('file', optional: true)], [], $this->request('POST')));
+    }
+
+    #[Test]
+    public function throwsWhenARequiredUploadIsAbsent(): void
+    {
+        // A same-named body field is not a file, so it must not satisfy the parameter.
+        $request = $this->request('POST')->withParsedBody(['file' => 'not-a-file']);
+
+        $this->expectException(ArgumentResolutionException::class);
+        $this->expectExceptionMessage('Missing required parameter: file');
+
+        $this->resolver->resolve([$this->uploadSpec('file')], [], $request);
+    }
+
     /**
      * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
      */
     private function spec(string $name, string $source, ?string $type, bool $nullable = false, bool $hasDefault = false, mixed $default = null): array
     {
         return ['name' => $name, 'type' => $type, 'source' => $source, 'nullable' => $nullable, 'hasDefault' => $hasDefault, 'default' => $default];
+    }
+
+    /**
+     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
+     */
+    private function uploadSpec(string $name, bool $optional = false): array
+    {
+        return $this->spec($name, 'upload', UploadedFileInterface::class, nullable: $optional, hasDefault: $optional);
+    }
+
+    private function uploadedFile(): UploadedFile
+    {
+        return new UploadedFile(new Stream('php://temp', 'wb+'), 0, \UPLOAD_ERR_OK, 'a.txt', 'text/plain');
     }
 
     private function request(string $method = 'GET'): ServerRequest

@@ -85,6 +85,7 @@ final readonly class ControllerArgumentResolver
                 'path', 'host' => $this->coerce($match[$spec['name']] ?? null, $spec),
                 'query' => $this->resolveInput($query, $spec),
                 'body' => $this->resolveInput($body, $spec),
+                'upload' => UploadedFileArgument::find($request->getUploadedFiles(), $spec['name']) ?? $this->fallbackForMissing($spec),
                 default => $this->resolveInput($inputs, $spec),
             };
         }
@@ -191,7 +192,7 @@ final readonly class ControllerArgumentResolver
             }
         }
 
-        throw $this->invalid($name);
+        throw ArgumentResolutionException::invalidValue($name, 1626049853);
     }
 
     /**
@@ -204,7 +205,7 @@ final readonly class ControllerArgumentResolver
     private function toEntity(mixed $value, string $class, string $name): object
     {
         if (!is_int($value) && !(is_string($value) && 1 === preg_match('/^-?\d+$/', $value))) {
-            throw $this->invalid($name);
+            throw ArgumentResolutionException::invalidValue($name, 1950619448);
         }
 
         $entity = $this->persistenceManager->getObjectByIdentifier($value, $class);
@@ -224,7 +225,7 @@ final readonly class ControllerArgumentResolver
             return (int) $value;
         }
 
-        throw $this->invalid($name);
+        throw ArgumentResolutionException::invalidValue($name, 1539193482);
     }
 
     private function toFloat(mixed $value, string $name): float
@@ -233,7 +234,7 @@ final readonly class ControllerArgumentResolver
             return (float) $value;
         }
 
-        throw $this->invalid($name);
+        throw ArgumentResolutionException::invalidValue($name, 1376915260);
     }
 
     private function toBool(mixed $value, string $name): bool
@@ -251,7 +252,7 @@ final readonly class ControllerArgumentResolver
             }
         }
 
-        throw $this->invalid($name);
+        throw ArgumentResolutionException::invalidValue($name, 1054817206);
     }
 
     /**
@@ -263,7 +264,7 @@ final readonly class ControllerArgumentResolver
             return $value;
         }
 
-        throw $this->invalid($name);
+        throw ArgumentResolutionException::invalidValue($name, 1972457332);
     }
 
     private function toString(mixed $value, string $name): string
@@ -275,11 +276,6 @@ final readonly class ControllerArgumentResolver
             return (string) $value;
         }
 
-        throw $this->invalid($name);
-    }
-
-    private function invalid(string $name): ArgumentResolutionException
-    {
-        return new ArgumentResolutionException(sprintf('Invalid value for parameter: %s', $name));
+        throw ArgumentResolutionException::invalidValue($name, 1444744660);
     }
 }

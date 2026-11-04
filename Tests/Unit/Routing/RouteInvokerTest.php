@@ -25,9 +25,10 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, InvokerProbeController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\UploadedFileInterface;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Context\Context;
-use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Http\{ServerRequest, Stream, UploadedFile};
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -247,6 +248,57 @@ final class RouteInvokerTest extends TestCase
     }
 
     #[Test]
+    public function resolvesAnUploadSourcedArgumentFromAnUploadedFileInput(): void
+    {
+        $file = new UploadedFile(new Stream('php://temp', 'wb+'), 0, \UPLOAD_ERR_OK, 'invoked.txt');
+
+        $response = $this->invoker()->invoke('upload', ['file' => $file], $this->request());
+
+        self::assertJsonStringEqualsJsonString('{"file":"invoked.txt"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function rejectsAnUploadInputThatIsNotAnUploadedFile(): void
+    {
+        $response = $this->invoker()->invoke('upload', ['file' => 'not-a-file'], $this->request());
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonPath((string) $response->getBody(), 'detail', 'Invalid value for parameter: file');
+    }
+
+    #[Test]
+    public function treatsANullUploadInputAsAbsent(): void
+    {
+        $response = $this->invoker()->invoke('upload', ['file' => null], $this->request());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"file":null}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function carriesUploadsAndBodyFieldsAsAMultipartForm(): void
+    {
+        $file = new UploadedFile(new Stream('php://temp', 'wb+'), 0, \UPLOAD_ERR_OK, 'invoked.txt');
+
+        $response = $this->invoker()->invoke('probeUpload', ['file' => $file, 'note' => 'hello'], $this->request());
+
+        self::assertJsonStringEqualsJsonString(
+            '{"file":"invoked.txt","note":"hello","parsedBody":{"note":"hello"},"body":"","contentType":"multipart/form-data"}',
+            (string) $response->getBody(),
+        );
+    }
+
+    #[Test]
+    public function doesNotLeakTheCallingRequestsUploadsIntoUploadSourcedArguments(): void
+    {
+        $caller = $this->request()->withUploadedFiles(['file' => new UploadedFile(new Stream('php://temp', 'wb+'), 0, \UPLOAD_ERR_OK, 'caller.txt')]);
+
+        $response = $this->invoker()->invoke('upload', [], $caller);
+
+        self::assertJsonStringEqualsJsonString('{"file":null}', (string) $response->getBody());
+    }
+
+    #[Test]
     public function dropsTheCallingRequestsQueryParameters(): void
     {
         $caller = (new RequestBuilder('POST', 'https://example.com/mcp?secret=1'))
@@ -463,6 +515,8 @@ final class RouteInvokerTest extends TestCase
             'probe' => ['path' => '/api/probe/{id}', 'methods' => ['POST'], 'controller' => 'probe::probe', 'env' => null, 'requirements' => []],
             'body' => ['path' => '/api/body', 'methods' => ['POST'], 'controller' => 'probe::body', 'env' => null, 'requirements' => []],
             'putBody' => ['path' => '/api/put-body', 'methods' => ['PUT'], 'controller' => 'probe::body', 'env' => null, 'requirements' => []],
+            'upload' => ['path' => '/api/upload', 'methods' => ['POST'], 'controller' => 'probe::upload', 'env' => null, 'requirements' => []],
+            'probeUpload' => ['path' => '/api/probe-upload', 'methods' => ['POST'], 'controller' => 'probe::uploadProbe', 'env' => null, 'requirements' => []],
             'probeBody' => ['path' => '/api/probe-body', 'methods' => ['POST'], 'controller' => 'probe::bodyProbe', 'env' => null, 'requirements' => []],
             'overridden' => ['path' => '/api/overridden/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => []],
             'range' => ['path' => '/api/range', 'methods' => ['GET'], 'controller' => 'ctrl::range', 'env' => null, 'requirements' => []],
@@ -523,6 +577,12 @@ final class RouteInvokerTest extends TestCase
             'putBody' => [
                 ['name' => 'title', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => true, 'default' => 'none'],
                 ['name' => 'priority', 'type' => 'int', 'source' => 'body', 'nullable' => false, 'hasDefault' => true, 'default' => 0],
+            ],
+            'upload' => [['name' => 'file', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => true, 'hasDefault' => true, 'default' => null]],
+            'probeUpload' => [
+                ['name' => 'file', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => false, 'hasDefault' => false, 'default' => null],
+                ['name' => 'note', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => false, 'default' => null],
+                $request,
             ],
             'probeBody' => [['name' => 'note', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => false, 'default' => null], $request],
             'overridden' => [['name' => 'id', 'type' => 'int', 'source' => 'query', 'nullable' => false, 'hasDefault' => false, 'default' => null]],

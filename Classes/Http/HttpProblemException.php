@@ -31,7 +31,7 @@ final class HttpProblemException extends RuntimeException
      * Thrown from a controller to answer with an RFC 9457 problem-details response instead of a
      * success payload: the dispatcher maps it to `application/problem+json` with the given status
      * and the message as "detail". Unexpected exceptions stay untouched and reach TYPO3's regular
-     * error handling (and its logging) as before.
+     * error handling (and its logging) as before. The extension raises it too, e.g. for failed uploads.
      *
      * @param int    $status HTTP error status code (4xx/5xx)
      * @param string $detail Problem detail; omitted from the response when it only repeats the status title

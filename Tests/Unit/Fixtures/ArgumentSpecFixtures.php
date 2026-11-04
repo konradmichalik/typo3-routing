@@ -17,7 +17,7 @@ use DateTimeImmutable;
 use KonradMichalik\Typo3Routing\Attribute\Param;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
 
 /**
  * ArgumentSpecFixtures.
@@ -91,4 +91,18 @@ final class ArgumentSpecFixtures
     public function unsupportedObject(DateTimeImmutable $when): void {}
 
     public function unsupportedScalar(object $thing): void {}
+
+    public function upload(UploadedFileInterface $file, ?UploadedFileInterface $thumb = null): void {}
+
+    public function uploadWithField(UploadedFileInterface $file, int $id, string $title): void {}
+
+    public function renamedUpload(#[Param(name: 'attachment')] UploadedFileInterface $file): void {}
+
+    public function bodySourcedUpload(#[Param(source: 'body')] UploadedFileInterface $file): void {}
+
+    public function querySourcedUpload(#[Param(source: 'query')] UploadedFileInterface $file): void {}
+
+    public function variadicUploads(UploadedFileInterface ...$files): void {}
+
+    public function constrainedUpload(#[Param(requirement: '.+')] UploadedFileInterface $file): void {}
 }

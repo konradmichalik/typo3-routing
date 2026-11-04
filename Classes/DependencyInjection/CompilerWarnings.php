@@ -20,6 +20,7 @@ use function array_map;
 use function assert;
 use function get_object_vars;
 use function implode;
+use function in_array;
 use function sprintf;
 use function trigger_error;
 
@@ -100,6 +101,28 @@ final readonly class CompilerWarnings
         }
 
         trigger_error(sprintf('"%s::%s()" overrides "%s::%s()" and repeats #[Route], but drops %s from the parent; %s no longer applies to this route. Repeat it on the override if that was not intended.', $serviceId, $method->getName(), $overriddenRouteMethod->getDeclaringClass()->getName(), $method->getName(), implode(', ', $dropped), implode(', ', $dropped)), E_USER_WARNING);
+    }
+
+    /**
+     * PHP fills `$_FILES` only for a multipart POST, so on any other method an upload argument is
+     * always missing. Empty methods mean "any method", POST included.
+     *
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs
+     * @param list<string>                                                                                                   $methods
+     */
+    public function warnIfUploadWithoutPost(array $specs, array $methods, string $routeName, string $controller): void
+    {
+        if ([] === $methods || in_array('POST', $methods, true)) {
+            return;
+        }
+
+        foreach ($specs as $spec) {
+            if ('upload' === $spec['source']) {
+                trigger_error(sprintf('Route "%s" (%s) binds the uploaded file "%s" but only allows %s. PHP parses multipart uploads for POST only, so the file will always be missing. Add POST to the route\'s methods.', $routeName, $controller, $spec['name'], implode(', ', $methods)), E_USER_WARNING);
+
+                return;
+            }
+        }
     }
 
     private function routeLabel(object $route): string

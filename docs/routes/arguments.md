@@ -7,6 +7,7 @@ Instead of reading values off the request by hand, declare them as **typed metho
 | `ServerRequestInterface $request` | The PSR-7 request itself.              |
 | A name matching a path `{placeholder}` | The matched path segment.         |
 | A name matching a [`host`](route-attribute.md#wildcards-and-multiple-hosts) `{placeholder}` | The matched host label. |
+| `UploadedFileInterface $file`     | The [uploaded file](#uploaded-files) of that name. |
 | Any other scalar name             | Query string, then request body.       |
 
 Values are coerced to the declared type (`int`, `float`, `bool`, `string`, `array`, `mixed`; untyped = raw string) — including **backed enums**. A value that cannot be coerced, or a missing parameter without a default, yields a **400** before the controller runs. Optional parameters use their PHP default; nullable parameters become `null` when absent.
@@ -80,6 +81,31 @@ public function filter(int ...$ids): ResponseInterface
     // /api/courses?ids[]=3&ids[]=7 → filter(3, 7)
 }
 ```
+
+## Uploaded files
+
+A parameter typed `Psr\Http\Message\UploadedFileInterface` resolves from the request's `getUploadedFiles()`, looked up by the parameter name or its [`#[Param(name:)]`](#overriding-the-source-with-param). Form fields of the same `multipart/form-data` request bind to the other parameters as usual.
+
+```php
+use Psr\Http\Message\UploadedFileInterface;
+
+#[Route(path: '/api/documents', name: 'document_upload', methods: ['POST'])]
+public function upload(UploadedFileInterface $file, string $title, ?UploadedFileInterface $thumbnail = null): ResponseInterface
+{
+    // $file      ← the "file" part of the multipart body, 400 when missing
+    // $title     ← the "title" form field
+    // $thumbnail ← null when the field is absent or left empty
+}
+```
+
+- A **missing** required file yields the same **400** as any missing parameter. A nullable parameter or one with a default becomes `null`. An empty file field (`UPLOAD_ERR_NO_FILE`) counts as missing.
+- A file whose upload **failed** yields an error naming the parameter, optional or not: **413** for a size limit (`UPLOAD_ERR_INI_SIZE`, `UPLOAD_ERR_FORM_SIZE`), **500** for a server-side failure (`UPLOAD_ERR_NO_TMP_DIR`, `UPLOAD_ERR_CANT_WRITE`, `UPLOAD_ERR_EXTENSION`), **400** for a partial upload.
+- PHP parses uploads for **`POST`** only, so on `PUT`, `PATCH` or `DELETE` the file is always missing. A route with an upload argument that does not allow `POST` triggers a warning at container build.
+- **One file per parameter.** Several files under one name (`file[]`) yield a **400**, and a variadic `UploadedFileInterface ...$files` is rejected at compile time. Inject `ServerRequestInterface` and read `getUploadedFiles()` for multi-file fields.
+- Only the interface itself is resolvable, not a concrete implementation class.
+- A `#[Param(source:)]`, a `{placeholder}` of the same name and a requirement (on `#[Route]` or `#[Param]`) are rejected at compile time.
+
+The extension validates neither size nor media type. Check `getSize()` and `getClientMediaType()` in the controller, and treat `getClientFilename()` as untrusted input.
 
 ## Overriding the source with `#[Param]`
 

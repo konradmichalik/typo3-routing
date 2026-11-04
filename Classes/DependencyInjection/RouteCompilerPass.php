@@ -321,6 +321,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $arguments = $this->argumentSpecs->build($method, $path, $serviceId, $route->host);
         $contributions = $this->argumentSpecs->paramContributions($method, $arguments, $path, $route->requirements, $route->defaults, $serviceId);
         $requirements = [...$requirements, ...$contributions['requirements']];
+        UploadArgumentGuard::assertValid($method, $arguments, $requirements, $path, $route->host, $serviceId);
         $defaults = [...$defaults, ...$contributions['defaults']];
         ParamConstraintGuard::assertRouteDefaults($arguments, $defaults, $serviceId.'::'.$method->getName().'()');
         $collected->paramDescriptions[$name] = $contributions['descriptions'];
@@ -329,6 +330,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->assertNoReservedDefaultKeys($defaults, $serviceId, $method, $name);
 
         $methods = array_map(strtoupper(...), $route->methods);
+        $this->compilerWarnings->warnIfUploadWithoutPost($arguments, $methods, $name, $serviceId.'::'.$method->getName().'()');
         // Null on both levels means "not set", which is the case-sensitive default.
         $caseInsensitive = $route->caseInsensitive ?? $classRoute?->caseInsensitive;
         $tags = $route->tags ?? $classRoute?->tags;

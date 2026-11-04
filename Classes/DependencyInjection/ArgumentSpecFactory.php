@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\Attribute\Param;
 use LogicException;
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
 use ReflectionEnum;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -217,6 +217,7 @@ final class ArgumentSpecFactory
 
         // A variadic collects zero or more values from a single input array — it never injects the request.
         if ($parameter->isVariadic()) {
+            UploadArgumentGuard::assertNotVariadic($type, $name, $where);
             $variadicType = $this->resolveValueType($type, $name, $where);
             if (null !== $variadicType && is_a($variadicType, DomainObjectInterface::class, true)) {
                 throw new LogicException(sprintf('Entity type "%s" on variadic parameter "$%s" of "%s" is not supported by route argument resolution.', $variadicType, $name, $where), 1750000009);
@@ -266,6 +267,11 @@ final class ArgumentSpecFactory
             return ['source' => 'request', 'type' => null];
         }
 
+        // Source override, placeholder and requirement rules follow in UploadArgumentGuard::assertValid().
+        if (UploadArgumentGuard::isUploadedFile($type)) {
+            return ['source' => 'upload', 'type' => UploadedFileInterface::class];
+        }
+
         $source = match (true) {
             in_array($key, $placeholders, true) => 'path',
             in_array($key, $hostPlaceholders, true) => 'host',
@@ -303,7 +309,7 @@ final class ArgumentSpecFactory
             return $class;
         }
 
-        throw new LogicException(sprintf('Unsupported object type "%s" on parameter "$%s" of "%s". Only scalars, backed enums, Extbase domain objects and the PSR-7 request are resolvable.', $class, $name, $where), 1750000004);
+        throw new LogicException(sprintf('Unsupported object type "%s" on parameter "$%s" of "%s". Only scalars, backed enums, Extbase domain objects, the PSR-7 request and Psr\\Http\\Message\\UploadedFileInterface are resolvable.', $class, $name, $where), 1750000004);
     }
 
     /**

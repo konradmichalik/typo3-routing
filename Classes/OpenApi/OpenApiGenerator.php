@@ -17,6 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, Bearer
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 
+use function array_intersect_key;
 use function array_key_exists;
 use function explode;
 use function in_array;
@@ -137,7 +138,7 @@ final readonly class OpenApiGenerator
 
         foreach ($arguments as $argument) {
             $pattern = $route['requirements'][$argument['name']] ?? null;
-            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
+            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0]));
             $description = $descriptions[$argument['name']] ?? null;
 
             match ($this->target($argument['source'], $hasBody)) {

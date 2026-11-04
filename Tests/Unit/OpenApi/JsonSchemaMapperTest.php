@@ -53,6 +53,23 @@ final class JsonSchemaMapperTest extends TestCase
     }
 
     #[Test]
+    public function mapsTheRangeOfAnArgumentToMinimumAndMaximum(): void
+    {
+        self::assertSame(['type' => 'integer', 'minimum' => 1, 'maximum' => 100], (new JsonSchemaMapper())->schemaForType('int', null, ['min' => 1, 'max' => 100]));
+    }
+
+    #[Test]
+    public function mapsTheLengthsOfAnArgumentNextToItsPatternIgnoringTheOtherSpecKeys(): void
+    {
+        $argument = ['name' => 'q', 'type' => 'string', 'source' => 'input', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'minLength' => 2, 'maxLength' => 200];
+
+        self::assertSame(
+            ['type' => 'string', 'pattern' => '\w+', 'minLength' => 2, 'maxLength' => 200],
+            (new JsonSchemaMapper())->schemaForType('string', '\w+', $argument),
+        );
+    }
+
+    #[Test]
     public function mapsArrayToSchemaWithAnEmptyObjectAsItems(): void
     {
         $schema = (new JsonSchemaMapper())->schemaForType('array');

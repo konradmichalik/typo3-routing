@@ -237,6 +237,15 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function exportsParamConstraintsOnPathAndBodySchemas(): void
+    {
+        $operation = $this->features()['paths']['/api/constrained/{page}']['post'];
+
+        self::assertSame(['type' => 'number', 'minimum' => 0, 'maximum' => 1.5], $this->schemasByName($operation['parameters'])['page']);
+        self::assertSame(['type' => 'string', 'minLength' => 2, 'maxLength' => 200], $operation['requestBody']['content']['application/json']['schema']['properties']['q']);
+    }
+
+    #[Test]
     public function buildsOptionalRequestBodyWithoutRequiredList(): void
     {
         $operation = $this->features()['paths']['/api/note']['post'];
@@ -444,6 +453,7 @@ final class OpenApiGeneratorTest extends TestCase
             'courses' => ['path' => '/api/courses', 'methods' => ['GET'], 'controller' => 'ctrl::courses', 'env' => null, 'requirements' => []],
             'noBody' => ['path' => '/api/no-body', 'methods' => ['GET'], 'controller' => 'ctrl::noBody', 'env' => null, 'requirements' => []],
             'nullableFields' => ['path' => '/api/nullable-fields', 'methods' => ['GET'], 'controller' => 'ctrl::nullableFields', 'env' => null, 'requirements' => []],
+            'constrained' => ['path' => '/api/constrained/{page}', 'methods' => ['POST'], 'controller' => 'ctrl::constrained', 'env' => null, 'requirements' => []],
         ];
 
         $arguments = [
@@ -472,6 +482,10 @@ final class OpenApiGeneratorTest extends TestCase
             'courses' => [],
             'noBody' => [],
             'nullableFields' => [],
+            'constrained' => [
+                ['name' => 'page', 'type' => 'float', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'min' => 0, 'max' => 1.5],
+                ['name' => 'q', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'minLength' => 2, 'maxLength' => 200],
+            ],
         ];
 
         $returns = [

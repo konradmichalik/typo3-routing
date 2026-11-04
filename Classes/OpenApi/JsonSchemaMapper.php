@@ -40,43 +40,27 @@ use function preg_match;
 final readonly class JsonSchemaMapper
 {
     /**
+     * @var array<string, string>
+     */
+    private const CONSTRAINT_KEYWORDS = ['min' => 'minimum', 'max' => 'maximum', 'minLength' => 'minLength', 'maxLength' => 'maxLength'];
+
+    /**
      * Turns an argument's `type` (as `RouteRegistry::getArguments()` reports it) into a JSON Schema
      * fragment. docs/background/extending.md documents the resulting schema per type, and the BC promise.
      *
-     * @param string|null $type    a scalar name (`int`, `float`, `bool`, `array`, `mixed`, `string`), a
-     *                             `class-string<UnitEnum>` of a **backed** enum, a
-     *                             `class-string<DomainObjectInterface>`, or `null` for untyped
-     * @param string|null $pattern the route's requirement for this argument: applied as `pattern` to a
-     *                             schema that ends up `{"type": "string"}`, and used to narrow a
-     *                             backed enum's `enum` list to the cases the route actually accepts
+     * @param string|null                                                               $type        a scalar name (`int`, `float`, `bool`, `array`, `mixed`, `string`), a
+     *                                                                                               `class-string<UnitEnum>` of a **backed** enum, a
+     *                                                                                               `class-string<DomainObjectInterface>`, or `null` for untyped
+     * @param string|null                                                               $pattern     the route's requirement for this argument: applied as `pattern` to a
+     *                                                                                               schema that ends up `{"type": "string"}`, and used to narrow a
+     *                                                                                               backed enum's `enum` list to the cases the route actually accepts
+     * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints the argument's value constraints, added as `minimum`, `maximum`, `minLength` and `maxLength`
      *
      * @return array<string, mixed>
      */
-    public function schemaForType(?string $type, ?string $pattern = null): array
+    public function schemaForType(?string $type, ?string $pattern = null, array $constraints = []): array
     {
-        if (null !== $type && is_a($type, UnitEnum::class, true)) {
-            return $this->enumSchema($type, $pattern);
-        }
-
-        if (null !== $type && is_a($type, DomainObjectInterface::class, true)) {
-            return ['type' => 'integer'];
-        }
-
-        $schema = match ($type) {
-            'int' => ['type' => 'integer'],
-            'float' => ['type' => 'number'],
-            'bool' => ['type' => 'boolean'],
-            'array' => ['type' => 'array', 'items' => (object) []],
-            'mixed' => [],
-            // Untyped parameters arrive as raw strings.
-            default => ['type' => 'string'],
-        };
-
-        if (null !== $pattern && 'string' === ($schema['type'] ?? null)) {
-            $schema['pattern'] = $pattern;
-        }
-
-        return $schema;
+        return [...$this->typeSchema($type, $pattern), ...$this->constraintKeywords($constraints)];
     }
 
     /**
@@ -117,6 +101,53 @@ final readonly class JsonSchemaMapper
         }
 
         return $schema;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function typeSchema(?string $type, ?string $pattern): array
+    {
+        if (null !== $type && is_a($type, UnitEnum::class, true)) {
+            return $this->enumSchema($type, $pattern);
+        }
+
+        if (null !== $type && is_a($type, DomainObjectInterface::class, true)) {
+            return ['type' => 'integer'];
+        }
+
+        $schema = match ($type) {
+            'int' => ['type' => 'integer'],
+            'float' => ['type' => 'number'],
+            'bool' => ['type' => 'boolean'],
+            'array' => ['type' => 'array', 'items' => (object) []],
+            'mixed' => [],
+            // Untyped parameters arrive as raw strings.
+            default => ['type' => 'string'],
+        };
+
+        if (null !== $pattern && 'string' === ($schema['type'] ?? null)) {
+            $schema['pattern'] = $pattern;
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints
+     *
+     * @return array<string, int|float>
+     */
+    private function constraintKeywords(array $constraints): array
+    {
+        $keywords = [];
+        foreach (self::CONSTRAINT_KEYWORDS as $key => $keyword) {
+            if (isset($constraints[$key])) {
+                $keywords[$keyword] = $constraints[$key];
+            }
+        }
+
+        return $keywords;
     }
 
     /**

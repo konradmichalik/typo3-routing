@@ -18,6 +18,7 @@ TYPO3 extension `typo3_routing` (`konradmichalik/typo3-routing`). It registers f
 - `Classes/Routing/`: `RouteRegistry`, `RouteMatcher` (trailing-slash retry, opt-in case-insensitive matching, scheme redirects), `PathPrefixGate`, `RouteControllerInterface`
 - `Classes/Middleware/RouteDispatcher`: frontend middleware. Order: path gate, match, env filter, rate limit, response cache, dispatch. Registered in `Configuration/RequestMiddlewares.php` after `typo3/cms-frontend/site` and before `typo3/cms-frontend/page-resolver`
 - `Classes/Http/`: base-path resolving, URL generation, CORS, error responses, conditional GET
+- `Classes/Event/`: `UnmatchedRouteResponseEvent`, PSR-14, lets a listener replace the dispatcher's own 404
 - `Classes/Authentication/`, `Classes/Cache/`, `Classes/RateLimit/`, `Classes/OpenApi/`, `Classes/Command/`, `Classes/ViewHelpers/`, `Classes/Controller/`
 - `Configuration/`: `Services.php` (registers the compiler pass), `Services.yaml` (`RouteDispatcher` and `RouteUrlGenerator` are public), `RequestMiddlewares.php`
 - `ext_conf_template.txt`: `exclusivePrefixes` (404 semantics only) and `trailingSlash`

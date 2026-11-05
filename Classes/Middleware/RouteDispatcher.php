@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Middleware;
 
+use KonradMichalik\Typo3Routing\Event\UnmatchedRouteResponseEvent;
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, JsonErrorResponse, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Routing\{PathPrefixGate, RouteRegistry};
 use Override;
@@ -120,6 +121,18 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
+     * The dispatcher's own "nothing here" 404, after every matcher tier ran. Listeners may replace it, see
+     * UnmatchedRouteResponseEvent. A hidden route takes this path too, so it looks like a missing one.
+     */
+    private function notFound(ServerRequestInterface $request, string $path): ResponseInterface
+    {
+        $event = new UnmatchedRouteResponseEvent($request, $path);
+        $this->services->eventDispatcher()->dispatch($event);
+
+        return $event->getResponse() ?? JsonErrorResponse::create(404, 'Not Found');
+    }
+
+    /**
      * Returns null when nothing claims the path: no route matched, and no configured prefix reserves it
      * exclusively for this middleware. The caller then falls through to normal page rendering.
      *
@@ -139,7 +152,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
         if (!$this->services->invoker()->isVisibleInCurrentContext($match['_env'] ?? null)) {
-            return JsonErrorResponse::create(404, 'Not Found');
+            return $this->notFound($request, $path);
         }
 
         // 3b. Site/language scope: a route not bound to the current site or language is invisible too.
@@ -147,7 +160,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         //     redirect must never reveal a route invisible in the current context.
         if (!$this->services->siteLanguageScope()->isVisibleForSite($match['_sites'] ?? null, $request)
             || !$this->services->siteLanguageScope()->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
-            return JsonErrorResponse::create(404, 'Not Found');
+            return $this->notFound($request, $path);
         }
 
         // 3c. Legacy path (opt-in): a request that reached this route through one of its old paths
@@ -314,7 +327,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         try {
             return $this->services->matcher()->match($path, $this->requestContext($request));
         } catch (ResourceNotFoundException) {
-            return $this->exclusive->matches($path) ? JsonErrorResponse::create(404, 'Not Found') : null;
+            return $this->exclusive->matches($path) ? $this->notFound($request, $path) : null;
         } catch (MethodNotAllowedException $exception) {
             return JsonErrorResponse::create(405, 'Method Not Allowed', [
                 'Allow' => implode(', ', $exception->getAllowedMethods()),

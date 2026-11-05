@@ -24,10 +24,11 @@ use KonradMichalik\Typo3Routing\Middleware\{DispatcherServices, RouteDispatcher}
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry, SiteLanguageScope};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController, RecordingUnmatchedRouteDispatcher};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\RequestHandlerInterface;
 use RuntimeException;
@@ -56,10 +57,13 @@ final class RouteDispatcherTest extends TestCase
 
     private RateLimitCheck $rateLimitCheck;
 
+    private RecordingUnmatchedRouteDispatcher $events;
+
     protected function setUp(): void
     {
         $this->responseCache = $this->createResponseCacheManager();
         $this->rateLimitCheck = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()));
+        $this->events = new RecordingUnmatchedRouteDispatcher();
     }
 
     #[Test]
@@ -170,6 +174,30 @@ final class RouteDispatcherTest extends TestCase
 
         self::assertSame(404, $response->getStatusCode());
         self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function answersAnUnmatchedPathWithTheResponseOfAListener(): void
+    {
+        $this->events->response = new Response('php://temp', 404, ['Content-Type' => 'text/plain']);
+
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/missing'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('text/plain', $response->getHeaderLine('Content-Type'));
+        self::assertSame(['/api/missing'], $this->events->paths);
+    }
+
+    /**
+     * Every matcher tier runs before the event: a trailing-slash variant still reaches its route.
+     */
+    #[Test]
+    public function doesNotDispatchTheUnmatchedEventForAToleratedVariant(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/count/'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame([], $this->events->paths);
     }
 
     #[Test]
@@ -359,6 +387,8 @@ final class RouteDispatcherTest extends TestCase
 
         self::assertSame(404, $response->getStatusCode());
         self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
+        // A matched route without its record is the controller's 404, not an unmatched path.
+        self::assertSame([], $this->events->paths);
     }
 
     #[Test]
@@ -477,6 +507,17 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    #[WithEnvironment(context: 'Production')]
+    public function answersAnEnvHiddenRouteWithTheResponseOfAListener(): void
+    {
+        $this->events->response = new Response('php://temp', 404, ['Content-Type' => 'text/plain']);
+
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/dev'));
+
+        self::assertSame('text/plain', $response->getHeaderLine('Content-Type'));
+    }
+
+    #[Test]
     public function doesNotRedirectAnExactPathMatchOnACanonicalRoute(): void
     {
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/canonical'));
@@ -559,6 +600,16 @@ final class RouteDispatcherTest extends TestCase
         $response = $this->dispatch($this->request('GET', 'https://example.com/api/scoped-site-other'));
 
         self::assertSame(404, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function answersASiteHiddenRouteWithTheResponseOfAListener(): void
+    {
+        $this->events->response = new Response('php://temp', 404, ['Content-Type' => 'text/plain']);
+
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/scoped-site-other'));
+
+        self::assertSame('text/plain', $response->getHeaderLine('Content-Type'));
     }
 
     #[Test]
@@ -1393,6 +1444,7 @@ final class RouteDispatcherTest extends TestCase
             RouteUrlGenerator::class => static fn (): RouteUrlGenerator => new RouteUrlGenerator($registry, new SiteBasePathResolver()),
             SiteLanguageScope::class => $this->siteLanguageScope(...),
             DeprecationHeaders::class => fn (): DeprecationHeaders => $this->deprecationHeaders($registry),
+            EventDispatcherInterface::class => fn (): EventDispatcherInterface => $this->events,
         ]));
     }
 

@@ -19,6 +19,7 @@ use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, Deprec
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
 use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, RouteMatcher, SiteLanguageScope};
 use Psr\Container\ContainerInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 
 use function assert;
 
@@ -119,6 +120,11 @@ final readonly class DispatcherServices
     public function deprecation(): DeprecationHeaders
     {
         return $this->service(DeprecationHeaders::class);
+    }
+
+    public function eventDispatcher(): EventDispatcherInterface
+    {
+        return $this->service(EventDispatcherInterface::class);
     }
 
     /**

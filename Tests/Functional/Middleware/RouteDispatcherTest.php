@@ -323,33 +323,6 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
-    public function answersAnUnmatchedPathUnderAPrefixFromTheCatchAllRoute(): void
-    {
-        $response = $this->process($this->request('GET', 'https://example.com/catchall/no/such/endpoint'));
-
-        self::assertSame(404, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"error":"No endpoint at /catchall/no/such/endpoint","documentation":"https://example.com/docs"}', (string) $response->getBody());
-    }
-
-    #[Test]
-    public function letsARealRouteWinOverTheCatchAllRoute(): void
-    {
-        $response = $this->process($this->request('GET', 'https://example.com/catchall/known'));
-
-        self::assertSame(200, $response->getStatusCode());
-        self::assertJsonStringEqualsJsonString('{"route":"known"}', (string) $response->getBody());
-    }
-
-    #[Test]
-    public function letsTheCatchAllRouteAnswerAMethodTheRealRouteDoesNotAllow(): void
-    {
-        // The matcher only reports 405 when no route accepts the method, and the catch-all accepts POST.
-        $response = $this->process($this->request('POST', 'https://example.com/catchall/known'));
-
-        self::assertSame(404, $response->getStatusCode());
-    }
-
-    #[Test]
     public function appliesDefaultsForOmittedOptionalArguments(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=3'));

@@ -23,6 +23,7 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
@@ -68,6 +69,7 @@ final class DispatcherServicesTest extends TestCase
         $urlGenerator = new RouteUrlGenerator($registry, new SiteBasePathResolver());
         $siteLanguageScope = new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
         $deprecation = new DeprecationHeaders($registry, $urlGenerator);
+        $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
 
         $services = new DispatcherServices(new ServiceLocator([
             RouteMatcher::class => static fn (): RouteMatcher => $matcher,
@@ -83,6 +85,7 @@ final class DispatcherServicesTest extends TestCase
             RouteUrlGenerator::class => static fn (): RouteUrlGenerator => $urlGenerator,
             SiteLanguageScope::class => static fn (): SiteLanguageScope => $siteLanguageScope,
             DeprecationHeaders::class => static fn (): DeprecationHeaders => $deprecation,
+            EventDispatcherInterface::class => static fn (): EventDispatcherInterface => $eventDispatcher,
         ]));
 
         self::assertSame($matcher, $services->matcher());
@@ -98,6 +101,7 @@ final class DispatcherServicesTest extends TestCase
         self::assertSame($urlGenerator, $services->urlGenerator());
         self::assertSame($siteLanguageScope, $services->siteLanguageScope());
         self::assertSame($deprecation, $services->deprecation());
+        self::assertSame($eventDispatcher, $services->eventDispatcher());
     }
 
     /**

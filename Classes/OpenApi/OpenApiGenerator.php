@@ -131,6 +131,8 @@ final readonly class OpenApiGenerator
         [$serviceId] = explode('::', $route['controller'], 2);
         $arguments = $this->registry->getArguments($name);
         $hasBody = in_array(strtoupper($method), self::BODY_METHODS, true);
+        // PHP fills $_FILES for POST only, so no other operation can receive a file.
+        $acceptsUpload = 'POST' === strtoupper($method);
 
         $parameters = [];
         $bodyProperties = [];
@@ -143,7 +145,7 @@ final readonly class OpenApiGenerator
             $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, self::VALUE_CONSTRAINTS));
             $description = $descriptions[$argument['name']] ?? null;
 
-            match ($this->target($argument['source'], $hasBody)) {
+            match ($this->target($argument['source'], $hasBody, $acceptsUpload)) {
                 'path' => $parameters[] = $this->parameter($argument['name'], 'path', true, $schema, $description),
                 'query' => $parameters[] = $this->parameter($argument['name'], 'query', !$argument['nullable'] && !$argument['hasDefault'], $schema, $description),
                 'body' => $this->collectBody($argument, $schema, $bodyProperties, $bodyRequired, $description),
@@ -174,7 +176,7 @@ final readonly class OpenApiGenerator
         }
 
         if ([] !== $bodyProperties) {
-            $operation['requestBody'] = $this->requestBody($bodyProperties, $bodyRequired, $this->bodyMediaType($arguments, $hasBody));
+            $operation['requestBody'] = $this->requestBody($bodyProperties, $bodyRequired, $this->bodyMediaType($arguments, $acceptsUpload));
         }
 
         $security = $this->security($name, $usedSchemes);
@@ -239,7 +241,7 @@ final readonly class OpenApiGenerator
      * parameter. A "host" placeholder has no OpenAPI counterpart — it is not part of the path
      * template — so it maps to itself and is dropped by the caller.
      */
-    private function target(string $source, bool $hasBody): string
+    private function target(string $source, bool $hasBody, bool $acceptsUpload): string
     {
         return match ($source) {
             'path' => 'path',
@@ -248,8 +250,8 @@ final readonly class OpenApiGenerator
             'body' => 'body',
             'variadic' => 'query',
             'input' => $hasBody ? 'body' : 'query',
-            // A file cannot travel in a query, so a body-less operation does not describe it at all.
-            'upload' => $hasBody ? 'body' : 'request',
+            // A file cannot travel in a query, so an operation without an upload does not describe it at all.
+            'upload' => $acceptsUpload ? 'body' : 'request',
             default => 'request',
         };
     }
@@ -260,10 +262,10 @@ final readonly class OpenApiGenerator
      *
      * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
      */
-    private function bodyMediaType(array $arguments, bool $hasBody): string
+    private function bodyMediaType(array $arguments, bool $acceptsUpload): string
     {
         foreach ($arguments as $argument) {
-            if ($hasBody && 'upload' === $argument['source']) {
+            if ($acceptsUpload && 'upload' === $argument['source']) {
                 return 'multipart/form-data';
             }
         }

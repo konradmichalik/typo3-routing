@@ -16,7 +16,9 @@ namespace KonradMichalik\Typo3Routing\DependencyInjection;
 use KonradMichalik\Typo3Routing\Attribute\Route;
 use ReflectionMethod;
 
+use function array_intersect;
 use function array_map;
+use function array_values;
 use function assert;
 use function get_object_vars;
 use function implode;
@@ -105,24 +107,42 @@ final readonly class CompilerWarnings
 
     /**
      * PHP fills `$_FILES` only for a multipart POST, so on any other method an upload argument is
-     * always missing. Empty methods mean "any method", POST included.
+     * always missing. Empty methods mean "any method", POST included, and stay silent.
      *
      * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs
      * @param list<string>                                                                                                   $methods
      */
     public function warnIfUploadWithoutPost(array $specs, array $methods, string $routeName, string $controller): void
     {
-        if ([] === $methods || in_array('POST', $methods, true)) {
+        $upload = $this->uploadName($specs);
+        if (null === $upload || [] === $methods) {
             return;
         }
 
+        if (!in_array('POST', $methods, true)) {
+            trigger_error(sprintf('Route "%s" (%s) binds the uploaded file "%s" but only allows %s. PHP parses multipart uploads for POST only, so the file will always be missing. Add POST to the route\'s methods.', $routeName, $controller, $upload, implode(', ', $methods)), E_USER_WARNING);
+
+            return;
+        }
+
+        $withoutFiles = array_values(array_intersect($methods, ['PUT', 'PATCH']));
+        if ([] !== $withoutFiles) {
+            trigger_error(sprintf('Route "%s" (%s) binds the uploaded file "%s" and also allows %s. PHP parses multipart uploads for POST only, so only POST delivers the file. Send uploads with POST, or drop %s from the route\'s methods.', $routeName, $controller, $upload, implode(', ', $withoutFiles), implode(', ', $withoutFiles)), E_USER_WARNING);
+        }
+    }
+
+    /**
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs
+     */
+    private function uploadName(array $specs): ?string
+    {
         foreach ($specs as $spec) {
             if ('upload' === $spec['source']) {
-                trigger_error(sprintf('Route "%s" (%s) binds the uploaded file "%s" but only allows %s. PHP parses multipart uploads for POST only, so the file will always be missing. Add POST to the route\'s methods.', $routeName, $controller, $spec['name'], implode(', ', $methods)), E_USER_WARNING);
-
-                return;
+                return $spec['name'];
             }
         }
+
+        return null;
     }
 
     private function routeLabel(object $route): string

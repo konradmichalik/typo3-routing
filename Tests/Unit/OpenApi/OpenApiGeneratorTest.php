@@ -290,6 +290,16 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function describesAnUploadOnPostOnly(): void
+    {
+        $put = $this->features()['paths']['/api/attachments']['put'];
+
+        // PHP fills $_FILES for POST only, so a PUT operation cannot receive the file.
+        self::assertSame(['application/json'], array_keys($put['requestBody']['content']));
+        self::assertSame(['q'], array_keys($put['requestBody']['content']['application/json']['schema']['properties']));
+    }
+
+    #[Test]
     public function buildsOptionalRequestBodyWithoutRequiredList(): void
     {
         $operation = $this->features()['paths']['/api/note']['post'];
@@ -512,7 +522,7 @@ final class OpenApiGeneratorTest extends TestCase
             'constrained' => ['path' => '/api/constrained/{page}', 'methods' => ['POST'], 'controller' => 'ctrl::constrained', 'env' => null, 'requirements' => []],
             'payload' => ['path' => '/api/payload', 'methods' => ['POST'], 'controller' => 'ctrl::payload', 'env' => null, 'requirements' => []],
             'upload' => ['path' => '/api/upload', 'methods' => ['POST'], 'controller' => 'ctrl::upload', 'env' => null, 'requirements' => []],
-            'attachments' => ['path' => '/api/attachments', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::attachments', 'env' => null, 'requirements' => []],
+            'attachments' => ['path' => '/api/attachments', 'methods' => ['GET', 'POST', 'PUT'], 'controller' => 'ctrl::attachments', 'env' => null, 'requirements' => []],
         ];
 
         $arguments = [

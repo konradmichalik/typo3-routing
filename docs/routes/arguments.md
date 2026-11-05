@@ -100,7 +100,7 @@ public function upload(UploadedFileInterface $file, string $title, ?UploadedFile
 
 - A **missing** required file yields the same **400** as any missing parameter. A nullable parameter or one with a default becomes `null`. An empty file field (`UPLOAD_ERR_NO_FILE`) counts as missing.
 - A file whose upload **failed** yields an error naming the parameter, optional or not: **413** for a size limit (`UPLOAD_ERR_INI_SIZE`, `UPLOAD_ERR_FORM_SIZE`), **500** for a server-side failure (`UPLOAD_ERR_NO_TMP_DIR`, `UPLOAD_ERR_CANT_WRITE`, `UPLOAD_ERR_EXTENSION`), **400** for a partial upload.
-- PHP parses uploads for **`POST`** only, so on `PUT`, `PATCH` or `DELETE` the file is always missing. A route with an upload argument that does not allow `POST` triggers a warning at container build.
+- PHP parses uploads for **`POST`** only, so on `PUT`, `PATCH` or `DELETE` the file is always missing. A route with an upload argument triggers a warning at container build when it does not allow `POST`, or when it also allows `PUT` or `PATCH`.
 - **One file per parameter.** Several files under one name (`file[]`) yield a **400**, and a variadic `UploadedFileInterface ...$files` is rejected at compile time. Inject `ServerRequestInterface` and read `getUploadedFiles()` for multi-file fields.
 - Only the interface itself is resolvable, not a concrete implementation class.
 - A `#[Param(source:)]`, a `{placeholder}` of the same name and a requirement (on `#[Route]` or `#[Param]`) are rejected at compile time.

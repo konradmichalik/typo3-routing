@@ -216,6 +216,16 @@ final class CompilerWarningsTest extends TestCase
         self::assertStringContainsString('PUT, PATCH', $warnings[0]);
     }
 
+    #[Test]
+    public function warnIfUploadWithoutPostWarnsForAnUploadRouteThatAlsoAllowsPutOrPatch(): void
+    {
+        $warnings = $this->captureWarnings(fn () => (new CompilerWarnings())->warnIfUploadWithoutPost([$this->spec('upload')], ['POST', 'PUT', 'PATCH'], 'replace', 'ctrl::replace()'));
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('Route "replace" (ctrl::replace()) binds the uploaded file "file" and also allows PUT, PATCH', $warnings[0]);
+        self::assertStringContainsString('only POST delivers the file', $warnings[0]);
+    }
+
     /**
      * @param list<string> $methods
      */
@@ -233,7 +243,7 @@ final class CompilerWarningsTest extends TestCase
      */
     public static function silentUploadRoutes(): iterable
     {
-        yield 'upload on POST' => ['upload', ['PUT', 'POST']];
+        yield 'upload on POST' => ['upload', ['GET', 'POST']];
         yield 'upload on any method' => ['upload', []];
         yield 'no upload' => ['body', ['PUT']];
     }

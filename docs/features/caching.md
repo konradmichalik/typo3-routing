@@ -21,10 +21,11 @@ public function list(int $page = 1): ResponseInterface
 |----------------|----------------|---------|-----------------------------------------------------------------------------------|
 | `lifetime`     | `int`          | `86400` | Time to live in seconds (fallback when no tag is invalidated).                    |
 | `tags`         | `list<string>` | `[]`    | Cache tags. A tag matching a table name is flushed automatically when a record of that table changes (via DataHandler). |
-| `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key (e.g. an individual `search` term).  |
+| `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key, such as tracking parameters (`utm_source`).  |
 
 - Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, path, query string (minus `ignoreParams`) and language, so host/query/language variants are cached separately — in a multi-site install two sites never share a cache entry.
 - A parameter with a [`#[Param]` value constraint](../routes/arguments.md) (`min`, `max`, `minLength`, `maxLength`) cannot be listed in `ignoreParams`, the build fails. The cache answers before arguments are checked, so a request with an invalid value would get the cached `200` instead of `400`.
+- List only parameters the controller does not read. An ignored parameter that binds a controller argument gets the response cached for another value, and an invalid value (`?page=abc` on `int $page`) gets that cached `200` instead of `400`. The build does not catch this for unconstrained parameters.
 - Invalidation rides on the TYPO3 caching framework: changing a record of a tagged table flushes the matching entries immediately; `lifetime` is the fallback. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).
 
 - Routes carrying an [`#[Authenticate]`](authentication.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.

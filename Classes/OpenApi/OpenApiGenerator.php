@@ -17,6 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, Bearer
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 
+use function array_intersect_key;
 use function array_key_exists;
 use function explode;
 use function in_array;
@@ -54,6 +55,8 @@ final readonly class OpenApiGenerator
      * @var list<string>
      */
     private const BODY_METHODS = ['POST', 'PUT', 'PATCH'];
+
+    private const VALUE_CONSTRAINTS = ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0];
 
     public function __construct(
         private RouteRegistry $registry,
@@ -137,7 +140,7 @@ final readonly class OpenApiGenerator
 
         foreach ($arguments as $argument) {
             $pattern = $route['requirements'][$argument['name']] ?? null;
-            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
+            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, self::VALUE_CONSTRAINTS));
             $description = $descriptions[$argument['name']] ?? null;
 
             match ($this->target($argument['source'], $hasBody)) {
@@ -179,9 +182,26 @@ final readonly class OpenApiGenerator
             $operation['security'] = $security;
         }
 
-        $operation['responses'] = $this->responses($name, $route, [] !== $parameters || [] !== $bodyProperties, $usedSchemas);
+        $hasInput = [] !== $parameters || [] !== $bodyProperties || self::hasConstrainedHostArgument($arguments);
+        $operation['responses'] = $this->responses($name, $route, $hasInput, $usedSchemas);
 
         return $operation;
+    }
+
+    /**
+     * A host placeholder is no API parameter, but a value constraint on it still answers 400.
+     *
+     * @param list<array<string, mixed>> $arguments
+     */
+    private static function hasConstrainedHostArgument(array $arguments): bool
+    {
+        foreach ($arguments as $argument) {
+            if ('host' === $argument['source'] && [] !== array_intersect_key($argument, self::VALUE_CONSTRAINTS)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -248,10 +268,10 @@ final readonly class OpenApiGenerator
     }
 
     /**
-     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed} $argument
-     * @param array<string, mixed>                                                                                     $schema
-     * @param array<string, array<string, mixed>>                                                                      $properties
-     * @param list<string>                                                                                             $required
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $argument
+     * @param array<string, mixed>                                                                                                                                                         $schema
+     * @param array<string, array<string, mixed>>                                                                                                                                          $properties
+     * @param list<string>                                                                                                                                                                 $required
      */
     private function collectBody(array $argument, array $schema, array &$properties, array &$required, ?string $description): void
     {

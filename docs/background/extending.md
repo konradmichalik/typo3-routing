@@ -19,7 +19,7 @@ public function __construct(
 | Method | Returns |
 |---|---|
 | `getRoutes(): array<string, array{path, methods, controller, env, requirements, priority?, defaults?, schemes?, host?, description?}>` | Every compiled route, keyed by name |
-| `getArguments(string $routeName): list<array{name, type, source, nullable, hasDefault, default}>` | The controller method's parameters, in declaration order |
+| `getArguments(string $routeName): list<array{name, type, source, nullable, hasDefault, default, min?, max?, minLength?, maxLength?}>` | The controller method's parameters, in declaration order. The four optional keys carry a [`#[Param]` value constraint](../routes/arguments.md#value-constraints) and are present only when it was set |
 | `getAuthenticators(string $routeName): list<array{service, options}>` | OR-combined authenticators; empty means public |
 | `getRequestTokenScope(string $routeName): ?string` | The expected CSRF scope, or `null` |
 | `getCacheConfig(string $routeName): ?array{lifetime, tags, ignoreParams}` | Response-cache config, or `null` |
@@ -86,10 +86,11 @@ public function __construct(
 $argument = $this->routes->getArguments('example_item')[0];
 $pattern = $this->routes->getRoutes()['example_item']['requirements'][$argument['name']] ?? null;
 // A requirement of '' means "presence only" (see #[Route]), not a regex — normalise it away.
-$schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern);
+$constraints = array_intersect_key($argument, ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0]);
+$schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, $constraints);
 ```
 
-`schemaForType(?string $type, ?string $pattern = null): array`
+`schemaForType(?string $type, ?string $pattern = null, array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints = []): array`
 
 | `$type` | Resulting schema |
 |---|---|
@@ -102,11 +103,12 @@ $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? nul
 | A **backed** enum's class name | `{"type": …, "enum": [<backing values accepted by `$pattern`>]}`, `integer` for an `int` backing type, `string` otherwise |
 | An Extbase domain object's class name | `{"type": "integer"}` — the record UID |
 
-Four details are part of the contract rather than incidental:
+Five details are part of the contract rather than incidental:
 
 - **`$pattern` becomes a `pattern` keyword only on a `{"type": "string"}` schema.** It is the route's `requirements` regex for that argument. It is applied as `pattern` *only* when the mapping above produced a plain string schema — never to an `integer`/`number`/`boolean`/`array` schema, never to `mixed`, and never to a domain object. Pass `null` when there is no pattern — the mapper treats **only** `null` that way. A requirement of `''` means "presence only" rather than a regex (see [`#[Route]`](../../Classes/Attribute/Route.php)), so normalise it to `null` yourself before calling; `''` would otherwise land in the schema as `"pattern": ""`.
 - **On an enum, `$pattern` narrows the `enum` list instead of becoming a `pattern`.** A requirement applies to the raw wire value regardless of the argument's PHP type, so a route may accept fewer cases than the enum declares — `requirements: ['status' => 'active']` on a `Status{active,inactive}` argument matches only `active`, and a document listing both would advertise a value the router answers with a 404. The cases are therefore filtered and `enum` alone states the result; no `pattern` is added, since it would restate the same constraint. Matching mirrors enforcement exactly — anchored and grouped (`#^(?:…)$#`), the form [`ControllerInvoker`](../../Classes/Routing/ControllerInvoker.php) and Symfony's matcher both use — so a case merely *containing* the requirement is dropped. Two edge cases: a requirement no case satisfies yields `"enum": []`, which honestly describes a route that can never match; a requirement that is not a usable regex cannot be evaluated, so the list stays unnarrowed rather than claiming nothing is acceptable. Note this narrowing arrived in **`0.5.0`** — earlier releases ignored the requirement on enum-typed arguments entirely.
 - **An Extbase domain object describes its UID, not the object.** Such an argument is resolved by looking the record up by UID, and `ControllerArgumentResolver::toEntity()` accepts nothing but an integer — so `integer` is what a client has to send. Note this is a **change from earlier `0.x` releases**, which described these arguments as `{"type": "string"}`; an OpenAPI document regenerated after upgrading will differ for every entity-typed argument.
+- **`$constraints` adds the argument's value constraints.** The `min`, `max`, `minLength` and `maxLength` keys of a `getArguments()` entry become `minimum`, `maximum`, `minLength` and `maxLength`, after the type keywords. An argument without constraints yields exactly the schema it did before.
 - **Only backed enums are expected.** The extension's own compile step rejects a pure enum outright, so one cannot reach this mapper through a registered route. An external caller passing one gets `{"type": "string", "enum": []}` rather than an exception.
 
 `JsonSchemaMapper` gained a second `@api` method in **`1.1.0`**: `objectSchemaForClass(string $class): array`. Where `schemaForType()` maps a single argument's type, `objectSchemaForClass()` maps a whole DTO class — its public properties (plain or promoted constructor properties alike) become an object schema's `properties`, used by [`#[Returns]`](../operating/openapi.md#declaring-a-response-schema) to describe a route's response body:

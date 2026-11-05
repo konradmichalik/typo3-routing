@@ -113,6 +113,21 @@ final class OpenApiGeneratorTest extends TestCase
 
         // A host placeholder is not part of the path template, so OpenAPI has no place for it.
         self::assertArrayNotHasKey('parameters', $operation);
+        self::assertArrayNotHasKey(400, $operation['responses']);
+    }
+
+    #[Test]
+    public function documentsTheBadRequestOfAConstrainedHostPlaceholder(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, host?: string|null}> $routes */
+        $routes = ['tenant' => ['path' => '/api/status', 'methods' => ['GET'], 'controller' => 'ctrl::status', 'env' => null, 'requirements' => [], 'host' => '{subdomain}.example.com']];
+        $arguments = ['tenant' => [['name' => 'subdomain', 'type' => 'string', 'source' => 'host', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'maxLength' => 20]]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), arguments: $arguments);
+
+        $operation = $this->generator($registry)->generate('My API', '2.0.0', '/api/')['paths']['/api/status']['get'];
+
+        self::assertArrayNotHasKey('parameters', $operation);
+        self::assertArrayHasKey(400, $operation['responses']);
     }
 
     #[Test]
@@ -234,6 +249,15 @@ final class OpenApiGeneratorTest extends TestCase
         $params = $this->schemasByName($this->features()['paths']['/api/types']['get']['parameters']);
 
         self::assertSame(['type' => 'integer'], $params['item']);
+    }
+
+    #[Test]
+    public function exportsParamConstraintsOnPathAndBodySchemas(): void
+    {
+        $operation = $this->features()['paths']['/api/constrained/{page}']['post'];
+
+        self::assertSame(['type' => 'number', 'minimum' => 0, 'maximum' => 1.5], $this->schemasByName($operation['parameters'])['page']);
+        self::assertSame(['type' => 'string', 'minLength' => 2, 'maxLength' => 200], $operation['requestBody']['content']['application/json']['schema']['properties']['q']);
     }
 
     #[Test]
@@ -444,6 +468,7 @@ final class OpenApiGeneratorTest extends TestCase
             'courses' => ['path' => '/api/courses', 'methods' => ['GET'], 'controller' => 'ctrl::courses', 'env' => null, 'requirements' => []],
             'noBody' => ['path' => '/api/no-body', 'methods' => ['GET'], 'controller' => 'ctrl::noBody', 'env' => null, 'requirements' => []],
             'nullableFields' => ['path' => '/api/nullable-fields', 'methods' => ['GET'], 'controller' => 'ctrl::nullableFields', 'env' => null, 'requirements' => []],
+            'constrained' => ['path' => '/api/constrained/{page}', 'methods' => ['POST'], 'controller' => 'ctrl::constrained', 'env' => null, 'requirements' => []],
         ];
 
         $arguments = [
@@ -472,6 +497,10 @@ final class OpenApiGeneratorTest extends TestCase
             'courses' => [],
             'noBody' => [],
             'nullableFields' => [],
+            'constrained' => [
+                ['name' => 'page', 'type' => 'float', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'min' => 0, 'max' => 1.5],
+                ['name' => 'q', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'minLength' => 2, 'maxLength' => 200],
+            ],
         ];
 
         $returns = [

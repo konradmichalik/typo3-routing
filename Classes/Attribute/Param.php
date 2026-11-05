@@ -26,15 +26,23 @@ use Attribute;
 final readonly class Param
 {
     /**
-     * @param string|null $name        Input/path key to read instead of the parameter name
-     * @param string|null $source      Pin the value source: "path", "query", "body" or "input" (query + body)
-     * @param string|null $requirement Regex the value must satisfy, hoisted into the route's requirements
-     * @param string|null $description Human-readable summary of the parameter, surfaced in the OpenAPI export
+     * @param string|null    $name        Input/path key to read instead of the parameter name
+     * @param string|null    $source      Pin the value source: "path", "query", "body" or "input" (query + body)
+     * @param string|null    $requirement Regex the value must satisfy, hoisted into the route's requirements
+     * @param string|null    $description Human-readable summary of the parameter, surfaced in the OpenAPI export
+     * @param int|float|null $min         Smallest accepted value (inclusive) of an int or float parameter
+     * @param int|float|null $max         Largest accepted value (inclusive) of an int or float parameter
+     * @param int|null       $minLength   Fewest characters (not bytes) a string parameter accepts
+     * @param int|null       $maxLength   Most characters (not bytes) a string parameter accepts
      */
     public function __construct(
         public ?string $name = null,
         public ?string $source = null,
         public ?string $requirement = null,
         public ?string $description = null,
+        public int|float|null $min = null,
+        public int|float|null $max = null,
+        public ?int $minLength = null,
+        public ?int $maxLength = null,
     ) {}
 }

@@ -91,6 +91,8 @@ By default the lookup key is the parameter name and the source is auto-derived. 
 | `source`      | Pin the source: `path`, `query`, `body` (form or JSON), or `input` (query + body). |
 | `requirement` | Regex the value must satisfy, equivalent to a [`requirements`](route-attribute.md#requirements) entry on the `#[Route]`. |
 | `description` | Human-readable summary of the parameter, surfaced in the [OpenAPI export](../operating/openapi.md). |
+| `min`, `max`  | Inclusive range of an `int` or `float` parameter. See [Value constraints](#value-constraints). |
+| `minLength`, `maxLength` | Inclusive length of a `string` parameter, in characters. See [Value constraints](#value-constraints). |
 
 ```php
 use KonradMichalik\Typo3Routing\Attribute\Param;
@@ -135,8 +137,35 @@ public function filter(
 ): ResponseInterface { /* … */ }
 ```
 
+### Value constraints
+
+`min`/`max` bound a number and `minLength`/`maxLength` bound the length of a string, so range and length checks no longer have to be repeated in every controller:
+
+```php
+#[Route(path: '/api/courses', name: 'courses_search')]
+public function search(
+    #[Param(min: 1, max: 100)] int $limit = 20,
+    #[Param(name: 'q', minLength: 2, maxLength: 200)] ?string $term = null,
+): ResponseInterface { /* … */ }
+```
+
+- **Checked before the controller is called**, on the value after type coercion: `?limit=010` is compared as `10`. A value outside the bounds answers `400` with the same problem response as a value that cannot be coerced, naming the wire parameter (`Invalid value for parameter: q`). All bounds are inclusive.
+- **Length counts characters, not bytes** (`mb_strlen`): `äöü` has a length of 3.
+- **A number that overflows to infinity never passes a range**: `?ratio=1e999` on `#[Param(min: 0)] float $ratio` is a `400`.
+- **Only a received value is checked at request time.** A missing parameter falls back to its PHP default unchecked, so `string $q = ''` with `minLength: 2` keeps `?q` optional. A path placeholder is the exception, see below.
+- **Path placeholders answer `400` too.** A `requirement` decides whether the route matches at all, so its violation is a `404`. A constraint is checked once the route is known, like the type of the value, so `/api/blog/0` with `#[Param(min: 1)] int $page` is a `400`, the same as `/api/blog/abc` for an `int $page` without a requirement.
+- **A variadic is checked per element**: `#[Param(min: 1)] int ...$ids` rejects `?ids[]=3&ids[]=0`.
+- **`routing:debug <route>`** lists them in the argument's line (`$limit (int, from input, min: 1, max: 100)`), and `getArguments()` reports them as optional keys for [consumers of the metadata API](../background/extending.md).
+- **The [OpenAPI export](../operating/openapi.md)** states them as `minimum`, `maximum`, `minLength` and `maxLength` on the schema of the path or query parameter, or of the request-body property.
+
 Rejected at build time, so the route definition never contradicts itself:
 
 - A key **constrained** on both the method's `#[Route]` and a `#[Param]`, or **defaulted** on both — the two could disagree, and the `#[Param]` would silently win. A *class-level* `#[Route]` requirement or default is only a base and stays overridable.
 - `requirement: ''` on a defaulted parameter — `''` means "must be present", which the default contradicts.
 - A default on a placeholder that is not at the end of the path — only a trailing placeholder can become optional, so the default would be silently inert.
+- `min`/`max` on anything but an `int` or `float` parameter, and `minLength`/`maxLength` on anything but a `string` parameter. Untyped and `mixed` parameters, backed enums and entities have no single value to compare, so a constraint there is rejected rather than ignored.
+- `min` greater than `max`, `minLength` greater than `maxLength`, or a negative length: no value could pass.
+- A `min` or `max` of `INF`, `-INF` or `NAN`: it bounds nothing and cannot be exported to JSON.
+- A float `min` or `max` on an `int` parameter, even a whole number like `5.0`. `min: 1.1, max: 1.9` holds no integer, and a float beyond 2^53 cannot be compared exactly. Write the bound as an int.
+- A constrained query or body parameter listed in [`#[Cache(ignoreParams:)]`](../features/caching.md). The cache answers before the check runs, so an invalid value would get the cached `200`.
+- A PHP default outside the bounds on a path or host placeholder, such as `/list/{limit}` with `#[Param(max: 100)] int $limit = 500`. The router fills a left-out segment with the default, which would then answer `400`. The same applies to a `#[Route(defaults:)]` entry for that placeholder, on the method or the class.

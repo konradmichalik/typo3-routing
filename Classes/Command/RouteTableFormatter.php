@@ -29,7 +29,7 @@ use function sprintf;
 final class RouteTableFormatter
 {
     /**
-     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>} $row
+     * @param array{name: string, path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, schemes: list<string>, host: string|null, description: string|null, auth: list<string>, csrf: string|null, cache: array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null, rateLimit: array{limit: int, interval: string, policy: string, keyBy: string}|null, arguments: list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}>} $row
      *
      * @return list<string>
      */
@@ -66,7 +66,7 @@ final class RouteTableFormatter
     }
 
     /**
-     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $arguments
      */
     public static function arguments(array $arguments): string
     {
@@ -78,7 +78,13 @@ final class RouteTableFormatter
         foreach ($arguments as $argument) {
             $type = $argument['type'] ?? 'mixed';
             $suffix = $argument['nullable'] ? '?' : '';
-            $parts[] = sprintf('$%s (%s%s, from %s)', $argument['name'], $suffix, $type, $argument['source']);
+            $constraints = '';
+            foreach (['min', 'max', 'minLength', 'maxLength'] as $key) {
+                if (isset($argument[$key])) {
+                    $constraints .= sprintf(', %s: %s', $key, $argument[$key]);
+                }
+            }
+            $parts[] = sprintf('$%s (%s%s, from %s%s)', $argument['name'], $suffix, $type, $argument['source'], $constraints);
         }
 
         return implode(\PHP_EOL, $parts);

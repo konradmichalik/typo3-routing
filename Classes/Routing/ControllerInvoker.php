@@ -22,6 +22,7 @@ use TYPO3\CMS\Core\Http\ImmediateResponseException;
 use function array_flip;
 use function array_intersect_key;
 use function array_key_exists;
+use function array_keys;
 use function array_map;
 use function assert;
 use function explode;
@@ -30,6 +31,7 @@ use function is_array;
 use function is_object;
 use function is_string;
 use function sprintf;
+use function str_contains;
 
 /**
  * ControllerInvoker.
@@ -124,13 +126,14 @@ final readonly class ControllerInvoker
     }
 
     /**
-     * Validates `requirements` whose name is not a matched path placeholder against the query and parsed
+     * Validates `requirements` whose name is not a path or host placeholder against the query and parsed
      * body: a missing parameter or a value violating the regex yields a 400.
      *
      * A key the compiler marked optional — its requirement came from a #[Param] on a parameter with a
      * PHP default — is "optional but constrained": its absence falls back to that default instead of
      * being an error, while a value that is present is still checked against the pattern. A
-     * requirement declared on the #[Route] itself stays mandatory, PHP default or not.
+     * requirement declared on the #[Route] itself stays mandatory, PHP default or not. A route
+     * `defaults` entry for a name that is no placeholder makes the input optional the same way.
      *
      * @param array<string, mixed> $match
      */
@@ -138,12 +141,15 @@ final readonly class ControllerInvoker
     {
         $requirements = $match['_requirements'] ?? null;
         $inputs = array_merge($request->getQueryParams(), RequestBody::toArray($request));
-        $optional = $this->registry->getOptionalInputs((string) ($match['_route'] ?? ''));
+        $routeName = (string) ($match['_route'] ?? '');
+        // A route default lands in $match as well, so its input may be absent but is checked when present.
+        $optional = [...$this->registry->getOptionalInputs($routeName), ...array_keys($match)];
+        $route = $this->registry->getRoutes()[$routeName] ?? null;
 
         foreach (is_array($requirements) ? $requirements : [] as $name => $pattern) {
             $key = (string) $name;
-            // A matched path placeholder is already validated by the matcher.
-            if (array_key_exists($key, $match)) {
+            // The matcher already validated placeholders. Being in $match is not enough: defaults are too.
+            if (self::isPlaceholder($key, $route, $match)) {
                 continue;
             }
             if (!array_key_exists($key, $inputs)) {
@@ -211,6 +217,24 @@ final readonly class ControllerInvoker
         }
 
         return $request;
+    }
+
+    /**
+     * Substring tests instead of a regex per request. The inline forms `{name<...>}` and `{name?...}`
+     * are covered because PlaceholderSyntaxGuard checks paths only, never the host.
+     *
+     * @param array{path: string, host?: string|null}|null $route
+     * @param array<string, mixed>                         $match
+     */
+    private static function isPlaceholder(string $key, ?array $route, array $match): bool
+    {
+        // Without a registry row, fall back to the match as before: defaults are indistinguishable there.
+        if (null === $route) {
+            return array_key_exists($key, $match);
+        }
+        $patterns = $route['path'].' '.($route['host'] ?? '');
+
+        return str_contains($patterns, '{'.$key.'}') || str_contains($patterns, '{'.$key.'<') || str_contains($patterns, '{'.$key.'?');
     }
 
     /**

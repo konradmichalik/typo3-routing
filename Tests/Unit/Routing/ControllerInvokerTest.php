@@ -196,6 +196,84 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function skipsAPathPlaceholderRequirementEvenWhenTheQueryCarriesTheSameName(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'item', '_requirements' => ['id' => '\d+'], 'id' => '42'],
+            $this->request(['id' => 'abc']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function skipsAHostPlaceholderRequirement(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'tenant', '_requirements' => ['tenant' => '[a-z]+'], 'tenant' => 'acme'],
+            $this->request(['tenant' => '123']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function skipsAnInlineHostPlaceholderRequirement(): void
+    {
+        // PlaceholderSyntaxGuard checks paths only, so a host may still use the inline forms.
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'inlineTenant', '_requirements' => ['tenant' => '[a-z]+'], 'tenant' => 'acme'],
+            $this->request(['tenant' => '123']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function treatsAMatchedKeyAsPlaceholderWhenTheRouteIsUnknownToTheRegistry(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'unregistered', '_requirements' => ['id' => '\d+'], 'id' => '42'],
+            $this->request(['id' => 'abc']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function rejectsAnInvalidInputWhoseNameOnlyHasARouteDefault(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'listing', '_requirements' => ['sort' => 'asc|desc'], 'sort' => 'asc'],
+            $this->request(['sort' => 'evil']),
+        );
+
+        self::assertSame('Invalid value for parameter: sort', $error);
+    }
+
+    #[Test]
+    public function acceptsAValidInputWhoseNameOnlyHasARouteDefault(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'listing', '_requirements' => ['sort' => 'asc|desc'], 'sort' => 'asc'],
+            $this->request(['sort' => 'desc']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function treatsAnAbsentInputWithARouteDefaultAsOptional(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'listing', '_requirements' => ['sort' => 'asc|desc'], 'sort' => 'asc'],
+            $this->request(),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
     public function acceptsARequirementWithoutAPattern(): void
     {
         $error = $this->invoker()->firstInputRequirementError(
@@ -364,7 +442,15 @@ final class ControllerInvokerTest extends TestCase
         // 'jsonError' and 'shortCircuit' both opted into converting an uncaught exception to a
         // generic JSON error — 'shortCircuit' proves an ImmediateResponseException is excluded
         // from that conversion even so.
-        return new RouteRegistry([], $locator, arguments: $arguments, optionalInputs: ['optional' => ['page']], jsonErrorRoutes: ['jsonError' => true, 'shortCircuit' => true]);
+        // Only the path and host matter here: they tell a placeholder from a name that just has a default.
+        $routes = [
+            'item' => ['path' => '/api/items/{id}', 'methods' => [], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
+            'tenant' => ['path' => '/api/tenant', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['tenant' => '[a-z]+'], 'host' => '{tenant}.example.com'],
+            'inlineTenant' => ['path' => '/api/inline-tenant', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'host' => '{tenant<[a-z]+>}.example.com'],
+            'listing' => ['path' => '/api/list', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['sort' => 'asc|desc'], 'defaults' => ['sort' => 'asc']],
+        ];
+
+        return new RouteRegistry($routes, $locator, arguments: $arguments, optionalInputs: ['optional' => ['page']], jsonErrorRoutes: ['jsonError' => true, 'shortCircuit' => true]);
     }
 
     /**

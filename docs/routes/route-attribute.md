@@ -57,6 +57,8 @@ The default flows through everywhere the placeholder does: it is available as a 
 
 Keys starting with `_` are reserved for internal metadata and are rejected at build time.
 
+A default for a name that is no path or host placeholder only becomes a request attribute. It does not exempt a query or body input of the same name from its requirement: a present value is still checked, and only an absent one is accepted.
+
 Instead of repeating the placeholder name in `defaults`, a [`#[Param]`](arguments.md#declaring-the-constraint-at-the-parameter) on the parameter contributes its PHP default — `public function blog(#[Param] int $page = 1)` makes the trailing `{page}` optional without a `defaults` entry.
 
 ## Matched route name

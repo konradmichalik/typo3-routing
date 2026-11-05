@@ -18,6 +18,7 @@ use KonradMichalik\Typo3Routing\Routing\ArgumentConstraints;
 use LogicException;
 
 use function array_filter;
+use function array_intersect_key;
 use function array_key_exists;
 use function in_array;
 use function is_finite;
@@ -80,6 +81,26 @@ final class ParamConstraintGuard
             $default = $defaults[$spec['name']];
             if (ArgumentConstraints::violates(self::coerced($default, $spec['type']), $spec)) {
                 throw new LogicException(sprintf('#[Route] default for "%s" on "%s" is %s, which breaks the #[Param] constraints of that parameter. Fix the default or the constraints.', $spec['name'], $where, var_export($default, true)), 1750000064);
+            }
+        }
+    }
+
+    /**
+     * The response cache answers before arguments are resolved, so a request differing only in an ignored
+     * parameter would get the cached 200 instead of its 400. A placeholder is part of the path or host,
+     * which the cache key always includes.
+     *
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs
+     * @param list<string>                                                                                                                                                                       $ignoreParams
+     */
+    public static function assertNotIgnoredByCache(array $specs, array $ignoreParams, string $where): void
+    {
+        foreach ($specs as $spec) {
+            if (!in_array($spec['name'], $ignoreParams, true) || in_array($spec['source'], ['path', 'host'], true)) {
+                continue;
+            }
+            if ([] !== array_intersect_key($spec, ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0])) {
+                throw new LogicException(sprintf('#[Cache(ignoreParams:)] on "%s" names "%s", which has a #[Param] value constraint. A cached response would be served without checking it. Remove it from ignoreParams or drop the constraint.', $where, $spec['name']), 1750000066);
             }
         }
     }

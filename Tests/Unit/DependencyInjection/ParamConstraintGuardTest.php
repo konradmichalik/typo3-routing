@@ -248,6 +248,41 @@ final class ParamConstraintGuardTest extends TestCase
         ], ['limit' => $default], 'ctrl::list()');
     }
 
+    #[Test]
+    public function rejectsACacheIgnoringAConstrainedInput(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000066);
+        $this->expectExceptionMessage('#[Cache(ignoreParams:)] on "ctrl::list()" names "limit", which has a #[Param] value constraint');
+
+        ParamConstraintGuard::assertNotIgnoredByCache([$this->spec('limit', 'int', 'input', ['max' => 100])], ['limit'], 'ctrl::list()');
+    }
+
+    /**
+     * @return iterable<string, array{string, array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int}}>
+     */
+    public static function argumentsTheCacheMayIgnore(): iterable
+    {
+        yield 'unconstrained input' => ['input', []];
+        yield 'constrained path placeholder, part of the cache key anyway' => ['path', ['max' => 100]];
+        yield 'constrained host placeholder, part of the cache key anyway' => ['host', ['max' => 100]];
+    }
+
+    /**
+     * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints
+     */
+    #[Test]
+    #[DataProvider('argumentsTheCacheMayIgnore')]
+    public function acceptsACacheIgnoringAnArgumentThatCannotFail(string $source, array $constraints): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        ParamConstraintGuard::assertNotIgnoredByCache([
+            $this->spec('limit', 'int', $source, $constraints),
+            $this->spec('page', 'int', 'input', ['min' => 1]),
+        ], ['limit'], 'ctrl::list()');
+    }
+
     /**
      * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints
      *

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Command;
 
+use KonradMichalik\Typo3Routing\Routing\ArgumentConstraints;
+
 use function gmdate;
 use function implode;
 use function mb_strlen;
@@ -79,7 +81,7 @@ final class RouteTableFormatter
             $type = $argument['type'] ?? 'mixed';
             $suffix = $argument['nullable'] ? '?' : '';
             $constraints = '';
-            foreach (['min', 'max', 'minLength', 'maxLength'] as $key) {
+            foreach (array_keys(ArgumentConstraints::KEYS) as $key) {
                 if (isset($argument[$key])) {
                     $constraints .= sprintf(', %s: %s', $key, $argument[$key]);
                 }

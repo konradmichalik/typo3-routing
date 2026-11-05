@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\OpenApi;
 
 use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, BearerTokenAuthenticator, FrontendUserAuthenticator};
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
-use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
+use KonradMichalik\Typo3Routing\Routing\{ArgumentConstraints, RouteRegistry};
 
 use function array_column;
 use function array_intersect_key;
@@ -56,8 +56,6 @@ final readonly class OpenApiGenerator
      * @var list<string>
      */
     private const BODY_METHODS = ['POST', 'PUT', 'PATCH'];
-
-    private const VALUE_CONSTRAINTS = ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0];
 
     public function __construct(
         private RouteRegistry $registry,
@@ -143,7 +141,7 @@ final readonly class OpenApiGenerator
 
         foreach ($arguments as $argument) {
             $pattern = $route['requirements'][$argument['name']] ?? null;
-            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, self::VALUE_CONSTRAINTS));
+            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, ArgumentConstraints::KEYS));
             $description = $descriptions[$argument['name']] ?? null;
 
             match ($this->target($argument['source'], $hasBody, $acceptsUpload)) {
@@ -199,7 +197,7 @@ final readonly class OpenApiGenerator
     private static function hasConstrainedHostArgument(array $arguments): bool
     {
         foreach ($arguments as $argument) {
-            if ('host' === $argument['source'] && [] !== array_intersect_key($argument, self::VALUE_CONSTRAINTS)) {
+            if ('host' === $argument['source'] && [] !== array_intersect_key($argument, ArgumentConstraints::KEYS)) {
                 return true;
             }
         }

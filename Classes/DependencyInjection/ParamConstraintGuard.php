@@ -99,7 +99,7 @@ final class ParamConstraintGuard
             if (!in_array($spec['name'], $ignoreParams, true) || in_array($spec['source'], ['path', 'host'], true)) {
                 continue;
             }
-            if ([] !== array_intersect_key($spec, ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0])) {
+            if ([] !== array_intersect_key($spec, ArgumentConstraints::KEYS)) {
                 throw new LogicException(sprintf('#[Cache(ignoreParams:)] on "%s" names "%s", which has a #[Param] value constraint. A cached response would be served without checking it. Remove it from ignoreParams or drop the constraint.', $where, $spec['name']), 1750000066);
             }
         }

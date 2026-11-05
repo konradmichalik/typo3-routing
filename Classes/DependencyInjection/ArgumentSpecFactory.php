@@ -205,7 +205,7 @@ final class ArgumentSpecFactory
     {
         $type = $parameter->getType();
         if (null !== $type && !$type instanceof ReflectionNamedType) {
-            throw new LogicException(sprintf('Union/intersection type on parameter "$%s" of "%s" is not supported by route argument resolution.', $parameter->getName(), $where), 1750000003);
+            throw new LogicException(sprintf('Union/intersection type on parameter "$%s" of "%s" is not supported by route argument resolution.', $parameter->getName(), $where), 1750000054);
         }
 
         $name = $parameter->getName();

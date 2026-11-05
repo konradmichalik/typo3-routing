@@ -39,7 +39,7 @@ final readonly class RouteAliasCollector
         foreach ($aliases as $alias) {
             $prefixedAlias = $namePrefix.$alias;
             if (isset($collected->aliases[$prefixedAlias]) && $collected->aliases[$prefixedAlias] !== $routeName) {
-                throw new LogicException(sprintf('Route alias "%s" is declared by both "%s" and "%s" (%s::%s()). Each alias name must be unique.', $prefixedAlias, $collected->aliases[$prefixedAlias], $routeName, $serviceId, $methodName), 1750000033);
+                throw new LogicException(sprintf('Route alias "%s" is declared by both "%s" and "%s" (%s::%s()). Each alias name must be unique.', $prefixedAlias, $collected->aliases[$prefixedAlias], $routeName, $serviceId, $methodName), 1750000060);
             }
             $collected->aliases[$prefixedAlias] = $routeName;
         }
@@ -55,7 +55,7 @@ final readonly class RouteAliasCollector
     {
         foreach ($collected->aliases as $alias => $owner) {
             if (isset($collected->routes[$alias])) {
-                throw new LogicException(sprintf('Route alias "%s" declared by "%s" collides with an existing route of the same name.', $alias, $owner), 1750000032);
+                throw new LogicException(sprintf('Route alias "%s" declared by "%s" collides with an existing route of the same name.', $alias, $owner), 1750000058);
             }
         }
     }

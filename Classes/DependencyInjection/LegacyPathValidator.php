@@ -65,7 +65,7 @@ final readonly class LegacyPathValidator
                 $declaredPlaceholders = self::placeholders($route['path']);
                 $legacyPlaceholders = self::placeholders($legacyPath);
                 if ($declaredPlaceholders !== $legacyPlaceholders) {
-                    throw new LogicException(sprintf('Legacy path "%s" on route "%s" declares placeholders {%s}, but the route\'s path "%s" declares {%s}. A legacy path must use the exact same placeholder names as the declared path.', $legacyPath, $name, implode(', ', $legacyPlaceholders), $route['path'], implode(', ', $declaredPlaceholders)), 1750000037);
+                    throw new LogicException(sprintf('Legacy path "%s" on route "%s" declares placeholders {%s}, but the route\'s path "%s" declares {%s}. A legacy path must use the exact same placeholder names as the declared path.', $legacyPath, $name, implode(', ', $legacyPlaceholders), $route['path'], implode(', ', $declaredPlaceholders)), 1750000062);
                 }
             }
         }
@@ -98,7 +98,7 @@ final readonly class LegacyPathValidator
         }
 
         if ($this->overlapsAMatcher($matcher, $legacyPath) || (null !== $caseInsensitiveMatcher && $this->overlapsAMatcher($caseInsensitiveMatcher, $legacyPath))) {
-            throw new LogicException(sprintf('Legacy path "%s" on route "%s" overlaps with a declared #[Route] path (a placeholder, a trailing-slash variant, or a #[Route(caseInsensitive: true)] route matching it in another case). The primary matcher runs before legacy paths are ever consulted, so this legacy path could never be reached.', $legacyPath, $name), 1750000035);
+            throw new LogicException(sprintf('Legacy path "%s" on route "%s" overlaps with a declared #[Route] path (a placeholder, a trailing-slash variant, or a #[Route(caseInsensitive: true)] route matching it in another case). The primary matcher runs before legacy paths are ever consulted, so this legacy path could never be reached.', $legacyPath, $name), 1750000061);
         }
 
         if (isset($claimedBy[$legacyPath])) {

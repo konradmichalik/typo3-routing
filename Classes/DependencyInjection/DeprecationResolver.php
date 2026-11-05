@@ -71,7 +71,7 @@ final readonly class DeprecationResolver
         $sunset = null !== $deprecation->sunset ? $this->parse($deprecation->sunset, 'sunset', $name, $serviceId, $method) : null;
 
         if (null !== $sunset && $sunset < $since) {
-            throw new LogicException(sprintf('#[DeprecatedRoute] on "%s::%s()" (route "%s") has a "sunset" earlier than "since": a route cannot stop being supported before it was deprecated.', $serviceId, $method, $name), 1750000032);
+            throw new LogicException(sprintf('#[DeprecatedRoute] on "%s::%s()" (route "%s") has a "sunset" earlier than "since": a route cannot stop being supported before it was deprecated.', $serviceId, $method, $name), 1750000057);
         }
 
         $collected->deprecations[$name] = [
@@ -101,7 +101,7 @@ final readonly class DeprecationResolver
         try {
             return (new DateTimeImmutable($value, new DateTimeZone('UTC')))->getTimestamp();
         } catch (Exception) {
-            throw new LogicException(sprintf('#[DeprecatedRoute] on "%s::%s()" (route "%s") has an unparseable "%s" value: "%s".', $serviceId, $method, $name, $field, $value), 1750000033);
+            throw new LogicException(sprintf('#[DeprecatedRoute] on "%s::%s()" (route "%s") has an unparseable "%s" value: "%s".', $serviceId, $method, $name, $field, $value), 1750000059);
         }
     }
 }

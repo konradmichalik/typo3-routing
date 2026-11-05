@@ -92,7 +92,7 @@ final class LegacyPathValidatorTest extends TestCase
         ];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000035);
+        $this->expectExceptionCode(1750000061);
         $this->expectExceptionMessageMatches('/^Legacy path "\/api\/item\/42" on route "renamed" overlaps with a declared #\[Route\] path/');
 
         (new LegacyPathValidator())->assertNoCollisions($collected);
@@ -108,7 +108,7 @@ final class LegacyPathValidatorTest extends TestCase
         ];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000035);
+        $this->expectExceptionCode(1750000061);
 
         (new LegacyPathValidator())->assertNoCollisions($collected);
     }
@@ -123,7 +123,7 @@ final class LegacyPathValidatorTest extends TestCase
         ];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000035);
+        $this->expectExceptionCode(1750000061);
 
         (new LegacyPathValidator())->assertNoCollisions($collected);
     }
@@ -142,7 +142,7 @@ final class LegacyPathValidatorTest extends TestCase
         ];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000035);
+        $this->expectExceptionCode(1750000061);
 
         (new LegacyPathValidator())->assertNoCollisions($collected);
     }
@@ -184,7 +184,7 @@ final class LegacyPathValidatorTest extends TestCase
         ];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000037);
+        $this->expectExceptionCode(1750000062);
         $this->expectExceptionMessageMatches('/^Legacy path "\/legacy\/\{oldId\}" on route "show" declares placeholders \{oldId\}, but the route\'s path "\/api\/\{id\}" declares \{id\}\./');
 
         (new LegacyPathValidator())->assertNoCollisions($collected);

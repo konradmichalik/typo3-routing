@@ -47,7 +47,7 @@ final class RouteCompileGuardTest extends TestCase
         $routes = ['broken' => ['path' => '/api/broken/{id}/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::broken', 'env' => null, 'requirements' => []]];
 
         $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000026);
+        $this->expectExceptionCode(1750000055);
         $this->expectExceptionMessageMatches('/^Route "broken" \(ctrl::broken\) failed to compile:/');
 
         (new RouteCompileGuard())->assertCompiles(RouteRegistry::buildCollection($routes), $routes);

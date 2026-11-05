@@ -78,7 +78,7 @@ final readonly class RateLimitResolver
         }
 
         if (!in_array($rateLimit->policy, self::SUPPORTED_POLICIES, true)) {
-            throw new LogicException(sprintf('Unsupported #[RateLimit] policy "%s" on "%s::%s()". Supported policies are "%s".', $rateLimit->policy, $serviceId, $method, implode('", "', self::SUPPORTED_POLICIES)), 1750000001);
+            throw new LogicException(sprintf('Unsupported #[RateLimit] policy "%s" on "%s::%s()". Supported policies are "%s".', $rateLimit->policy, $serviceId, $method, implode('", "', self::SUPPORTED_POLICIES)), 1750000053);
         }
 
         if (!in_array($rateLimit->keyBy, self::SUPPORTED_KEYS, true)) {

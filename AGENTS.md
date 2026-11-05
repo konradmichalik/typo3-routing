@@ -67,6 +67,7 @@ CI runs PHPUnit through a reusable workflow on PHP 8.2 to 8.5, TYPO3 13.4, 14.0 
 - Rector for TYPO3 and PHP 8.2 modernization (`Tests/CGL/rector.php`)
 - `declare(strict_types=1)` everywhere, `final readonly` where sensible
 - Keep 100% line coverage
+- New exception codes are `1750000xxx`. Take the next number above the highest one on `main` and in open pull requests; `ExceptionCodeUniquenessTest` fails on any ten-digit code used twice
 
 ## Git workflow
 

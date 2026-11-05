@@ -45,7 +45,7 @@ final readonly class RouteCompileGuard
             } catch (Throwable $exception) {
                 $controller = $routes[$name]['controller'] ?? 'unknown controller';
 
-                throw new LogicException(sprintf('Route "%s" (%s) failed to compile: %s', $name, $controller, $exception->getMessage()), 1750000026, $exception);
+                throw new LogicException(sprintf('Route "%s" (%s) failed to compile: %s', $name, $controller, $exception->getMessage()), 1750000055, $exception);
             }
         }
     }

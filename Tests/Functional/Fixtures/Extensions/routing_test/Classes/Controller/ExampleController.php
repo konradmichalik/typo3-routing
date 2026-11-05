@@ -109,6 +109,13 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['page' => $page]);
     }
 
+    #[Route(path: '/api/example/sorted', name: 'example_sorted', requirements: ['sort' => 'asc|desc'], defaults: ['sort' => 'asc'])]
+    public function sorted(ServerRequestInterface $request): JsonResponse
+    {
+        // A default for a name that is no placeholder: a request attribute, while ?sort= is still checked.
+        return new JsonResponse(['attribute' => $request->getAttributes()['sort'] ?? null, 'query' => $request->getQueryParams()['sort'] ?? null]);
+    }
+
     #[Route(path: '/api/example/status/{status}', name: 'example_status')]
     public function status(Status $status): JsonResponse
     {

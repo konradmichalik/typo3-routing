@@ -297,6 +297,32 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function returnsBadRequestWhenAnInputWithARouteDefaultViolatesItsRequirement(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/sorted?sort=evil'));
+
+        self::assertSame(400, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function dispatchesWhenAnInputWithARouteDefaultSatisfiesItsRequirement(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/sorted?sort=desc'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"attribute":"asc","query":"desc"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function keepsANonPlaceholderRouteDefaultAsRequestAttributeWhenTheInputIsAbsent(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/sorted'));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"attribute":"asc","query":null}', (string) $response->getBody());
+    }
+
+    #[Test]
     public function appliesDefaultsForOmittedOptionalArguments(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=3'));

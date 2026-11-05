@@ -351,7 +351,8 @@ final class ControllerInvokerTest extends TestCase
     private function logManager(LoggerInterface $logger): LogManager
     {
         $logManager = $this->createMock(LogManager::class);
-        $logManager->method('getLogger')->willReturn($logger);
+        // The docs name this logger, so site writer configuration keys on it.
+        $logManager->method('getLogger')->with(ControllerInvoker::class)->willReturn($logger);
 
         return $logManager;
     }
@@ -401,9 +402,9 @@ final class ControllerInvokerTest extends TestCase
         ]);
 
         // Only 'optional' has its requirement contributed by #[Param] on a defaulted parameter.
-        // 'jsonError', 'shortCircuit' and 'problem' all opted into converting an uncaught exception
-        // to a generic JSON error. 'shortCircuit' proves an ImmediateResponseException is excluded
-        // from that conversion even so, 'problem' that a mapped exception is never logged.
+        // 'jsonError' and 'shortCircuit' both opted into converting an uncaught exception to a
+        // generic JSON error. 'shortCircuit' proves an ImmediateResponseException is excluded
+        // from that conversion even so.
         return new RouteRegistry([], $locator, arguments: $arguments, optionalInputs: ['optional' => ['page']], jsonErrorRoutes: ['jsonError' => true, 'shortCircuit' => true]);
     }
 

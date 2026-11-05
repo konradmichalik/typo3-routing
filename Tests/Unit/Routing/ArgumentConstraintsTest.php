@@ -17,6 +17,8 @@ use KonradMichalik\Typo3Routing\Routing\ArgumentConstraints;
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 
+use function mb_internal_encoding;
+
 /**
  * ArgumentConstraintsTest.
  *
@@ -56,5 +58,18 @@ final class ArgumentConstraintsTest extends TestCase
     public function tellsWhetherAValueBreaksItsConstraints(mixed $value, array $constraints, bool $violated): void
     {
         self::assertSame($violated, ArgumentConstraints::violates($value, $constraints));
+    }
+
+    #[Test]
+    public function countsUtf8CharactersWhateverTheInternalEncoding(): void
+    {
+        $previous = mb_internal_encoding();
+        mb_internal_encoding('8bit');
+
+        try {
+            self::assertFalse(ArgumentConstraints::violates('äöü', ['maxLength' => 3]));
+        } finally {
+            mb_internal_encoding($previous);
+        }
     }
 }

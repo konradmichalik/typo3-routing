@@ -30,7 +30,7 @@ use function mb_strlen;
 final class ArgumentConstraints
 {
     /**
-     * Length counts characters, not bytes. A non-finite number ("1e999" as float) never satisfies a range.
+     * Length counts UTF-8 characters, not bytes, independent of mb_internal_encoding(). A non-finite number ("1e999" as float) never satisfies a range.
      *
      * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints
      */
@@ -47,7 +47,7 @@ final class ArgumentConstraints
         }
 
         if (is_string($value)) {
-            $length = mb_strlen($value);
+            $length = mb_strlen($value, 'UTF-8');
 
             return (array_key_exists('minLength', $constraints) && $length < $constraints['minLength']) || (array_key_exists('maxLength', $constraints) && $length > $constraints['maxLength']);
         }

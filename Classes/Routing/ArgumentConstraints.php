@@ -30,6 +30,11 @@ use function mb_strlen;
 final class ArgumentConstraints
 {
     /**
+     * The #[Param] value constraint keys of an argument spec, keyed for array_intersect_key().
+     */
+    public const KEYS = ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0];
+
+    /**
      * An empty form field (`?q=`) means "not given" when a PHP default exists, so neither its type nor
      * its constraints are checked. A bool keeps `''` as false.
      *

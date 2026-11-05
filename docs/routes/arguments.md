@@ -99,7 +99,7 @@ public function upload(UploadedFileInterface $file, string $title, ?UploadedFile
 ```
 
 - A **missing** required file yields the same **400** as any missing parameter. A nullable parameter or one with a default becomes `null`. An empty file field (`UPLOAD_ERR_NO_FILE`) counts as missing.
-- A file whose upload **failed** yields an error naming the parameter, optional or not: **413** for a size limit (`UPLOAD_ERR_INI_SIZE`, `UPLOAD_ERR_FORM_SIZE`), **500** for a server-side failure (`UPLOAD_ERR_NO_TMP_DIR`, `UPLOAD_ERR_CANT_WRITE`, `UPLOAD_ERR_EXTENSION`), **400** for a partial upload.
+- A file whose upload **failed** yields an error naming the parameter, optional or not: **413** for a size limit (`UPLOAD_ERR_INI_SIZE`, `UPLOAD_ERR_FORM_SIZE`), **400** for a partial upload. A server-side failure (`UPLOAD_ERR_NO_TMP_DIR`, `UPLOAD_ERR_CANT_WRITE`, `UPLOAD_ERR_EXTENSION`) throws a `RuntimeException` with the PHP error code, which reaches TYPO3's error handling and its log like any unexpected exception.
 - A `POST` whose `Content-Length` exceeds `post_max_size` yields a **413**, even for an optional file: PHP discards such a body entirely, files and form fields alike.
 - PHP parses uploads for **`POST`** only, so on `PUT`, `PATCH` or `DELETE` the file is always missing. A route with an upload argument triggers a warning at container build when it does not allow `POST`, or when it also allows `PUT` or `PATCH`.
 - **One file per parameter.** Several files under one name (`file[]`) yield a **400**, and a variadic `UploadedFileInterface ...$files` is rejected at compile time. Inject `ServerRequestInterface` and read `getUploadedFiles()` for multi-file fields.

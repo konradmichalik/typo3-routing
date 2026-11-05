@@ -17,6 +17,7 @@ use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, UploadedFileArgument};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use TYPO3\CMS\Core\Http\{ServerRequest, Stream, UploadedFile};
 
 use function ini_get;
@@ -79,9 +80,31 @@ final class UploadedFileArgumentTest extends TestCase
     {
         yield 'php.ini size limit' => [\UPLOAD_ERR_INI_SIZE, 413, 'Uploaded file too large for parameter: file'];
         yield 'form size limit' => [\UPLOAD_ERR_FORM_SIZE, 413, 'Uploaded file too large for parameter: file'];
-        yield 'no temporary directory' => [\UPLOAD_ERR_NO_TMP_DIR, 500, 'Upload could not be stored for parameter: file'];
-        yield 'write failure' => [\UPLOAD_ERR_CANT_WRITE, 500, 'Upload could not be stored for parameter: file'];
-        yield 'stopped by an extension' => [\UPLOAD_ERR_EXTENSION, 500, 'Upload could not be stored for parameter: file'];
+    }
+
+    #[Test]
+    #[DataProvider('serverSideUploadErrors')]
+    public function leavesAServerSideUploadFailureToTypo3ErrorHandling(int $error, string $message): void
+    {
+        try {
+            UploadedFileArgument::find(['file' => $this->file($error)], 'file');
+            self::fail('Expected a RuntimeException.');
+        } catch (HttpProblemException $exception) {
+            self::fail('A server-side failure must not become a problem response: '.$exception->getMessage());
+        } catch (RuntimeException $exception) {
+            self::assertSame(1750000067, $exception->getCode());
+            self::assertSame($message, $exception->getMessage());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{int, string}>
+     */
+    public static function serverSideUploadErrors(): iterable
+    {
+        yield 'no temporary directory' => [\UPLOAD_ERR_NO_TMP_DIR, 'Uploaded file for parameter "file" could not be stored (PHP upload error 6).'];
+        yield 'write failure' => [\UPLOAD_ERR_CANT_WRITE, 'Uploaded file for parameter "file" could not be stored (PHP upload error 7).'];
+        yield 'stopped by an extension' => [\UPLOAD_ERR_EXTENSION, 'Uploaded file for parameter "file" could not be stored (PHP upload error 8).'];
     }
 
     #[Test]

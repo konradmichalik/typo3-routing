@@ -15,6 +15,7 @@ namespace KonradMichalik\Typo3Routing\Routing;
 
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
+use RuntimeException;
 
 use function ctype_digit;
 use function ini_get;
@@ -63,7 +64,8 @@ final class UploadedFileArgument
      * @param array<mixed> $files the request's getUploadedFiles()
      *
      * @throws ArgumentResolutionException for several files under one name, or a partial upload
-     * @throws HttpProblemException        413 for a size limit, 500 for a failure on the server side
+     * @throws HttpProblemException        413 for a size limit
+     * @throws RuntimeException            for a failure on the server side
      */
     public static function find(array $files, string $name): ?UploadedFileInterface
     {
@@ -75,12 +77,14 @@ final class UploadedFileArgument
             throw ArgumentResolutionException::invalidValue($name, 6402317598);
         }
 
-        return match ($file->getError()) {
+        $error = $file->getError();
+
+        return match ($error) {
             \UPLOAD_ERR_OK => $file,
             \UPLOAD_ERR_NO_FILE => null,
             \UPLOAD_ERR_INI_SIZE, \UPLOAD_ERR_FORM_SIZE => throw new HttpProblemException(413, sprintf('Uploaded file too large for parameter: %s', $name)),
-            // The client cannot fix these, and the detail stays generic so no server path leaks.
-            \UPLOAD_ERR_NO_TMP_DIR, \UPLOAD_ERR_CANT_WRITE, \UPLOAD_ERR_EXTENSION => throw new HttpProblemException(500, sprintf('Upload could not be stored for parameter: %s', $name)),
+            // A server fault the client cannot fix: TYPO3's exception handling logs it for the admin.
+            \UPLOAD_ERR_NO_TMP_DIR, \UPLOAD_ERR_CANT_WRITE, \UPLOAD_ERR_EXTENSION => throw new RuntimeException(sprintf('Uploaded file for parameter "%s" could not be stored (PHP upload error %d).', $name, $error), 1750000067),
             default => throw new ArgumentResolutionException(sprintf('Upload failed for parameter: %s', $name), 4127730619),
         };
     }

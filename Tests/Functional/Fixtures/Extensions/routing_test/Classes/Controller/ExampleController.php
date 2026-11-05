@@ -21,6 +21,7 @@ use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
+use Symfony\Component\Routing\Requirement\Requirement;
 use TYPO3\CMS\Core\Http\JsonResponse;
 
 /**
@@ -31,6 +32,19 @@ use TYPO3\CMS\Core\Http\JsonResponse;
  */
 final class ExampleController implements RouteControllerInterface
 {
+    // Declared before the route it must not shadow: priority, not declaration order, decides.
+    #[Route(path: '/catchall/{path}', methods: ['GET', 'POST'], name: 'catchall_fallback', requirements: ['path' => Requirement::CATCH_ALL], priority: -100)]
+    public function fallback(string $path): JsonResponse
+    {
+        return new JsonResponse(['error' => 'No endpoint at /catchall/'.$path, 'documentation' => 'https://example.com/docs'], 404);
+    }
+
+    #[Route(path: '/catchall/known', name: 'catchall_known')]
+    public function known(): JsonResponse
+    {
+        return new JsonResponse(['route' => 'known']);
+    }
+
     #[Route(path: '/api/example/count', name: 'example_count', aliases: ['example_count_legacy'])]
     public function count(): JsonResponse
     {

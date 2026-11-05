@@ -43,6 +43,33 @@ public function show(int $id): ResponseInterface { /* … */ }
 
 `priority` affects match order only; `routing:debug` and URL generation are unaffected. (Often unnecessary — a `requirements` constraint like `['id' => '\d+']` already keeps `/api/item/new` from matching the `{id}` route.)
 
+### Fallback route for a prefix
+
+A negative `priority` plus `Requirement::CATCH_ALL` gives a prefix its own answer for every path no other route matched. Use it to shape the 404 of an API, for example with a link to its documentation, instead of the fixed `{error, status}` body an [exclusive prefix](../operating/configuration.md#exclusive-path-prefixes) answers with:
+
+```php
+use Symfony\Component\Routing\Requirement\Requirement;
+
+#[Route(
+    path: '/api/{path}',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    name: 'api_fallback',
+    requirements: ['path' => Requirement::CATCH_ALL],
+    priority: -100,
+)]
+public function fallback(string $path): ResponseInterface
+{
+    return new JsonResponse(['error' => 'No endpoint at /api/'.$path, 'documentation' => 'https://example.com/api-docs'], 404);
+}
+```
+
+The static prefix `/api/` keeps the route inside the [path gate](../operating/configuration.md#path-gate), so pages outside it are unaffected. Keep in mind:
+
+- **List the methods.** `methods` defaults to `['GET']`, so a fallback without the list answers other methods with `405`.
+- **It replaces `405` too.** The matcher only reports `405` when no route accepts the method. `POST /api/items/5` on a GET-only route reaches the fallback, because the fallback accepts `POST`.
+- **The prefix itself is not covered.** `CATCH_ALL` needs at least one character, so `/api/` alone does not match `/api/{path}`.
+- **It is a route like any other**: `routing:debug` lists it, and `routing:openapi` exports it.
+
 ## Defaults (optional placeholders)
 
 A `defaults` entry supplies a value for a path placeholder. When the placeholder is **trailing**, this makes the segment optional: the shorter path matches too and the default is passed to your controller.

@@ -26,6 +26,8 @@ use function array_filter;
 use function array_values;
 use function class_exists;
 use function is_a;
+use function is_array;
+use function is_string;
 use function preg_match;
 
 /**
@@ -82,7 +84,8 @@ final readonly class JsonSchemaMapper
      * both alike) to an OpenAPI object schema, for `#[Returns(SomeDto::class)]`. A property typed as
      * another class is mapped the same way, recursively, unless it is a backed enum or an Extbase
      * domain object — those go through schemaForType() so the two mappers never disagree about them.
-     * A non-nullable property without a default is `required`.
+     * A non-nullable property without a default is `required`. A nullable typed property also accepts
+     * `null` in its schema, in the JSON Schema 2020-12 form OpenAPI 3.1 uses (see withNull()).
      *
      * @param class-string $class
      *
@@ -98,9 +101,10 @@ final readonly class JsonSchemaMapper
             $type = $property->getType();
             $typeName = $type instanceof ReflectionNamedType ? $type->getName() : null;
 
-            $properties[$name] = $this->propertySchema($typeName);
-
             $nullable = null === $type || $type->allowsNull();
+            $schema = $this->propertySchema($typeName);
+            $properties[$name] = null !== $typeName && $nullable ? $this->withNull($schema) : $schema;
+
             $hasDefault = $property->isPromoted() ? $this->promotedParameterHasDefault($property) : $property->hasDefaultValue();
             if (!$nullable && !$hasDefault) {
                 $required[] = $name;
@@ -133,6 +137,34 @@ final readonly class JsonSchemaMapper
         }
 
         return $this->schemaForType($typeName);
+    }
+
+    /**
+     * An object schema cannot widen its `type`, so it becomes an `anyOf`; a schema without `type`
+     * (`mixed`) already accepts `null`.
+     *
+     * @param array<string, mixed> $schema
+     *
+     * @return array<string, mixed>
+     */
+    private function withNull(array $schema): array
+    {
+        $type = $schema['type'] ?? null;
+
+        if ('object' === $type) {
+            return ['anyOf' => [$schema, ['type' => 'null']]];
+        }
+
+        if (!is_string($type)) {
+            return $schema;
+        }
+
+        $schema['type'] = [$type, 'null'];
+        if (is_array($schema['enum'] ?? null)) {
+            $schema['enum'][] = null;
+        }
+
+        return $schema;
     }
 
     /**

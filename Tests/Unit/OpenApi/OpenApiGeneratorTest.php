@@ -18,7 +18,7 @@ use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator, ResponsesBuilder};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\Collision\CourseDto as CollidingCourseDto;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{CourseDto, NullableFieldsDto};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use LogicException;
@@ -354,6 +354,23 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function exportsNullablePropertiesOfAReturnsDtoWithNullInTheirComponentSchema(): void
+    {
+        $document = $this->features();
+        $properties = $document['components']['schemas']['NullableFieldsDto']['properties'];
+
+        self::assertSame(
+            '#/components/schemas/NullableFieldsDto',
+            $document['paths']['/api/nullable-fields']['get']['responses'][200]['content']['application/json']['schema']['$ref'],
+        );
+        self::assertSame(['type' => 'string'], $properties['name']);
+        self::assertSame(['type' => ['string', 'null']], $properties['title']);
+        self::assertSame(['type' => ['string', 'null'], 'enum' => ['active', 'inactive', null]], $properties['status']);
+        self::assertSame(['type' => 'null'], $properties['instructor']['anyOf'][1]);
+        self::assertSame(['type' => 'string'], $document['components']['schemas']['CourseDto']['properties']['title']);
+    }
+
+    #[Test]
     public function rejectsTwoDifferentClassesResolvingToTheSameSchemaName(): void
     {
         $routes = [
@@ -426,6 +443,7 @@ final class OpenApiGeneratorTest extends TestCase
             'courseAgain' => ['path' => '/api/course-again', 'methods' => ['GET'], 'controller' => 'ctrl::courseAgain', 'env' => null, 'requirements' => []],
             'courses' => ['path' => '/api/courses', 'methods' => ['GET'], 'controller' => 'ctrl::courses', 'env' => null, 'requirements' => []],
             'noBody' => ['path' => '/api/no-body', 'methods' => ['GET'], 'controller' => 'ctrl::noBody', 'env' => null, 'requirements' => []],
+            'nullableFields' => ['path' => '/api/nullable-fields', 'methods' => ['GET'], 'controller' => 'ctrl::nullableFields', 'env' => null, 'requirements' => []],
         ];
 
         $arguments = [
@@ -453,6 +471,7 @@ final class OpenApiGeneratorTest extends TestCase
             'courseAgain' => [],
             'courses' => [],
             'noBody' => [],
+            'nullableFields' => [],
         ];
 
         $returns = [
@@ -468,6 +487,9 @@ final class OpenApiGeneratorTest extends TestCase
             ],
             'noBody' => [
                 ['status' => 204, 'schema' => null, 'collection' => false, 'description' => null],
+            ],
+            'nullableFields' => [
+                ['status' => 200, 'schema' => NullableFieldsDto::class, 'collection' => false, 'description' => null],
             ],
         ];
 

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\OpenApi\JsonSchemaMapper;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{AllOptionalDto, CourseDto, CourseWithInstructorDto};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{AllOptionalDto, CourseDto, CourseWithInstructorDto, NullableFieldsDto};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
@@ -283,7 +283,7 @@ final class JsonSchemaMapperTest extends TestCase
             [
                 'id' => ['type' => 'integer'],
                 'title' => ['type' => 'string'],
-                'description' => ['type' => 'string'],
+                'description' => ['type' => ['string', 'null']],
                 'enrolledCount' => ['type' => 'integer'],
             ],
             $schema['properties'],
@@ -320,5 +320,40 @@ final class JsonSchemaMapperTest extends TestCase
         );
         self::assertSame(['type' => 'string', 'enum' => ['active', 'inactive']], $schema['properties']['status']);
         self::assertSame(['id', 'instructor', 'status'], $schema['required']);
+    }
+
+    /**
+     * Optional and nullable are different things: a missing key and an explicit `null` are two
+     * distinct cases, so a nullable property's schema has to accept `null` itself.
+     *
+     * @param array<string, mixed> $expected
+     */
+    #[Test]
+    #[DataProvider('nullablePropertyProvider')]
+    public function includesNullInTheSchemaOfANullableProperty(string $property, array $expected): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(NullableFieldsDto::class);
+
+        // Compared as JSON because `items` is an `stdClass`, which assertSame() compares by identity.
+        self::assertSame(json_encode($expected), json_encode($schema['properties'][$property]));
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, mixed>}>
+     */
+    public static function nullablePropertyProvider(): iterable
+    {
+        yield 'non-nullable scalar stays as it was' => ['name', ['type' => 'string']];
+        yield 'nullable scalar' => ['title', ['type' => ['string', 'null']]];
+        yield 'nullable string enum' => ['status', ['type' => ['string', 'null'], 'enum' => ['active', 'inactive', null]]];
+        // An object schema with `properties` cannot simply widen its `type`.
+        yield 'nullable nested DTO' => ['instructor', ['anyOf' => [
+            ['type' => 'object', 'properties' => ['id' => ['type' => 'integer'], 'name' => ['type' => 'string']], 'required' => ['id', 'name']],
+            ['type' => 'null'],
+        ]]];
+        yield 'nullable array keeps its items' => ['tags', ['type' => ['array', 'null'], 'items' => (object) []]];
+        // `mixed` has no `type`, so it already accepts null.
+        yield 'mixed stays unconstrained' => ['anything', []];
+        yield 'untyped stays as it was' => ['legacy', ['type' => 'string']];
     }
 }

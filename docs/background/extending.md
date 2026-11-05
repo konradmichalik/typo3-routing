@@ -118,6 +118,7 @@ $schema = $this->schemas->objectSchemaForClass(CourseDto::class);
 
 - **A property's own type is mapped through the same rules as `schemaForType()`** — a backed enum or Extbase domain object property is never treated as a nested DTO, so the two methods never disagree about them. Any other class-typed property is mapped recursively via `objectSchemaForClass()` itself.
 - **`required` lists every non-nullable property without a default.** A nullable property, or one with a default value (including a promoted constructor parameter's default), is omitted from `required`; the key itself is left out of the schema entirely when nothing qualifies, rather than emitted as `"required": []`.
+- **A nullable typed property accepts `null` in its schema**, because a missing key and an explicit `null` are different things. A scalar, array or entity property widens its `type` (`?string` becomes `{"type": ["string", "null"]}`), a backed enum also gains `null` in its `enum` list, and a nested DTO becomes `{"anyOf": [{…}, {"type": "null"}]}`. Untyped and `mixed` properties are left as they are.
 
 ## Reference consumer: the OpenAPI export
 

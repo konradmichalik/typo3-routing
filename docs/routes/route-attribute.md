@@ -265,7 +265,7 @@ The attribute may also sit on the **controller class**, where its `path` and `na
 `requirements` constrains parameters by name, with two enforcement layers depending on where the parameter lives:
 
 - **Path placeholders** (a name that appears as `{name}` in the path) are enforced by the **matcher**: a violating path is treated as no match → **404**.
-- **Any other name** is a required **query or POST-body** parameter, validated at **dispatch**: missing or format-violating → **400**, before your controller runs. (`''` means presence only.)
+- **Any other name** is a required **query or POST-body** parameter, validated at **dispatch**: missing or format-violating → **400**, before your controller runs. (`''` means presence only.) When both the query and the body carry the name, each value must match.
 
 A constraint can equivalently be written on the parameter itself with [`#[Param(requirement:)]`](arguments.md#declaring-the-constraint-at-the-parameter) — which additionally allows an *optional but constrained* parameter.
 

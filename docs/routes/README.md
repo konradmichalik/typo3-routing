@@ -37,7 +37,7 @@ One gap in that second promise is worth knowing about if you [share route defini
 |------|---------------|
 | [The `#[Route]` attribute](route-attribute.md) | Every parameter: `requirements`, priority, optional placeholders, schemes, host, case tolerance, and how a controller returns an error |
 | [Route groups](route-groups.md) | A class-level `#[Route]` as a shared prefix, which parameters inherit from it, and sharing route definitions through a base class |
-| [Typed controller arguments](arguments.md) | Type coercion, backed enums, Extbase entity binding, variadics, and overriding the source with `#[Param]` |
+| [Typed controller arguments](arguments.md) | Type coercion, backed enums, Extbase entity binding, variadics, uploaded files, and overriding the source with `#[Param]` |
 | [URL generation](url-generation.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator, so a path is never duplicated |
 | [List/detail endpoints for database records](records.md) | A recipe combining the above for exposing a table, and why that stays a recipe rather than a feature |
 

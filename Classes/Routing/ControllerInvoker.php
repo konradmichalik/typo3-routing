@@ -20,6 +20,7 @@ use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Http\ImmediateResponseException;
 use TYPO3\CMS\Core\Log\LogManager;
 
+use function array_column;
 use function array_flip;
 use function array_intersect_key;
 use function array_key_exists;
@@ -120,12 +121,15 @@ final readonly class ControllerInvoker
      */
     public function firstRequestBodyError(array $match, ServerRequestInterface $request): ?ResponseInterface
     {
-        if (!$this->bindsBody((string) ($match['_route'] ?? ''))) {
+        $routeName = (string) ($match['_route'] ?? '');
+        if (!$this->bindsBody($routeName)) {
             return null;
         }
 
         if (RequestBody::isUnsupportedMediaType($request)) {
-            return JsonErrorResponse::create(415, 'Unsupported request body content type', ['Accept-Post' => 'application/json']);
+            $accepted = $this->bindsUpload($routeName) ? 'multipart/form-data' : 'application/json';
+
+            return JsonErrorResponse::create(415, 'Unsupported request body content type', ['Accept-Post' => $accepted]);
         }
 
         $detail = RequestBody::decodeErrorDetail($request);
@@ -254,18 +258,22 @@ final readonly class ControllerInvoker
     }
 
     /**
-     * Whether any of the route's controller arguments can resolve from the body: explicitly (`body`),
-     * merged with the query (`input`), or spread from it (`variadic`) — as opposed to `path`, `query`,
-     * or the request itself, none of which a request body's content type could ever affect.
+     * Whether an argument can resolve from the body (`body`, `input`, `variadic`, `upload`), so the
+     * body's content type matters.
      */
     private function bindsBody(string $routeName): bool
     {
         foreach ($this->registry->getArguments($routeName) as $spec) {
-            if (in_array($spec['source'], ['body', 'input', 'variadic'], true)) {
+            if (in_array($spec['source'], ['body', 'input', 'variadic', 'upload'], true)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function bindsUpload(string $routeName): bool
+    {
+        return in_array('upload', array_column($this->registry->getArguments($routeName), 'source'), true);
     }
 }

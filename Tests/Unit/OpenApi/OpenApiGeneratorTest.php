@@ -24,6 +24,7 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\UploadedFileInterface;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 
 /**
@@ -261,9 +262,61 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function describesARouteWithAnUploadAsAMultipartFormBody(): void
+    {
+        $operation = $this->features()['paths']['/api/upload']['post'];
+
+        self::assertSame(['multipart/form-data'], array_keys($operation['requestBody']['content']));
+        self::assertTrue($operation['requestBody']['required']);
+        self::assertSame([
+            'type' => 'object',
+            'properties' => [
+                'file' => ['type' => 'string', 'format' => 'binary'],
+                'thumb' => ['type' => 'string', 'format' => 'binary'],
+                'title' => ['type' => 'string'],
+            ],
+            'required' => ['file', 'title'],
+        ], $operation['requestBody']['content']['multipart/form-data']['schema']);
+    }
+
+    #[Test]
+    public function describesAnUploadOnlyOnTheOperationsThatCarryABody(): void
+    {
+        $paths = $this->features()['paths']['/api/attachments'];
+
+        self::assertArrayNotHasKey('requestBody', $paths['get']);
+        self::assertSame(['q'], array_column($paths['get']['parameters'], 'name'));
+        self::assertSame(['file', 'q'], array_keys($paths['post']['requestBody']['content']['multipart/form-data']['schema']['properties']));
+    }
+
+    #[Test]
+    public function documentsThe413OfAnUploadOperation(): void
+    {
+        $paths = $this->features()['paths'];
+
+        self::assertSame('Content Too Large', $paths['/api/upload']['post']['responses'][413]['description']);
+        self::assertArrayHasKey(413, $paths['/api/attachments']['post']['responses']);
+        self::assertArrayNotHasKey(413, $paths['/api/attachments']['put']['responses']);
+        self::assertArrayNotHasKey(413, $paths['/api/note']['post']['responses']);
+    }
+
+    #[Test]
+    public function describesAnUploadOnPostOnly(): void
+    {
+        $put = $this->features()['paths']['/api/attachments']['put'];
+
+        // PHP fills $_FILES for POST only, so a PUT operation cannot receive the file.
+        self::assertSame(['application/json'], array_keys($put['requestBody']['content']));
+        self::assertSame(['q'], array_keys($put['requestBody']['content']['application/json']['schema']['properties']));
+    }
+
+    #[Test]
     public function buildsOptionalRequestBodyWithoutRequiredList(): void
     {
         $operation = $this->features()['paths']['/api/note']['post'];
+
+        // A route without an upload keeps its JSON body.
+        self::assertSame(['application/json'], array_keys($operation['requestBody']['content']));
 
         $schema = $operation['requestBody']['content']['application/json']['schema'];
         self::assertSame(['type' => 'string'], $schema['properties']['note']);
@@ -478,7 +531,10 @@ final class OpenApiGeneratorTest extends TestCase
             'noBody' => ['path' => '/api/no-body', 'methods' => ['GET'], 'controller' => 'ctrl::noBody', 'env' => null, 'requirements' => []],
             'nullableFields' => ['path' => '/api/nullable-fields', 'methods' => ['GET'], 'controller' => 'ctrl::nullableFields', 'env' => null, 'requirements' => []],
             'constrained' => ['path' => '/api/constrained/{page}', 'methods' => ['POST'], 'controller' => 'ctrl::constrained', 'env' => null, 'requirements' => []],
-            'payload' => ['path' => '/api/payload', 'methods' => ['POST'], 'controller' => 'ctrl::payload', 'env' => null, 'requirements' => []],        ];
+            'payload' => ['path' => '/api/payload', 'methods' => ['POST'], 'controller' => 'ctrl::payload', 'env' => null, 'requirements' => []],
+            'upload' => ['path' => '/api/upload', 'methods' => ['POST'], 'controller' => 'ctrl::upload', 'env' => null, 'requirements' => []],
+            'attachments' => ['path' => '/api/attachments', 'methods' => ['GET', 'POST', 'PUT'], 'controller' => 'ctrl::attachments', 'env' => null, 'requirements' => []],
+        ];
 
         $arguments = [
             'types' => [
@@ -512,6 +568,16 @@ final class OpenApiGeneratorTest extends TestCase
             ],
             'payload' => [
                 ['name' => 'payload', 'type' => 'mixed', 'source' => 'body', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+            ],
+            'upload' => [
+                ['name' => 'file', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => false, 'hasDefault' => false, 'default' => null],
+                ['name' => 'thumb', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => true, 'hasDefault' => true, 'default' => null],
+                ['name' => 'title', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => false, 'default' => null],
+                ['name' => 'request', 'type' => null, 'source' => 'request', 'nullable' => false, 'hasDefault' => false, 'default' => null],
+            ],
+            'attachments' => [
+                ['name' => 'file', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => true, 'hasDefault' => true, 'default' => null],
+                ['name' => 'q', 'type' => 'string', 'source' => 'input', 'nullable' => true, 'hasDefault' => true, 'default' => null],
             ],
         ];
 

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\OpenApi;
 
+use Psr\Http\Message\UploadedFileInterface;
 use ReflectionClass;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
@@ -109,6 +110,7 @@ final readonly class JsonSchemaMapper
         }
 
         $schema = match ($type) {
+            UploadedFileInterface::class => ['type' => 'string', 'format' => 'binary'],
             'int' => ['type' => 'integer'],
             'float' => ['type' => 'number'],
             'bool' => ['type' => 'boolean'],

@@ -19,6 +19,7 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\UploadedFileInterface;
 
 /**
  * JsonSchemaMapperTest.
@@ -50,6 +51,7 @@ final class JsonSchemaMapperTest extends TestCase
         yield 'mixed constrains nothing' => ['mixed', []];
         yield 'untyped falls back to string' => [null, ['type' => 'string']];
         yield 'unrecognised type falls back to string' => ['DateTimeImmutable', ['type' => 'string']];
+        yield 'uploaded file is binary' => [UploadedFileInterface::class, ['type' => 'string', 'format' => 'binary']];
     }
 
     #[Test]

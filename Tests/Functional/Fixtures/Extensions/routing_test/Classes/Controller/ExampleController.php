@@ -20,7 +20,7 @@ use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, Deprecated
 use KonradMichalik\Typo3Routing\Authentication\BearerTokenAuthenticator;
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
 use TYPO3\CMS\Core\Http\JsonResponse;
 
 /**
@@ -178,6 +178,17 @@ final class ExampleController implements RouteControllerInterface
     {
         // Every body argument is optional: an absent or empty body must still succeed.
         return new JsonResponse(['priority' => $priority]);
+    }
+
+    #[Route(path: '/api/example/upload', methods: ['POST'], name: 'example_upload')]
+    public function upload(UploadedFileInterface $file, string $title, ?UploadedFileInterface $thumb = null): JsonResponse
+    {
+        return new JsonResponse([
+            'file' => $file->getClientFilename(),
+            'content' => (string) $file->getStream(),
+            'title' => $title,
+            'thumb' => $thumb?->getClientFilename(),
+        ]);
     }
 
     #[Route(path: '/api/example/restricted', name: 'example_restricted', schemes: ['https'], host: 'example.com')]

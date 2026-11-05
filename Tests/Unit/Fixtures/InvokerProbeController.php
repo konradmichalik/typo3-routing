@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures;
 
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
 use TYPO3\CMS\Core\Http\JsonResponse;
 
 /**
@@ -58,5 +58,21 @@ final class InvokerProbeController implements RouteControllerInterface
     public function body(string $title = 'none', int $priority = 0): JsonResponse
     {
         return new JsonResponse(['title' => $title, 'priority' => $priority]);
+    }
+
+    public function upload(?UploadedFileInterface $file = null): JsonResponse
+    {
+        return new JsonResponse(['file' => $file?->getClientFilename()]);
+    }
+
+    public function uploadProbe(UploadedFileInterface $file, string $note, ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse([
+            'file' => $file->getClientFilename(),
+            'note' => $note,
+            'parsedBody' => $request->getParsedBody(),
+            'body' => (string) $request->getBody(),
+            'contentType' => $request->getHeaderLine('Content-Type'),
+        ]);
     }
 }

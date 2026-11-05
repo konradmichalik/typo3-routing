@@ -44,7 +44,7 @@ $response = $this->invoker->invoke('example_item', ['id' => 42], $request);
 `invoke(string $routeName, array $input, ServerRequestInterface $request): ResponseInterface`
 
 - **`$routeName`** — a name from `getRoutes()`. An unknown name is a programming error rather than an HTTP condition, so it throws `InvalidArgumentException` instead of answering 404.
-- **`$input`** — a flat map of argument values, keyed by the **wire name** the argument is read under: `getArguments()`'s `name`, which `#[Param(name: …)]` may have set to something other than the PHP parameter name. Each value is placed where that argument's `source` expects it (path segment, query parameter, or JSON body), so all six sources — `path`, `query`, `body`, `input`, `request`, `variadic` — resolve exactly as they would for an inbound request. Keys no argument and no requirement claims are ignored. The seventh source, `host`, is the exception: `RouteInvoker` does not generate URLs for routes whose [`host`](../routes/route-attribute.md#wildcards-and-multiple-hosts) carries a placeholder, so such routes answer `404` here even when `$input` contains the host value.
+- **`$input`** — a flat map of argument values, keyed by the **wire name** the argument is read under: `getArguments()`'s `name`, which `#[Param(name: …)]` may have set to something other than the PHP parameter name. Each value is placed where that argument's `source` expects it (path segment, query parameter, JSON body, or the uploaded files), so all seven sources — `path`, `query`, `body`, `input`, `request`, `variadic`, `upload` — resolve exactly as they would for an inbound request. An `upload` value must be a `Psr\Http\Message\UploadedFileInterface` or `null` (absent); anything else answers `400`. With a file among the inputs, the body fields travel as the parsed body of a `multipart/form-data` request instead of a JSON payload, as they would over HTTP. Keys no argument and no requirement claims are ignored. The eighth source, `host`, is the exception: `RouteInvoker` does not generate URLs for routes whose [`host`](../routes/route-attribute.md#wildcards-and-multiple-hosts) carries a placeholder, so such routes answer `404` here even when `$input` contains the host value.
 - **`$request`** — the calling request. It supplies the context a controller may depend on (`site`, `language`, the authenticated user, the credentials) and is deliberately required: there is no sensible default for *which site* a programmatic invocation happens in. A caller without an inbound request (a CLI process, say) has to build one.
 
 The request the controller finally sees is synthesised from it: the route's first declared method, the route's own URL as the request target, the inputs in query and body, path placeholders additionally exposed as request attributes, the route name under `routing.route` — and always a fresh body stream, so nothing of the calling request's own payload can bleed into a body-sourced argument.
@@ -75,7 +75,7 @@ Exception handling is the dispatcher's, so error semantics match a real call to 
 
 ## Describing an argument as JSON Schema
 
-`getArguments()` reports each argument's `type` as a string — a scalar name, a backed enum's class name, an Extbase domain object's FQCN, or `null` when the parameter is untyped. Turning that into a JSON Schema fragment is what both the OpenAPI export and any consumer describing routes to a schema-driven client (an MCP server's `inputSchema`, a client generator) needs to do, identically. [`JsonSchemaMapper`](../../Classes/OpenApi/JsonSchemaMapper.php) is the `@api` seam for it, so the mapping rules cannot drift between consumers:
+`getArguments()` reports each argument's `type` as a string — a scalar name, a backed enum's class name, an Extbase domain object's FQCN, `Psr\Http\Message\UploadedFileInterface` for an uploaded file (source `upload`), or `null` when the parameter is untyped. Turning that into a JSON Schema fragment is what both the OpenAPI export and any consumer describing routes to a schema-driven client (an MCP server's `inputSchema`, a client generator) needs to do, identically. [`JsonSchemaMapper`](../../Classes/OpenApi/JsonSchemaMapper.php) is the `@api` seam for it, so the mapping rules cannot drift between consumers:
 
 ```php
 public function __construct(
@@ -102,6 +102,7 @@ $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? nul
 | `string`, `null` (untyped), or any unrecognised type | `{"type": "string"}` |
 | A **backed** enum's class name | `{"type": …, "enum": [<backing values accepted by `$pattern`>]}`, `integer` for an `int` backing type, `string` otherwise |
 | An Extbase domain object's class name | `{"type": "integer"}` — the record UID |
+| `Psr\Http\Message\UploadedFileInterface` | `{"type": "string", "format": "binary"}` |
 
 Five details are part of the contract rather than incidental:
 

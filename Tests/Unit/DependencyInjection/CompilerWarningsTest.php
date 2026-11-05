@@ -17,7 +17,7 @@ use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Route};
 use KonradMichalik\Typo3Routing\DependencyInjection\CompilerWarnings;
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, InheritsProtectedRouteCleanlyController, NarrowsAuthenticateOnOverrideController, OrCombinedAuthenticateBaseController, OverridesPlainMethodController, ProtectedRouteBaseController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, TwoAliasRouteBaseController, TwoRouteBaseController};
-use PHPUnit\Framework\Attributes\{CoversClass, Test};
+use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 
@@ -204,6 +204,56 @@ final class CompilerWarningsTest extends TestCase
         $warnings = $this->captureWarnings(static fn () => (new CompilerWarnings())->warnIfAModifierWasDropped($overridden, $override, 'repeats', [Cache::class => '#[Cache]']));
 
         self::assertSame([], $warnings);
+    }
+
+    #[Test]
+    public function warnIfUploadWithoutPostWarnsForAnUploadRouteWithoutPost(): void
+    {
+        $warnings = $this->captureWarnings(fn () => (new CompilerWarnings())->warnIfUploadWithoutPost([$this->spec('body'), $this->spec('upload')], ['PUT', 'PATCH'], 'replace', 'ctrl::replace()'));
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('Route "replace" (ctrl::replace()) binds the uploaded file "file"', $warnings[0]);
+        self::assertStringContainsString('PUT, PATCH', $warnings[0]);
+    }
+
+    #[Test]
+    public function warnIfUploadWithoutPostWarnsForAnUploadRouteThatAlsoAllowsPutOrPatch(): void
+    {
+        $warnings = $this->captureWarnings(fn () => (new CompilerWarnings())->warnIfUploadWithoutPost([$this->spec('upload')], ['POST', 'PUT', 'PATCH'], 'replace', 'ctrl::replace()'));
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('Route "replace" (ctrl::replace()) binds the uploaded file "file" and also allows PUT, PATCH', $warnings[0]);
+        self::assertStringContainsString('only POST delivers the file', $warnings[0]);
+    }
+
+    /**
+     * @param list<string> $methods
+     */
+    #[Test]
+    #[DataProvider('silentUploadRoutes')]
+    public function warnIfUploadWithoutPostStaysSilent(string $source, array $methods): void
+    {
+        $warnings = $this->captureWarnings(fn () => (new CompilerWarnings())->warnIfUploadWithoutPost([$this->spec($source)], $methods, 'replace', 'ctrl::replace()'));
+
+        self::assertSame([], $warnings);
+    }
+
+    /**
+     * @return iterable<string, array{string, list<string>}>
+     */
+    public static function silentUploadRoutes(): iterable
+    {
+        yield 'upload on POST' => ['upload', ['GET', 'POST']];
+        yield 'upload on any method' => ['upload', []];
+        yield 'no upload' => ['body', ['PUT']];
+    }
+
+    /**
+     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
+     */
+    private function spec(string $source): array
+    {
+        return ['name' => 'file', 'type' => null, 'source' => $source, 'nullable' => false, 'hasDefault' => false, 'default' => null];
     }
 
     /**

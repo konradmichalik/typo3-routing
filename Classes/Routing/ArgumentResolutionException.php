@@ -15,6 +15,8 @@ namespace KonradMichalik\Typo3Routing\Routing;
 
 use RuntimeException;
 
+use function sprintf;
+
 /**
  * ArgumentResolutionException.
  *
@@ -22,4 +24,10 @@ use RuntimeException;
  *
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
-final class ArgumentResolutionException extends RuntimeException {}
+final class ArgumentResolutionException extends RuntimeException
+{
+    public static function invalidValue(string $name, int $code): self
+    {
+        return new self(sprintf('Invalid value for parameter: %s', $name), $code);
+    }
+}

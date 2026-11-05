@@ -22,6 +22,7 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, RouteNameController, ThrowingController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\UploadedFileInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
@@ -396,6 +397,19 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function treatsAnUploadArgumentAsBindingTheBody(): void
+    {
+        $response = $this->invoker()->firstRequestBodyError(
+            ['_route' => 'upload', '_requirements' => []],
+            $this->bodyRequest('raw bytes', 'application/octet-stream'),
+        );
+
+        self::assertNotNull($response);
+        self::assertSame(415, $response->getStatusCode());
+        self::assertSame('multipart/form-data', $response->getHeaderLine('Accept-Post'));
+    }
+
+    #[Test]
     public function treatsARouteWithoutAnEnvAsVisibleEverywhere(): void
     {
         self::assertTrue($this->invoker()->isVisibleInCurrentContext(null));
@@ -470,6 +484,7 @@ final class ControllerInvokerTest extends TestCase
             'plainError' => [],
             'shortCircuit' => [],
             'routeName' => [['name' => 'request', 'type' => null, 'source' => 'request', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
+            'upload' => [['name' => 'file', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => false, 'hasDefault' => false, 'default' => null]],
         ];
 
         $locator = new ServiceLocator([

@@ -17,7 +17,7 @@ use InvalidArgumentException;
 use JsonException;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, RouteUrlGenerator};
-use Psr\Http\Message\{ResponseInterface, ServerRequestInterface, UriInterface};
+use Psr\Http\Message\{ResponseInterface, ServerRequestInterface, UploadedFileInterface, UriInterface};
 use Symfony\Component\Routing\Exception\{InvalidParameterException, MissingMandatoryParametersException};
 use TYPO3\CMS\Core\Http\{Stream, Uri};
 
@@ -110,6 +110,8 @@ final readonly class RouteInvoker
             $synthetic = $this->syntheticRequest($request, $route, $path, $input, $placeholders, $this->registry->getArguments($routeName));
         } catch (JsonException) {
             return JsonErrorResponse::create(400, 'Invalid body input');
+        } catch (ArgumentResolutionException $exception) {
+            return JsonErrorResponse::create(400, $exception->getMessage());
         }
 
         // 3. Input requirements (query/body) → 400, exactly as for an inbound request.
@@ -168,8 +170,8 @@ final readonly class RouteInvoker
     /**
      * Builds the request the controller sees: the calling request's context (site, language, user,
      * credentials) with this route's method, path and inputs put where the argument resolver looks
-     * for them. The body stream is always a fresh one — reusing the caller's would hand its payload
-     * to a body-sourced argument that this invocation left empty.
+     * for them. The body stream and the uploaded files are always fresh ones. Reusing the caller's
+     * would hand its payload to a body or upload argument that this invocation left empty.
      *
      * @param array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool, tags?: list<string>, canonical?: bool, sites?: list<string>, languages?: list<int>} $route
      * @param array<string, mixed>                                                                                                                                                                                                                                                                                                                                      $input
@@ -182,6 +184,9 @@ final readonly class RouteInvoker
         $body = [];
         foreach ($input as $name => $value) {
             $source = $this->sourceOf($specs, $name);
+            if ('upload' === $source) {
+                continue;
+            }
             if ('body' === $source) {
                 // A JSON body carries native types, so these values are passed through untouched.
                 $body[$name] = $value;
@@ -195,13 +200,53 @@ final readonly class RouteInvoker
             $query[$name] = $this->asTransportValue($value);
         }
 
+        $files = $this->uploadedFiles($input, $specs);
         $synthetic = $request
             ->withMethod($route['methods'][0] ?? 'GET')
             ->withUri($this->uri($request, $path, $query))
             ->withQueryParams($query)
             ->withBody(new Stream('php://temp', 'rw'))
+            ->withUploadedFiles($files)
             ->withoutHeader('Content-Type')
             ->withoutHeader('Content-Length');
+
+        return $this->withPayload($synthetic, $body, $files);
+    }
+
+    /**
+     * @param array<string, mixed>                                                                                           $input
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $specs
+     *
+     * @return array<string, UploadedFileInterface>
+     */
+    private function uploadedFiles(array $input, array $specs): array
+    {
+        $files = [];
+        foreach ($input as $name => $value) {
+            // Null means absent here as for every other source, so the argument's default applies.
+            if (null === $value || 'upload' !== $this->sourceOf($specs, $name)) {
+                continue;
+            }
+            $files[$name] = $value instanceof UploadedFileInterface
+                ? $value
+                : throw ArgumentResolutionException::invalidValue($name, 3370914426);
+        }
+
+        return $files;
+    }
+
+    /**
+     * @param array<string, mixed>                 $body
+     * @param array<string, UploadedFileInterface> $files
+     */
+    private function withPayload(ServerRequestInterface $synthetic, array $body, array $files): ServerRequestInterface
+    {
+        // Built like a multipart POST over HTTP: the fields arrive parsed and the stream stays empty.
+        if ([] !== $files) {
+            return $synthetic
+                ->withHeader('Content-Type', 'multipart/form-data')
+                ->withParsedBody($body);
+        }
 
         if ([] === $body) {
             return $synthetic->withParsedBody(null);

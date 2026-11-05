@@ -17,6 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, Bearer
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 
+use function array_column;
 use function array_intersect_key;
 use function array_key_exists;
 use function explode;
@@ -131,6 +132,8 @@ final readonly class OpenApiGenerator
         [$serviceId] = explode('::', $route['controller'], 2);
         $arguments = $this->registry->getArguments($name);
         $hasBody = in_array(strtoupper($method), self::BODY_METHODS, true);
+        // PHP fills $_FILES for POST only, so no other operation can receive a file.
+        $acceptsUpload = 'POST' === strtoupper($method);
 
         $parameters = [];
         $bodyProperties = [];
@@ -143,7 +146,7 @@ final readonly class OpenApiGenerator
             $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, self::VALUE_CONSTRAINTS));
             $description = $descriptions[$argument['name']] ?? null;
 
-            match ($this->target($argument['source'], $hasBody)) {
+            match ($this->target($argument['source'], $hasBody, $acceptsUpload)) {
                 'path' => $parameters[] = $this->parameter($argument['name'], 'path', true, $schema, $description),
                 'query' => $parameters[] = $this->parameter($argument['name'], 'query', !$argument['nullable'] && !$argument['hasDefault'], $schema, $description),
                 'body' => $this->collectBody($argument, $schema, $bodyProperties, $bodyRequired, $description),
@@ -174,7 +177,7 @@ final readonly class OpenApiGenerator
         }
 
         if ([] !== $bodyProperties) {
-            $operation['requestBody'] = $this->requestBody($bodyProperties, $bodyRequired);
+            $operation['requestBody'] = $this->requestBody($bodyProperties, $bodyRequired, $this->bodyMediaType($arguments, $acceptsUpload));
         }
 
         $security = $this->security($name, $usedSchemes);
@@ -183,7 +186,7 @@ final readonly class OpenApiGenerator
         }
 
         $hasInput = [] !== $parameters || [] !== $bodyProperties || self::hasConstrainedHostArgument($arguments);
-        $operation['responses'] = $this->responses($name, $route, $hasInput, $usedSchemas);
+        $operation['responses'] = $this->responses($name, $route, $hasInput, $this->takesUpload($arguments, $acceptsUpload), $usedSchemas);
 
         return $operation;
     }
@@ -239,7 +242,7 @@ final readonly class OpenApiGenerator
      * parameter. A "host" placeholder has no OpenAPI counterpart — it is not part of the path
      * template — so it maps to itself and is dropped by the caller.
      */
-    private function target(string $source, bool $hasBody): string
+    private function target(string $source, bool $hasBody, bool $acceptsUpload): string
     {
         return match ($source) {
             'path' => 'path',
@@ -248,8 +251,29 @@ final readonly class OpenApiGenerator
             'body' => 'body',
             'variadic' => 'query',
             'input' => $hasBody ? 'body' : 'query',
+            // A file cannot travel in a query, so an operation without an upload does not describe it at all.
+            'upload' => $acceptsUpload ? 'body' : 'request',
             default => 'request',
         };
+    }
+
+    /**
+     * A file can only travel as a multipart part, so one upload argument turns the whole body into a
+     * form, its other body properties becoming form fields.
+     *
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
+     */
+    private function bodyMediaType(array $arguments, bool $acceptsUpload): string
+    {
+        return $this->takesUpload($arguments, $acceptsUpload) ? 'multipart/form-data' : 'application/json';
+    }
+
+    /**
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
+     */
+    private function takesUpload(array $arguments, bool $acceptsUpload): bool
+    {
+        return $acceptsUpload && in_array('upload', array_column($arguments, 'source'), true);
     }
 
     /**
@@ -292,7 +316,7 @@ final readonly class OpenApiGenerator
      *
      * @return array<string, mixed>
      */
-    private function requestBody(array $properties, array $required): array
+    private function requestBody(array $properties, array $required, string $mediaType): array
     {
         $schema = ['type' => 'object', 'properties' => $properties];
         if ([] !== $required) {
@@ -301,7 +325,7 @@ final readonly class OpenApiGenerator
 
         return [
             'required' => [] !== $required,
-            'content' => ['application/json' => ['schema' => $schema]],
+            'content' => [$mediaType => ['schema' => $schema]],
         ];
     }
 
@@ -377,7 +401,7 @@ final readonly class OpenApiGenerator
      *
      * @return array<int, array<string, mixed>>
      */
-    private function responses(string $name, array $route, bool $hasInput, array &$usedSchemas): array
+    private function responses(string $name, array $route, bool $hasInput, bool $hasUpload, array &$usedSchemas): array
     {
         return $this->responsesBuilder->build(
             $this->registry->getReturns($name),
@@ -386,6 +410,7 @@ final readonly class OpenApiGenerator
             null !== $this->registry->getRequestTokenScope($name),
             [] !== $route['methods'],
             null !== $this->registry->getRateLimit($name),
+            $hasUpload,
             $usedSchemas,
         );
     }

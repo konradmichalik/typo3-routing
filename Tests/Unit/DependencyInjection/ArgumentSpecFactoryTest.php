@@ -13,13 +13,14 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
-use KonradMichalik\Typo3Routing\DependencyInjection\ArgumentSpecFactory;
+use KonradMichalik\Typo3Routing\DependencyInjection\{ArgumentSpecFactory, UploadArgumentGuard};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\ArgumentSpecFixtures;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
 use LogicException;
-use PHPUnit\Framework\Attributes\{CoversClass, Test};
+use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\UploadedFileInterface;
 use ReflectionMethod;
 
 /**
@@ -28,6 +29,7 @@ use ReflectionMethod;
  * @author Konrad Michalik <hej@konradmichalik.dev>
  */
 #[CoversClass(ArgumentSpecFactory::class)]
+#[CoversClass(UploadArgumentGuard::class)]
 final class ArgumentSpecFactoryTest extends TestCase
 {
     private ArgumentSpecFactory $factory;
@@ -350,6 +352,111 @@ final class ArgumentSpecFactoryTest extends TestCase
         // so its PHP default never turns it into an optional route default or an optional input.
         self::assertSame([], $contributions['defaults']);
         self::assertSame([], $contributions['optional']);
+    }
+
+    #[Test]
+    public function marksAnUploadedFileParameterAsUploadSourced(): void
+    {
+        $specs = $this->build('upload', '/api/x');
+
+        self::assertSame(['name' => 'file', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => false, 'hasDefault' => false, 'default' => null], $specs[0]);
+        self::assertSame(['name' => 'thumb', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => true, 'hasDefault' => true, 'default' => null], $specs[1]);
+    }
+
+    #[Test]
+    public function readsAnUploadedFileUnderItsParamWireName(): void
+    {
+        $spec = $this->build('renamedUpload', '/api/x')[0];
+
+        self::assertSame('attachment', $spec['name']);
+        self::assertSame('upload', $spec['source']);
+    }
+
+    #[Test]
+    public function acceptsAnUploadNextToAFormField(): void
+    {
+        $this->validate('uploadWithField', '/api/x/{id}', routeRequirements: ['id' => '\d+', 'title' => '.+']);
+
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    #[DataProvider('uploadSourceOverrides')]
+    public function rejectsAnySourceOverrideOnAnUploadedFile(string $method): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000040);
+
+        $this->validate($method, '/api/x');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function uploadSourceOverrides(): iterable
+    {
+        yield 'body' => ['bodySourcedUpload'];
+        yield 'query' => ['querySourcedUpload'];
+    }
+
+    #[Test]
+    public function rejectsAVariadicUploadedFileParameter(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000041);
+
+        $this->build('variadicUploads', '/api/x');
+    }
+
+    #[Test]
+    public function rejectsAnUploadedFileBoundToAPathPlaceholder(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000042);
+
+        $this->validate('upload', '/api/x/{file}');
+    }
+
+    #[Test]
+    public function rejectsAnUploadedFileBoundToAHostPlaceholder(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000042);
+
+        $this->validate('upload', '/api/x', '{file}.example.com');
+    }
+
+    #[Test]
+    public function rejectsAParamRequirementOnAnUploadedFile(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000043);
+
+        $this->validate('constrainedUpload', '/api/x');
+    }
+
+    #[Test]
+    public function rejectsARouteRequirementOnAnUploadedFile(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000043);
+
+        $this->validate('upload', '/api/x', routeRequirements: ['file' => '.+']);
+    }
+
+    /**
+     * Runs the compiler pass's sequence: specs, #[Param] contributions, then the upload check against
+     * the merged requirements.
+     *
+     * @param array<string, string> $routeRequirements
+     */
+    private function validate(string $method, string $path, ?string $host = null, array $routeRequirements = []): void
+    {
+        $reflection = new ReflectionMethod(ArgumentSpecFixtures::class, $method);
+        $specs = $this->build($method, $path, $host);
+        $contributions = $this->factory->paramContributions($reflection, $specs, $path, $routeRequirements, [], 'fixtures');
+
+        UploadArgumentGuard::assertValid($reflection, $specs, [...$routeRequirements, ...$contributions['requirements']], $path, $host, 'fixtures');
     }
 
     /**

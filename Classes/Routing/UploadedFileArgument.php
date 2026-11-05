@@ -14,8 +14,11 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Routing;
 
 use KonradMichalik\Typo3Routing\Http\HttpProblemException;
-use Psr\Http\Message\UploadedFileInterface;
+use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
 
+use function ctype_digit;
+use function ini_get;
+use function ini_parse_quantity;
 use function sprintf;
 
 /**
@@ -28,6 +31,31 @@ use function sprintf;
  */
 final class UploadedFileArgument
 {
+    /**
+     * PHP discards the whole body of a POST beyond `post_max_size`, files and fields alike, so an
+     * oversized upload would otherwise look merely absent.
+     *
+     * @param int $postMaxSize in bytes, 0 or less for unlimited
+     *
+     * @throws HttpProblemException 413 when PHP discarded the body
+     */
+    public static function assertBodyWithinPostMaxSize(ServerRequestInterface $request, int $postMaxSize): void
+    {
+        if ($postMaxSize <= 0 || 'POST' !== $request->getMethod() || [] !== $request->getUploadedFiles()) {
+            return;
+        }
+
+        $contentLength = $request->getHeaderLine('Content-Length');
+        if (ctype_digit($contentLength) && (int) $contentLength > $postMaxSize) {
+            throw new HttpProblemException(413, 'Request body exceeds the server\'s post_max_size');
+        }
+    }
+
+    public static function postMaxSize(): int
+    {
+        return ini_parse_quantity((string) ini_get('post_max_size'));
+    }
+
     /**
      * The single uploaded file under a wire name, or null when there is none. `UPLOAD_ERR_NO_FILE` is
      * how PHP reports an empty file field, so it counts as absent rather than as a failed upload.

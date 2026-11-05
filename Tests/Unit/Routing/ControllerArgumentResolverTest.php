@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
 use KonradMichalik\Ttt\Http\RequestBuilder;
+use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver, EntityNotFoundException};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
@@ -430,6 +431,18 @@ final class ControllerArgumentResolverTest extends TestCase
     public function yieldsNullForAnAbsentOptionalUpload(): void
     {
         self::assertSame([null], $this->resolver->resolve([$this->uploadSpec('file', optional: true)], [], $this->request('POST')));
+    }
+
+    #[Test]
+    public function answers413WhenPhpDiscardedABodyOverPostMaxSize(): void
+    {
+        // PHP drops files and fields alike, so the optional upload would otherwise just be null.
+        $request = $this->request('POST')->withHeader('Content-Length', (string) \PHP_INT_MAX);
+
+        $this->expectException(HttpProblemException::class);
+        $this->expectExceptionMessage('Request body exceeds the server\'s post_max_size');
+
+        $this->resolver->resolve([$this->uploadSpec('file', optional: true)], [], $request);
     }
 
     #[Test]

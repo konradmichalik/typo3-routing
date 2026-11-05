@@ -85,12 +85,22 @@ final readonly class ControllerArgumentResolver
                 'path', 'host' => $this->coerce($match[$spec['name']] ?? null, $spec),
                 'query' => $this->resolveInput($query, $spec),
                 'body' => $this->resolveInput($body, $spec),
-                'upload' => UploadedFileArgument::find($request->getUploadedFiles(), $spec['name']) ?? $this->fallbackForMissing($spec),
+                'upload' => $this->resolveUpload($request, $spec),
                 default => $this->resolveInput($inputs, $spec),
             };
         }
 
         return $arguments;
+    }
+
+    /**
+     * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
+     */
+    private function resolveUpload(ServerRequestInterface $request, array $spec): mixed
+    {
+        UploadedFileArgument::assertBodyWithinPostMaxSize($request, UploadedFileArgument::postMaxSize());
+
+        return UploadedFileArgument::find($request->getUploadedFiles(), $spec['name']) ?? $this->fallbackForMissing($spec);
     }
 
     /**

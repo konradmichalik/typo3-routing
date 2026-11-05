@@ -84,6 +84,17 @@ final class UploadedFileArgumentTest extends FunctionalTestCase
         self::assertJsonPath((string) $response->getBody(), 'detail', 'Uploaded file too large for parameter: file');
     }
 
+    #[Test]
+    public function answersContentTooLargeForABodyPhpDiscardedOverPostMaxSize(): void
+    {
+        $request = $this->multipart([], [])->withHeader('Content-Length', (string) \PHP_INT_MAX);
+
+        $response = $this->process($request);
+
+        self::assertSame(413, $response->getStatusCode());
+        self::assertJsonPath((string) $response->getBody(), 'detail', 'Request body exceeds the server\'s post_max_size');
+    }
+
     private function process(ServerRequestInterface $request): ResponseInterface
     {
         return $this->get(RouteDispatcher::class)->process($request, $this->handler());

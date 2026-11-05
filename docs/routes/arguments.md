@@ -105,8 +105,9 @@ public function upload(UploadedFileInterface $file, string $title, ?UploadedFile
 - **One file per parameter.** Several files under one name (`file[]`) yield a **400**, and a variadic `UploadedFileInterface ...$files` is rejected at compile time. Inject `ServerRequestInterface` and read `getUploadedFiles()` for multi-file fields.
 - Only the interface itself is resolvable, not a concrete implementation class.
 - A `#[Param(source:)]`, a `{placeholder}` of the same name and a requirement (on `#[Route]` or `#[Param]`) are rejected at compile time.
+- An `array` parameter bound from a form field of the same request needs a bracketed field name (`tags[]`). PHP parses a multipart body like a form, so a repeated plain `tags` field keeps only its last value.
 
-The extension validates neither size nor media type. Check `getSize()` and `getClientMediaType()` in the controller, and treat `getClientFilename()` as untrusted input. The [OpenAPI export](../operating/openapi.md) describes such a route with a `multipart/form-data` request body in which the file is `{"type": "string", "format": "binary"}`.
+The extension validates neither size nor media type. Check `getSize()` in the controller. `getClientMediaType()` and `getClientFilename()` are whatever the client sent, so treat both as untrusted input: verify the type from the file content on the server (for example with `finfo`) before relying on it. The [OpenAPI export](../operating/openapi.md) describes such a route with a `multipart/form-data` request body in which the file is `{"type": "string", "format": "binary"}`.
 
 ## Overriding the source with `#[Param]`
 

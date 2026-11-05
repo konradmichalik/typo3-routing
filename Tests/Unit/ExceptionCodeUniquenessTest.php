@@ -40,7 +40,7 @@ final class ExceptionCodeUniquenessTest extends TestCase
 
         /** @var SplFileInfo $file */
         foreach ($files as $file) {
-            preg_match_all('/\b1750\d{6}\b/', (string) file_get_contents($file->getPathname()), $matches);
+            preg_match_all('/\b\d{10}\b/', (string) file_get_contents($file->getPathname()), $matches);
             foreach ($matches[0] as $code) {
                 $sites[$code][] = $file->getPathname();
             }

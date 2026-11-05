@@ -148,7 +148,7 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => 200, 'schema' => CycleHolderDto::class, 'collection' => false, 'description' => null]];
 
-        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame(['CycleHolderDto', 'CycleADto'], array_keys($usedSchemas));
         self::assertSame(CycleADto::class, $usedSchemas['CycleADto']['class']);
@@ -164,7 +164,7 @@ final class ResponsesBuilderTest extends TestCase
         $this->expectExceptionCode(1750000038);
         $this->expectExceptionMessageMatches('/both resolve to the OpenAPI schema name "CycleADto"/');
 
-        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
     }
 
     #[Test]
@@ -177,7 +177,7 @@ final class ResponsesBuilderTest extends TestCase
         $this->expectExceptionCode(1750000063);
         $this->expectExceptionMessageMatches('/"Error" is reserved/');
 
-        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
     }
 
     #[Test]

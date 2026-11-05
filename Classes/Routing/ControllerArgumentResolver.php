@@ -163,7 +163,7 @@ final readonly class ControllerArgumentResolver
 
         // Checked on the coerced value, so "010" is compared as 10. A fallback default is never checked.
         if (ArgumentConstraints::violates($coerced, $spec)) {
-            throw $this->invalid($spec['name']);
+            throw ArgumentResolutionException::invalidValue($spec['name'], 1873046215);
         }
 
         return $coerced;

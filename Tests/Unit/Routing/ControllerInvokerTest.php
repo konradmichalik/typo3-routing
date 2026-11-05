@@ -373,6 +373,28 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function treatsAnEmptyOptionalInputAsAbsent(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'optional', '_requirements' => ['page' => '\d+']],
+            $this->request(['page' => '']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function stillRejectsAnEmptyRequiredInput(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_requirements' => ['q' => '\d+']],
+            $this->request(['q' => '']),
+        );
+
+        self::assertSame('Invalid value for parameter: q', $error);
+    }
+
+    #[Test]
     public function keepsARouteLevelRequirementMandatoryDespiteAPhpDefault(): void
     {
         // 'legacy' mirrors #[Route(requirements: ['page' => '\d+'])] on list(int $page = 1) with no

@@ -166,12 +166,10 @@ final readonly class ControllerInvoker
             if (self::isPlaceholder($key, $route, $match)) {
                 continue;
             }
-            $values = array_map(
-                static fn (array $source): mixed => $source[$key],
-                array_values(array_filter($sources, static fn (array $source): bool => array_key_exists($key, $source))),
-            );
+            $isOptional = in_array($key, $optional, true);
+            $values = self::presentValues($key, $sources, $isOptional);
             if ([] === $values) {
-                if (in_array($key, $optional, true)) {
+                if ($isOptional) {
                     continue;
                 }
 
@@ -235,6 +233,21 @@ final readonly class ControllerInvoker
         }
 
         return $request;
+    }
+
+    /**
+     * The values `$key` carries in the query and the body. An empty optional value falls back to its
+     * default like an absent one, see ArgumentConstraints::isEmptyWithDefault().
+     *
+     * @param list<array<string, mixed>> $sources
+     *
+     * @return list<mixed>
+     */
+    private static function presentValues(string $key, array $sources, bool $isOptional): array
+    {
+        $present = array_filter($sources, static fn (array $source): bool => array_key_exists($key, $source) && !($isOptional && '' === $source[$key]));
+
+        return array_map(static fn (array $source): mixed => $source[$key], array_values($present));
     }
 
     /**

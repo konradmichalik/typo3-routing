@@ -111,16 +111,28 @@ Five details are part of the contract rather than incidental:
 - **`$constraints` adds the argument's value constraints.** The `min`, `max`, `minLength` and `maxLength` keys of a `getArguments()` entry become `minimum`, `maximum`, `minLength` and `maxLength`, after the type keywords. An argument without constraints yields exactly the schema it did before.
 - **Only backed enums are expected.** The extension's own compile step rejects a pure enum outright, so one cannot reach this mapper through a registered route. An external caller passing one gets `{"type": "string", "enum": []}` rather than an exception.
 
-`JsonSchemaMapper` gained a second `@api` method in **`1.1.0`**: `objectSchemaForClass(string $class): array`. Where `schemaForType()` maps a single argument's type, `objectSchemaForClass()` maps a whole DTO class — its public properties (plain or promoted constructor properties alike) become an object schema's `properties`, used by [`#[Returns]`](../operating/openapi.md#declaring-a-response-schema) to describe a route's response body:
+`JsonSchemaMapper` gained a second `@api` method in **`1.1.0`**: `objectSchemaForClass(string $class, array &$referenced = []): array`. Where `schemaForType()` maps a single argument's type, `objectSchemaForClass()` maps a whole DTO class: its public properties (plain or promoted constructor properties alike) become an object schema's `properties`, used by [`#[Returns]`](../operating/openapi.md#declaring-a-response-schema) to describe a route's response body:
 
 ```php
 $schema = $this->schemas->objectSchemaForClass(CourseDto::class);
 // {"type": "object", "properties": {"id": {"type": "integer"}, "title": {"type": "string"}, …}, "required": ["id", "title"]}
 ```
 
-- **A property's own type is mapped through the same rules as `schemaForType()`** — a backed enum or Extbase domain object property is never treated as a nested DTO, so the two methods never disagree about them. Any other class-typed property is mapped recursively via `objectSchemaForClass()` itself.
-- **`required` lists every non-nullable property without a default.** A nullable property, or one with a default value (including a promoted constructor parameter's default), is omitted from `required`; the key itself is left out of the schema entirely when nothing qualifies, rather than emitted as `"required": []`.
-- **A nullable typed property accepts `null` in its schema**, because a missing key and an explicit `null` are different things. A scalar, array or entity property widens its `type` (`?string` becomes `{"type": ["string", "null"]}`), a backed enum also gains `null` in its `enum` list, and a nested DTO becomes `{"anyOf": [{…}, {"type": "null"}]}`. Untyped and `mixed` properties are left as they are.
+- **Scalar, backed enum and Extbase domain object properties follow `schemaForType()`**, so the two methods never disagree about them: a backed enum or domain object property is never treated as a nested DTO. Any other class-typed property is a nested DTO and is inlined by mapping it recursively, unless it causes a cycle (see `$ref` below).
+- **Some property types map differently than the same type as an argument**, because a response value is serialized PHP data rather than a raw query string:
+
+  | Property type | Resulting schema |
+  |---|---|
+  | Untyped, `iterable`, an interface (`BackedEnum` and `UnitEnum` included), or an intersection type (`A&B`) | `{}` (constrains nothing) |
+  | A union (`int\|string\|null`) | `{"anyOf": [<one schema per member>]}`, each member mapped like a property of that type; a `null` member becomes `{"type": "null"}`, a `false` member `{"const": false}` and a `true` member `{"const": true}` |
+  | `object` | `{"type": "object"}` |
+  | `self`, `parent` | the declaring class, or its parent class, mapped as that DTO (a `$ref` when it is still being mapped) |
+
+- **`required` lists every non-nullable property without a default.** A nullable property, or one with a default value (including a promoted constructor parameter's default), is omitted from `required`; the key itself is left out of the schema entirely when nothing qualifies, rather than emitted as `"required": []`. Untyped properties count as nullable.
+- **A nullable typed property accepts `null` in its schema**, because a missing key and an explicit `null` are different things. A scalar, array or entity property widens its `type` (`?string` becomes `{"type": ["string", "null"]}`), a backed enum also gains `null` in its `enum` list, and a nested DTO or a `$ref` becomes `{"anyOf": [{…}, {"type": "null"}]}`. A nullable union already contains its `null` member, and `{}` (`mixed`, interfaces) accepts `null` anyway, while `?false` and `?true` become `anyOf` with their `const` and `{"type": "null"}`, so neither is wrapped.
+- **A DTO that reaches itself again becomes a `$ref`.** A property typed as a class that is still being mapped further up (`public ?NodeDto $parent` inside `NodeDto`, or `A` to `B` to `A`) is emitted as `{"$ref": "#/components/schemas/<ShortName>"}` instead of being inlined forever. Pass a second, by-reference argument to learn which classes were referenced that way: `objectSchemaForClass(NodeDto::class, $referenced)` sets `$referenced` to `[NodeDto::class]`. Your document has to define each of them under its short name.
+- **Empty schemas are `stdClass` objects** inside the returned array, so `json_encode()` writes `{}` rather than `[]`: an unconstrained property, the `items` of an `array`, and the `properties` of a DTO without public properties. Compare such values as JSON rather than with `===`. `schemaForType('mixed')` itself still returns the empty array `[]`; convert it with `(object) []` before you embed it in a document.
+- **The one-argument call still works, but its output changed** in the release that added `$referenced`: untyped, interface, union and pseudo-typed properties now yield `{}`, `anyOf` or `const` instead of `{"type": "string"}`, empty schemas and empty `properties` are `stdClass` instead of `[]`, and a cycle yields a `$ref` that the caller has to resolve through `$referenced` instead of overflowing the stack.
 
 ## Reference consumer: the OpenAPI export
 

@@ -213,7 +213,7 @@ final class OpenApiGeneratorTest extends TestCase
         // items is an empty schema object ({} in JSON), so compare structurally.
         self::assertSame('array', $params['arr']['type']);
         self::assertArrayHasKey('items', $params['arr']);
-        self::assertSame([], $params['m']);
+        self::assertSame('{}', json_encode($params['m']));
         // Untyped input becomes a raw string, and a requirement regex becomes the pattern.
         self::assertSame(['type' => 'string', 'pattern' => '[a-z]+'], $params['raw']);
         // A variadic parameter is exposed as a query parameter.
@@ -395,6 +395,15 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function encodesAMixedArgumentAsAnEmptySchemaObject(): void
+    {
+        $document = $this->features();
+
+        self::assertSame('{}', json_encode($document['paths']['/api/payload']['post']['requestBody']['content']['application/json']['schema']['properties']['payload']));
+        self::assertStringNotContainsString('"schema":[]', (string) json_encode($document));
+    }
+
+    #[Test]
     public function rejectsTwoDifferentClassesResolvingToTheSameSchemaName(): void
     {
         $routes = [
@@ -469,7 +478,7 @@ final class OpenApiGeneratorTest extends TestCase
             'noBody' => ['path' => '/api/no-body', 'methods' => ['GET'], 'controller' => 'ctrl::noBody', 'env' => null, 'requirements' => []],
             'nullableFields' => ['path' => '/api/nullable-fields', 'methods' => ['GET'], 'controller' => 'ctrl::nullableFields', 'env' => null, 'requirements' => []],
             'constrained' => ['path' => '/api/constrained/{page}', 'methods' => ['POST'], 'controller' => 'ctrl::constrained', 'env' => null, 'requirements' => []],
-        ];
+            'payload' => ['path' => '/api/payload', 'methods' => ['POST'], 'controller' => 'ctrl::payload', 'env' => null, 'requirements' => []],        ];
 
         $arguments = [
             'types' => [
@@ -500,6 +509,9 @@ final class OpenApiGeneratorTest extends TestCase
             'constrained' => [
                 ['name' => 'page', 'type' => 'float', 'source' => 'path', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'min' => 0, 'max' => 1.5],
                 ['name' => 'q', 'type' => 'string', 'source' => 'body', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'minLength' => 2, 'maxLength' => 200],
+            ],
+            'payload' => [
+                ['name' => 'payload', 'type' => 'mixed', 'source' => 'body', 'nullable' => true, 'hasDefault' => false, 'default' => null],
             ],
         ];
 

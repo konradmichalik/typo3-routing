@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\OpenApi\JsonSchemaMapper;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{AllOptionalDto, CourseDto, CourseWithInstructorDto, NullableFieldsDto};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{AllOptionalDto, ChildDto, CourseDto, CourseWithInstructorDto, CycleADto, CycleHolderDto, EmptyDto, LooseFieldsDto, NodeDto, NullableFieldsDto, SelfTypedNodeDto};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
@@ -343,11 +343,11 @@ final class JsonSchemaMapperTest extends TestCase
      * Optional and nullable are different things: a missing key and an explicit `null` are two
      * distinct cases, so a nullable property's schema has to accept `null` itself.
      *
-     * @param array<string, mixed> $expected
+     * @param array<string, mixed>|object $expected
      */
     #[Test]
     #[DataProvider('nullablePropertyProvider')]
-    public function includesNullInTheSchemaOfANullableProperty(string $property, array $expected): void
+    public function includesNullInTheSchemaOfANullableProperty(string $property, array|object $expected): void
     {
         $schema = (new JsonSchemaMapper())->objectSchemaForClass(NullableFieldsDto::class);
 
@@ -356,7 +356,7 @@ final class JsonSchemaMapperTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string, array<string, mixed>}>
+     * @return iterable<string, array{string, array<string, mixed>|object}>
      */
     public static function nullablePropertyProvider(): iterable
     {
@@ -370,7 +370,119 @@ final class JsonSchemaMapperTest extends TestCase
         ]]];
         yield 'nullable array keeps its items' => ['tags', ['type' => ['array', 'null'], 'items' => (object) []]];
         // `mixed` has no `type`, so it already accepts null.
-        yield 'mixed stays unconstrained' => ['anything', []];
-        yield 'untyped stays as it was' => ['legacy', ['type' => 'string']];
+        yield 'mixed stays unconstrained' => ['anything', (object) []];
+        // A response value is not a raw query string, so nothing is known about an untyped one.
+        yield 'untyped is unconstrained' => ['legacy', (object) []];
+    }
+
+    /**
+     * @param array<string, mixed>|object $expected
+     */
+    #[Test]
+    #[DataProvider('looseTypePropertyProvider')]
+    public function mapsUnionIntersectionUntypedAndPseudoTypedProperties(string $property, array|object $expected): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(LooseFieldsDto::class);
+
+        self::assertSame(json_encode($expected), json_encode($schema['properties'][$property]));
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, mixed>|object}>
+     */
+    public static function looseTypePropertyProvider(): iterable
+    {
+        yield 'nullable union lists null once' => ['ref', ['anyOf' => [['type' => 'string'], ['type' => 'integer'], ['type' => 'null']]]];
+        yield 'union' => ['code', ['anyOf' => [['type' => 'string'], ['type' => 'integer']]]];
+        yield 'false member is a constant' => ['label', ['anyOf' => [['type' => 'string'], ['const' => false]]]];
+        yield 'true member is a constant' => ['flag', ['anyOf' => [['type' => 'integer'], ['const' => true]]]];
+        yield 'nullable false' => ['off', ['anyOf' => [['const' => false], ['type' => 'null']]]];
+        yield 'nullable true' => ['on', ['anyOf' => [['const' => true], ['type' => 'null']]]];
+        yield 'BackedEnum interface' => ['backed', (object) []];
+        yield 'UnitEnum interface' => ['unit', (object) []];
+        yield 'object' => ['meta', ['type' => 'object']];
+        yield 'nullable object' => ['extra', ['type' => ['object', 'null']]];
+        // A Traversable is encoded as an object, an array as a list, so nothing is known.
+        yield 'iterable' => ['items', (object) []];
+        yield 'intersection' => ['both', (object) []];
+        yield 'intersection inside a union' => ['either', ['anyOf' => [(object) [], ['type' => 'null']]]];
+        yield 'interface' => ['payload', (object) []];
+    }
+
+    #[Test]
+    public function requiresOnlyTheNonNullablePropertiesWithoutDefaultOfALooseDto(): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(LooseFieldsDto::class);
+
+        self::assertSame(['meta', 'both', 'payload'], $schema['required']);
+    }
+
+    #[Test]
+    public function encodesAnEmptyDtoAsAJsonObject(): void
+    {
+        self::assertSame('{"type":"object","properties":{}}', json_encode((new JsonSchemaMapper())->objectSchemaForClass(EmptyDto::class)));
+    }
+
+    #[Test]
+    public function referencesADirectlySelfReferencingDtoInsteadOfRecursing(): void
+    {
+        $referenced = [];
+
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(NodeDto::class, $referenced);
+
+        self::assertSame(
+            ['anyOf' => [['$ref' => '#/components/schemas/NodeDto'], ['type' => 'null']]],
+            $schema['properties']['parent'],
+        );
+        self::assertSame([NodeDto::class], $referenced);
+    }
+
+    #[Test]
+    public function resolvesSelfToTheDeclaringClass(): void
+    {
+        $referenced = [];
+
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(SelfTypedNodeDto::class, $referenced);
+
+        self::assertSame(
+            ['anyOf' => [['$ref' => '#/components/schemas/SelfTypedNodeDto'], ['type' => 'null']]],
+            $schema['properties']['next'],
+        );
+        self::assertSame([SelfTypedNodeDto::class], $referenced);
+    }
+
+    #[Test]
+    public function resolvesParentToTheDeclaringClassesParent(): void
+    {
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(ChildDto::class);
+
+        self::assertSame(
+            ['anyOf' => [['type' => 'object', 'properties' => ['id' => ['type' => 'integer']]], ['type' => 'null']]],
+            $schema['properties']['base'],
+        );
+    }
+
+    #[Test]
+    public function inlinesACycleUntilItReachesAClassAlreadyBeingMapped(): void
+    {
+        $referenced = [];
+
+        $schema = (new JsonSchemaMapper())->objectSchemaForClass(CycleHolderDto::class, $referenced);
+
+        self::assertSame(
+            ['type' => 'object', 'properties' => ['a' => ['$ref' => '#/components/schemas/CycleADto']], 'required' => ['a']],
+            $schema['properties']['a']['properties']['b']['anyOf'][0],
+        );
+        self::assertSame([CycleADto::class], $referenced);
+    }
+
+    #[Test]
+    public function reportsNoReferencedClassesForAnAcyclicDto(): void
+    {
+        $referenced = [NodeDto::class];
+
+        (new JsonSchemaMapper())->objectSchemaForClass(CourseWithInstructorDto::class, $referenced);
+
+        self::assertSame([], $referenced);
     }
 }

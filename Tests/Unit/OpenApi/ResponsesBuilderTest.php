@@ -15,7 +15,8 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 
 use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, ResponsesBuilder};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\Collision\CourseDto as CollidingCourseDto;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{CourseDto, CycleADto, CycleHolderDto};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\Error as ErrorDto;
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
@@ -136,6 +137,44 @@ final class ResponsesBuilderTest extends TestCase
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000038);
         $this->expectExceptionMessageMatches('/both resolve to the OpenAPI schema name "CourseDto"/');
+
+        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+    }
+
+    #[Test]
+    public function registersAClassACycleRefersToThatIsNotTheDeclaredOne(): void
+    {
+        $usedSchemas = [];
+        $declared = [['status' => 200, 'schema' => CycleHolderDto::class, 'collection' => false, 'description' => null]];
+
+        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+
+        self::assertSame(['CycleHolderDto', 'CycleADto'], array_keys($usedSchemas));
+        self::assertSame(CycleADto::class, $usedSchemas['CycleADto']['class']);
+    }
+
+    #[Test]
+    public function rejectsAReferencedClassWhoseShortNameIsTaken(): void
+    {
+        $usedSchemas = ['CycleADto' => ['class' => CourseDto::class, 'schema' => ['type' => 'object', 'properties' => []]]];
+        $declared = [['status' => 200, 'schema' => CycleHolderDto::class, 'collection' => false, 'description' => null]];
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000038);
+        $this->expectExceptionMessageMatches('/both resolve to the OpenAPI schema name "CycleADto"/');
+
+        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+    }
+
+    #[Test]
+    public function rejectsASchemaNamedLikeTheBuiltInErrorSchema(): void
+    {
+        $usedSchemas = [];
+        $declared = [['status' => 200, 'schema' => ErrorDto::class, 'collection' => false, 'description' => null]];
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000063);
+        $this->expectExceptionMessageMatches('/"Error" is reserved/');
 
         $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
     }

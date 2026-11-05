@@ -14,11 +14,9 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\OpenApi;
 
 use LogicException;
+use ReflectionClass;
 
 use function sprintf;
-use function str_contains;
-use function strrpos;
-use function substr;
 
 /**
  * ResponsesBuilder.
@@ -115,7 +113,8 @@ final readonly class ResponsesBuilder
      * A `#[Returns]` schema is named after the class's short name and shared across every route
      * declaring it, so the same DTO never produces two separate `components/schemas` entries. Two
      * different classes sharing a short name is an ambiguity the build rejects rather than silently
-     * letting the second one win.
+     * letting the second one win. A class the mapper could only `$ref` (a self-reference or a cycle)
+     * is registered the same way, so the reference always resolves.
      *
      * @param class-string                                                            $class
      * @param array<string, array{class: class-string, schema: array<string, mixed>}> $usedSchemas
@@ -124,13 +123,26 @@ final readonly class ResponsesBuilder
      */
     private function schemaRef(string $class, array &$usedSchemas): array
     {
-        $shortName = str_contains($class, '\\') ? substr($class, (int) strrpos($class, '\\') + 1) : $class;
+        // Derived exactly like the `$ref` JsonSchemaMapper emits for a cycle, so both always name the same entry.
+        $shortName = (new ReflectionClass($class))->getShortName();
+
+        // The generator adds the problem+json schema under this name, and a DTO would silently replace it.
+        if ('Error' === $shortName) {
+            throw new LogicException(sprintf('The schema name "Error" is reserved for the problem+json error response, but "%s" resolves to it. Rename the class.', $class), 1750000063);
+        }
 
         if (isset($usedSchemas[$shortName]) && $usedSchemas[$shortName]['class'] !== $class) {
             throw new LogicException(sprintf('#[Returns] schemas "%s" and "%s" both resolve to the OpenAPI schema name "%s". Rename one of the classes so their short names differ.', $usedSchemas[$shortName]['class'], $class, $shortName), 1750000038);
         }
 
-        $usedSchemas[$shortName] ??= ['class' => $class, 'schema' => $this->schemas->objectSchemaForClass($class)];
+        if (!isset($usedSchemas[$shortName])) {
+            $referenced = [];
+            // Registered before its references, so a cycle back to this class ends at the isset() above.
+            $usedSchemas[$shortName] = ['class' => $class, 'schema' => $this->schemas->objectSchemaForClass($class, $referenced)];
+            foreach ($referenced as $referencedClass) {
+                $this->schemaRef($referencedClass, $usedSchemas);
+            }
+        }
 
         return ['$ref' => '#/components/schemas/'.$shortName];
     }

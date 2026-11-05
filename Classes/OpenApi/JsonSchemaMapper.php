@@ -19,12 +19,17 @@ use ReflectionEnumBackedCase;
 use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionProperty;
+use ReflectionType;
+use ReflectionUnionType;
 use TYPO3\CMS\Extbase\DomainObject\DomainObjectInterface;
 use UnitEnum;
 
 use function array_filter;
 use function array_values;
 use function class_exists;
+use function enum_exists;
+use function in_array;
+use function interface_exists;
 use function is_a;
 use function is_array;
 use function is_string;
@@ -70,37 +75,24 @@ final readonly class JsonSchemaMapper
      * domain object — those go through schemaForType() so the two mappers never disagree about them.
      * A non-nullable property without a default is `required`. A nullable typed property also accepts
      * `null` in its schema, in the JSON Schema 2020-12 form OpenAPI 3.1 uses (see withNull()).
+     * A union becomes `anyOf` over its members; an untyped or intersection-typed property is `{}`.
      *
-     * @param class-string $class
+     * A class reached again while it is still being mapped (a self-reference or a cycle) becomes
+     * `{"$ref": "#/components/schemas/<ShortName>"}` instead of being inlined forever. Those classes
+     * are reported through `$referenced`; the caller has to define each of them under that name.
+     *
+     * @param class-string       $class
+     * @param list<class-string> $referenced
+     *
+     * @param-out list<class-string> $referenced
      *
      * @return array<string, mixed>
      */
-    public function objectSchemaForClass(string $class): array
+    public function objectSchemaForClass(string $class, array &$referenced = []): array
     {
-        $properties = [];
-        $required = [];
+        $referenced = [];
 
-        foreach ($this->publicProperties($class) as $property) {
-            $name = $property->getName();
-            $type = $property->getType();
-            $typeName = $type instanceof ReflectionNamedType ? $type->getName() : null;
-
-            $nullable = null === $type || $type->allowsNull();
-            $schema = $this->propertySchema($typeName);
-            $properties[$name] = null !== $typeName && $nullable ? $this->withNull($schema) : $schema;
-
-            $hasDefault = $property->isPromoted() ? $this->promotedParameterHasDefault($property) : $property->hasDefaultValue();
-            if (!$nullable && !$hasDefault) {
-                $required[] = $name;
-            }
-        }
-
-        $schema = ['type' => 'object', 'properties' => $properties];
-        if ([] !== $required) {
-            $schema['required'] = $required;
-        }
-
-        return $schema;
+        return $this->objectSchema($class, [$class], $referenced);
     }
 
     /**
@@ -151,28 +143,161 @@ final readonly class JsonSchemaMapper
     }
 
     /**
+     * @param class-string       $class
+     * @param list<class-string> $stack      the classes currently being inlined, outermost first
+     * @param list<class-string> $referenced
+     *
+     * @return array<string, mixed>
+     */
+    private function objectSchema(string $class, array $stack, array &$referenced): array
+    {
+        $properties = [];
+        $required = [];
+
+        foreach ($this->publicProperties($class) as $property) {
+            $name = $property->getName();
+            $properties[$name] = $this->unconstrainedAsObject($this->declaredTypeSchema($property->getType(), $property->getDeclaringClass(), $stack, $referenced));
+
+            if ($this->isRequired($property)) {
+                $required[] = $name;
+            }
+        }
+
+        $schema = ['type' => 'object', 'properties' => $this->unconstrainedAsObject($properties)];
+        if ([] !== $required) {
+            $schema['required'] = $required;
+        }
+
+        return $schema;
+    }
+
+    private function isRequired(ReflectionProperty $property): bool
+    {
+        $type = $property->getType();
+        if (null === $type || $type->allowsNull()) {
+            return false;
+        }
+
+        return !($property->isPromoted() ? $this->promotedParameterHasDefault($property) : $property->hasDefaultValue());
+    }
+
+    /**
+     * @param ReflectionClass<object> $declaring
+     * @param list<class-string>      $stack
+     * @param list<class-string>      $referenced
+     *
+     * @return array<string, mixed>
+     */
+    private function declaredTypeSchema(?ReflectionType $type, ReflectionClass $declaring, array $stack, array &$referenced): array
+    {
+        if ($type instanceof ReflectionUnionType) {
+            $members = [];
+            foreach ($type->getTypes() as $member) {
+                $members[] = $this->unconstrainedAsObject($this->declaredTypeSchema($member, $declaring, $stack, $referenced));
+            }
+
+            return ['anyOf' => $members];
+        }
+
+        // Untyped and intersection-typed values have no JSON shape the mapper could state.
+        if (!$type instanceof ReflectionNamedType) {
+            return [];
+        }
+
+        $typeName = $type->getName();
+        $schema = $this->namedTypeSchema($this->resolvedTypeName($typeName, $declaring), $stack, $referenced);
+
+        return $type->allowsNull() && 'null' !== $typeName ? $this->withNull($schema) : $schema;
+    }
+
+    /**
+     * @param ReflectionClass<object> $declaring
+     */
+    private function resolvedTypeName(string $typeName, ReflectionClass $declaring): string
+    {
+        // PHP refuses to compile `parent` in a class without one, so the false branch is never taken.
+        $parent = $declaring->getParentClass();
+
+        return match (true) {
+            'self' === $typeName => $declaring->getName(),
+            'parent' === $typeName && false !== $parent => $parent->getName(),
+            default => $typeName,
+        };
+    }
+
+    /**
+     * Pseudo types are resolved here because schemaForType() maps request input, where they cannot occur.
+     *
+     * @param list<class-string> $stack
+     * @param list<class-string> $referenced
+     *
+     * @return array<string, mixed>
+     */
+    private function namedTypeSchema(string $typeName, array $stack, array &$referenced): array
+    {
+        return match ($typeName) {
+            'null' => ['type' => 'null'],
+            'true' => ['const' => true],
+            'false' => ['const' => false],
+            'object' => ['type' => 'object'],
+            // A Traversable is encoded as an object and an array as a list, so no shape fits both.
+            'iterable' => [],
+            default => $this->propertySchema($typeName, $stack, $referenced),
+        };
+    }
+
+    /**
      * A named type that is neither a backed enum nor an Extbase domain object but does resolve to a
      * class is treated as a nested DTO and mapped recursively; everything else defers to
      * schemaForType(), so the two mappers never diverge on a scalar, enum, or entity property.
      *
+     * @param list<class-string> $stack
+     * @param list<class-string> $referenced
+     *
      * @return array<string, mixed>
      */
-    private function propertySchema(?string $typeName): array
+    private function propertySchema(string $typeName, array $stack, array &$referenced): array
     {
-        if (null !== $typeName
-            && !is_a($typeName, UnitEnum::class, true)
-            && !is_a($typeName, DomainObjectInterface::class, true)
-            && class_exists($typeName)
-        ) {
-            return $this->objectSchemaForClass($typeName);
+        // enum_exists() rather than is_a(): the `UnitEnum` and `BackedEnum` interfaces are no enums.
+        if (enum_exists($typeName) || is_a($typeName, DomainObjectInterface::class, true)) {
+            return $this->schemaForType($typeName);
         }
 
-        return $this->schemaForType($typeName);
+        // An interface does not say which properties the serialized object has.
+        if (interface_exists($typeName)) {
+            return [];
+        }
+
+        if (!class_exists($typeName)) {
+            return $this->schemaForType($typeName);
+        }
+
+        if (!in_array($typeName, $stack, true)) {
+            return $this->objectSchema($typeName, [...$stack, $typeName], $referenced);
+        }
+
+        if (!in_array($typeName, $referenced, true)) {
+            $referenced[] = $typeName;
+        }
+
+        return ['$ref' => '#/components/schemas/'.(new ReflectionClass($typeName))->getShortName()];
     }
 
     /**
-     * An object schema cannot widen its `type`, so it becomes an `anyOf`; a schema without `type`
-     * (`mixed`) already accepts `null`.
+     * `json_encode()` writes an empty PHP array as `[]`, but a schema and `properties` must be objects.
+     *
+     * @param array<string, mixed> $schema
+     *
+     * @return array<string, mixed>|object
+     */
+    private function unconstrainedAsObject(array $schema): array|object
+    {
+        return [] === $schema ? (object) [] : $schema;
+    }
+
+    /**
+     * A DTO's object schema, a `$ref` or a `const` cannot widen its `type`, so it becomes an `anyOf`; a schema
+     * without `type` (`mixed`) already accepts `null`.
      *
      * @param array<string, mixed> $schema
      *
@@ -182,7 +307,7 @@ final readonly class JsonSchemaMapper
     {
         $type = $schema['type'] ?? null;
 
-        if ('object' === $type) {
+        if (isset($schema['properties']) || isset($schema['$ref']) || isset($schema['const'])) {
             return ['anyOf' => [$schema, ['type' => 'null']]];
         }
 

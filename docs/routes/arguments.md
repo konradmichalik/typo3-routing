@@ -166,4 +166,5 @@ Rejected at build time, so the route definition never contradicts itself:
 - `min`/`max` on anything but an `int` or `float` parameter, and `minLength`/`maxLength` on anything but a `string` parameter. Untyped and `mixed` parameters, backed enums and entities have no single value to compare, so a constraint there is rejected rather than ignored.
 - `min` greater than `max`, `minLength` greater than `maxLength`, or a negative length: no value could pass.
 - A `min` or `max` of `INF`, `-INF` or `NAN`: it bounds nothing and cannot be exported to JSON.
+- A float `min` or `max` on an `int` parameter, even a whole number like `5.0`. `min: 1.1, max: 1.9` holds no integer, and a float beyond 2^53 cannot be compared exactly. Write the bound as an int.
 - A PHP default outside the bounds on a path or host placeholder, such as `/list/{limit}` with `#[Param(max: 100)] int $limit = 500`. The router fills a left-out segment with the default, which would then answer `400`. The same applies to a `#[Route(defaults:)]` entry for that placeholder, on the method or the class.

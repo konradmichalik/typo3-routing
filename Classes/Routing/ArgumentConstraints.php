@@ -30,6 +30,17 @@ use function mb_strlen;
 final class ArgumentConstraints
 {
     /**
+     * An empty form field (`?q=`) means "not given" when a PHP default exists, so neither its type nor
+     * its constraints are checked. A bool keeps `''` as false.
+     *
+     * @param array{type: string|null, hasDefault: bool} $spec
+     */
+    public static function isEmptyWithDefault(mixed $value, array $spec): bool
+    {
+        return '' === $value && $spec['hasDefault'] && 'bool' !== $spec['type'];
+    }
+
+    /**
      * Length counts UTF-8 characters, not bytes, independent of mb_internal_encoding(). A non-finite number ("1e999" as float) never satisfies a range.
      *
      * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints

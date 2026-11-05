@@ -10,7 +10,7 @@ Instead of reading values off the request by hand, declare them as **typed metho
 | `UploadedFileInterface $file`     | The [uploaded file](#uploaded-files) of that name. |
 | Any other scalar name             | Query string, then request body.       |
 
-Values are coerced to the declared type (`int`, `float`, `bool`, `string`, `array`, `mixed`; untyped = raw string) — including **backed enums**. A value that cannot be coerced, or a missing parameter without a default, yields a **400** before the controller runs. Optional parameters use their PHP default; nullable parameters become `null` when absent.
+Values are coerced to the declared type (`int`, `float`, `bool`, `string`, `array`, `mixed`; untyped = raw string) — including **backed enums**. A value that cannot be coerced, or a missing parameter without a default, yields a **400** before the controller runs. Optional parameters use their PHP default; nullable parameters become `null` when absent. An empty value (`?page=`, typically an empty form field) counts as absent for a parameter with a PHP default, except for `bool`, where it stays `false`.
 
 > [!NOTE]
 > The request **body** is read as form fields for `application/x-www-form-urlencoded`/`multipart` POSTs, and decoded from the raw stream for `application/json` requests — so JSON payloads (and any `PUT`/`PATCH` body) bind to parameters the same way. The body stream stays rewound, so a controller that injects `ServerRequestInterface` can still read it.
@@ -180,7 +180,7 @@ public function search(
 - **Checked before the controller is called**, on the value after type coercion: `?limit=010` is compared as `10`. A value outside the bounds answers `400` with the same problem response as a value that cannot be coerced, naming the wire parameter (`Invalid value for parameter: q`). All bounds are inclusive.
 - **Length counts characters, not bytes** (`mb_strlen`): `äöü` has a length of 3.
 - **A number that overflows to infinity never passes a range**: `?ratio=1e999` on `#[Param(min: 0)] float $ratio` is a `400`.
-- **Only a received value is checked at request time.** A missing parameter falls back to its PHP default unchecked, so `string $q = ''` with `minLength: 2` keeps `?q` optional. A path placeholder is the exception, see below.
+- **Only a received value is checked at request time.** A missing or empty parameter falls back to its PHP default unchecked, so `string $q = ''` with `minLength: 2` accepts both a missing `q` and an empty `?q=`. A path placeholder is the exception, see below.
 - **Path placeholders answer `400` too.** A `requirement` decides whether the route matches at all, so its violation is a `404`. A constraint is checked once the route is known, like the type of the value, so `/api/blog/0` with `#[Param(min: 1)] int $page` is a `400`, the same as `/api/blog/abc` for an `int $page` without a requirement.
 - **A variadic is checked per element**: `#[Param(min: 1)] int ...$ids` rejects `?ids[]=3&ids[]=0`.
 - **`routing:debug <route>`** lists them in the argument's line (`$limit (int, from input, min: 1, max: 100)`), and `getArguments()` reports them as optional keys for [consumers of the metadata API](../background/extending.md).

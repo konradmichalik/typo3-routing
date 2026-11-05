@@ -127,11 +127,10 @@ final readonly class ControllerArgumentResolver
      */
     private function resolveInput(array $inputs, array $spec): mixed
     {
-        if (!array_key_exists($spec['name'], $inputs)) {
-            return $this->fallbackForMissing($spec);
-        }
+        // A missing value reaches coerce() as null, which falls back like an empty form field does.
+        $value = $inputs[$spec['name']] ?? null;
 
-        return $this->coerce($inputs[$spec['name']], $spec);
+        return $this->coerce(ArgumentConstraints::isEmptyWithDefault($value, $spec) ? null : $value, $spec);
     }
 
     /**

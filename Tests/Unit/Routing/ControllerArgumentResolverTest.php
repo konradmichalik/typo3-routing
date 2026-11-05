@@ -419,6 +419,46 @@ final class ControllerArgumentResolverTest extends TestCase
     }
 
     #[Test]
+    public function fallsBackToTheDefaultForAnEmptyConstrainedInput(): void
+    {
+        // An empty search field of a submitted GET form arrives as ?q=.
+        $specs = [[...$this->spec('q', 'input', 'string', hasDefault: true, default: ''), 'minLength' => 2]];
+        $request = $this->request()->withQueryParams(['q' => '']);
+
+        self::assertSame([''], $this->resolver->resolve($specs, [], $request));
+    }
+
+    #[Test]
+    public function fallsBackToTheDefaultForAnEmptyIntInput(): void
+    {
+        $specs = [$this->spec('page', 'query', 'int', hasDefault: true, default: 1)];
+        $request = $this->request()->withQueryParams(['page' => '']);
+
+        self::assertSame([1], $this->resolver->resolve($specs, [], $request));
+    }
+
+    #[Test]
+    public function keepsAnEmptyBoolInputFalseDespiteATrueDefault(): void
+    {
+        $specs = [$this->spec('flag', 'query', 'bool', hasDefault: true, default: true)];
+        $request = $this->request()->withQueryParams(['flag' => '']);
+
+        self::assertSame([false], $this->resolver->resolve($specs, [], $request));
+    }
+
+    #[Test]
+    public function stillRejectsAnEmptyInputWithoutADefault(): void
+    {
+        $specs = [[...$this->spec('q', 'input', 'string'), 'minLength' => 2]];
+        $request = $this->request()->withQueryParams(['q' => '']);
+
+        $this->expectException(ArgumentResolutionException::class);
+        $this->expectExceptionMessage('Invalid value for parameter: q');
+
+        $this->resolver->resolve($specs, [], $request);
+    }
+
+    #[Test]
     public function resolvesAnUploadedFileByItsWireName(): void
     {
         $file = $this->uploadedFile();

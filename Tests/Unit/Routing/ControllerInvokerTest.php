@@ -259,6 +259,43 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function skipsAnImportantHostPlaceholderRequirement(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'importantTenant', '_requirements' => ['tenant' => '[a-z]+'], 'tenant' => 'acme'],
+            $this->request(['tenant' => '123']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
+    public function rejectsAnInvalidQueryValueShadowedByAValidBodyValue(): void
+    {
+        $request = $this->request(['sort' => 'evil'])->withParsedBody(['sort' => 'asc']);
+
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'listing', '_requirements' => ['sort' => 'asc|desc'], 'sort' => 'asc'],
+            $request,
+        );
+
+        self::assertSame('Invalid value for parameter: sort', $error);
+    }
+
+    #[Test]
+    public function rejectsAnInvalidBodyValueNextToAValidQueryValue(): void
+    {
+        $request = $this->request(['sort' => 'asc'])->withParsedBody(['sort' => 'evil']);
+
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'listing', '_requirements' => ['sort' => 'asc|desc'], 'sort' => 'asc'],
+            $request,
+        );
+
+        self::assertSame('Invalid value for parameter: sort', $error);
+    }
+
+    #[Test]
     public function treatsAMatchedKeyAsPlaceholderWhenTheRouteIsUnknownToTheRegistry(): void
     {
         $error = $this->invoker()->firstInputRequirementError(
@@ -503,6 +540,7 @@ final class ControllerInvokerTest extends TestCase
             'item' => ['path' => '/api/items/{id}', 'methods' => [], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
             'tenant' => ['path' => '/api/tenant', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['tenant' => '[a-z]+'], 'host' => '{tenant}.example.com'],
             'inlineTenant' => ['path' => '/api/inline-tenant', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'host' => '{tenant<[a-z]+>}.example.com'],
+            'importantTenant' => ['path' => '/api/important-tenant', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['tenant' => '[a-z]+'], 'host' => '{!tenant}.example.com'],
             'listing' => ['path' => '/api/list', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['sort' => 'asc|desc'], 'defaults' => ['sort' => 'asc']],
         ];
 

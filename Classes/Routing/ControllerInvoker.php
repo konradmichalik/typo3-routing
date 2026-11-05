@@ -152,7 +152,9 @@ final readonly class ControllerInvoker
     public function firstInputRequirementError(array $match, ServerRequestInterface $request): ?string
     {
         $requirements = $match['_requirements'] ?? null;
-        $inputs = array_merge($request->getQueryParams(), RequestBody::toArray($request));
+        // Query and body are checked separately: a merge would let a valid body value hide an invalid
+        // query value, which a query-sourced argument then reads.
+        $sources = [$request->getQueryParams(), RequestBody::toArray($request)];
         $routeName = (string) ($match['_route'] ?? '');
         // A route default lands in $match as well, so its input may be absent but is checked when present.
         $optional = [...$this->registry->getOptionalInputs($routeName), ...array_keys($match)];
@@ -164,14 +166,18 @@ final readonly class ControllerInvoker
             if (self::isPlaceholder($key, $route, $match)) {
                 continue;
             }
-            if (!array_key_exists($key, $inputs)) {
+            $values = array_map(
+                static fn (array $source): mixed => $source[$key],
+                array_values(array_filter($sources, static fn (array $source): bool => array_key_exists($key, $source))),
+            );
+            if ([] === $values) {
                 if (in_array($key, $optional, true)) {
                     continue;
                 }
 
                 return sprintf('Missing required parameter: %s', $key);
             }
-            if (is_string($pattern) && $this->inputViolatesPattern($pattern, $inputs[$key])) {
+            if (is_string($pattern) && $this->anyInputViolatesPattern($pattern, $values)) {
                 return sprintf('Invalid value for parameter: %s', $key);
             }
         }
@@ -232,8 +238,8 @@ final readonly class ControllerInvoker
     }
 
     /**
-     * Substring tests instead of a regex per request. The inline forms `{name<...>}` and `{name?...}`
-     * are covered because PlaceholderSyntaxGuard checks paths only, never the host.
+     * Substring tests instead of a regex per request. The inline forms `{name<...>}`, `{name?...}` and
+     * `{!name}` are covered because PlaceholderSyntaxGuard checks paths only, never the host.
      *
      * @param array{path: string, host?: string|null}|null $route
      * @param array<string, mixed>                         $match
@@ -245,16 +251,22 @@ final readonly class ControllerInvoker
             return array_key_exists($key, $match);
         }
         $patterns = $route['path'].' '.($route['host'] ?? '');
+        $forms = ['{'.$key.'}', '{'.$key.'<', '{'.$key.'?', '{!'.$key.'}', '{!'.$key.'<', '{!'.$key.'?'];
 
-        return str_contains($patterns, '{'.$key.'}') || str_contains($patterns, '{'.$key.'<') || str_contains($patterns, '{'.$key.'?');
+        return [] !== array_filter($forms, static fn (string $form): bool => str_contains($patterns, $form));
     }
 
     /**
-     * A non-empty pattern is violated when the value is not a string or does not fully match the regex.
+     * A non-empty pattern is violated when a value is not a string or does not fully match the regex.
+     *
+     * @param list<mixed> $values
      */
-    private function inputViolatesPattern(string $pattern, mixed $value): bool
+    private function anyInputViolatesPattern(string $pattern, array $values): bool
     {
-        return '' !== $pattern && (!is_string($value) || 1 !== preg_match('#^(?:'.$pattern.')$#', $value));
+        return '' !== $pattern && [] !== array_filter(
+            $values,
+            static fn (mixed $value): bool => !is_string($value) || 1 !== preg_match('#^(?:'.$pattern.')$#', $value),
+        );
     }
 
     /**

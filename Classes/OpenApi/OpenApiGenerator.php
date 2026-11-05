@@ -17,6 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, Bearer
 use KonradMichalik\Typo3Routing\Controller\SwaggerUiController;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 
+use function array_column;
 use function array_intersect_key;
 use function array_key_exists;
 use function explode;
@@ -185,7 +186,7 @@ final readonly class OpenApiGenerator
         }
 
         $hasInput = [] !== $parameters || [] !== $bodyProperties || self::hasConstrainedHostArgument($arguments);
-        $operation['responses'] = $this->responses($name, $route, $hasInput, $usedSchemas);
+        $operation['responses'] = $this->responses($name, $route, $hasInput, $this->takesUpload($arguments, $acceptsUpload), $usedSchemas);
 
         return $operation;
     }
@@ -264,13 +265,15 @@ final readonly class OpenApiGenerator
      */
     private function bodyMediaType(array $arguments, bool $acceptsUpload): string
     {
-        foreach ($arguments as $argument) {
-            if ($acceptsUpload && 'upload' === $argument['source']) {
-                return 'multipart/form-data';
-            }
-        }
+        return $this->takesUpload($arguments, $acceptsUpload) ? 'multipart/form-data' : 'application/json';
+    }
 
-        return 'application/json';
+    /**
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
+     */
+    private function takesUpload(array $arguments, bool $acceptsUpload): bool
+    {
+        return $acceptsUpload && in_array('upload', array_column($arguments, 'source'), true);
     }
 
     /**
@@ -398,7 +401,7 @@ final readonly class OpenApiGenerator
      *
      * @return array<int, array<string, mixed>>
      */
-    private function responses(string $name, array $route, bool $hasInput, array &$usedSchemas): array
+    private function responses(string $name, array $route, bool $hasInput, bool $hasUpload, array &$usedSchemas): array
     {
         return $this->responsesBuilder->build(
             $this->registry->getReturns($name),
@@ -407,6 +410,7 @@ final readonly class OpenApiGenerator
             null !== $this->registry->getRequestTokenScope($name),
             [] !== $route['methods'],
             null !== $this->registry->getRateLimit($name),
+            $hasUpload,
             $usedSchemas,
         );
     }

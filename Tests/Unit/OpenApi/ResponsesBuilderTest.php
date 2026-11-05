@@ -38,7 +38,7 @@ final class ResponsesBuilderTest extends TestCase
     {
         $usedSchemas = [];
 
-        $responses = $this->builder()->build([], false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build([], false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame([200, 404], array_keys($responses));
         self::assertSame('Successful response', $responses[200]['description']);
@@ -49,9 +49,10 @@ final class ResponsesBuilderTest extends TestCase
     {
         $usedSchemas = [];
 
-        $responses = $this->builder()->build([], true, true, true, true, true, $usedSchemas);
+        $responses = $this->builder()->build([], true, true, true, true, true, true, $usedSchemas);
 
-        self::assertSame([200, 400, 401, 403, 404, 405, 429], array_keys($responses));
+        self::assertSame([200, 400, 401, 403, 404, 405, 413, 429], array_keys($responses));
+        self::assertSame(['application/problem+json' => ['schema' => ['$ref' => '#/components/schemas/Error']]], $responses[413]['content']);
     }
 
     #[Test]
@@ -60,7 +61,7 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => 200, 'schema' => null, 'collection' => false, 'description' => 'Custom success']];
 
-        $responses = $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame(['description' => 'Custom success'], $responses[200]);
     }
@@ -72,7 +73,7 @@ final class ResponsesBuilderTest extends TestCase
         $declared = [['status' => 404, 'schema' => null, 'collection' => false, 'description' => 'Nothing here']];
 
         // hasInput/authenticated/csrf false, but 404 is unconditional — proves it is not added twice.
-        $responses = $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame([200, 404], array_keys($responses));
         self::assertSame('Nothing here', $responses[404]['description']);
@@ -84,7 +85,7 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null]];
 
-        $responses = $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame('#/components/schemas/CourseDto', $responses[200]['content']['application/json']['schema']['$ref']);
         self::assertArrayHasKey('CourseDto', $usedSchemas);
@@ -98,7 +99,7 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => 200, 'schema' => CourseDto::class, 'collection' => true, 'description' => null]];
 
-        $responses = $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame('array', $responses[200]['content']['application/json']['schema']['type']);
         self::assertSame('#/components/schemas/CourseDto', $responses[200]['content']['application/json']['schema']['items']['$ref']);
@@ -110,7 +111,7 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => 204, 'schema' => null, 'collection' => false, 'description' => null]];
 
-        $responses = $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertArrayNotHasKey('content', $responses[204]);
         self::assertSame('No Content', $responses[204]['description']);
@@ -122,8 +123,8 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null]];
 
-        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
-        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
+        $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertCount(1, $usedSchemas);
     }
@@ -138,7 +139,7 @@ final class ResponsesBuilderTest extends TestCase
         $this->expectExceptionCode(1750000038);
         $this->expectExceptionMessageMatches('/both resolve to the OpenAPI schema name "CourseDto"/');
 
-        $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
     }
 
     #[Test]
@@ -185,7 +186,7 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => 418, 'schema' => null, 'collection' => false, 'description' => null]];
 
-        $responses = $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame('Response', $responses[418]['description']);
     }
@@ -216,7 +217,7 @@ final class ResponsesBuilderTest extends TestCase
         $usedSchemas = [];
         $declared = [['status' => $status, 'schema' => null, 'collection' => false, 'description' => null]];
 
-        $responses = $this->builder()->build($declared, false, false, false, false, false, $usedSchemas);
+        $responses = $this->builder()->build($declared, false, false, false, false, false, false, $usedSchemas);
 
         self::assertSame($expectedDescription, $responses[$status]['description']);
     }

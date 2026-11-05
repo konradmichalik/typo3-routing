@@ -37,7 +37,7 @@ final readonly class ResponsesBuilder
      *
      * @return array<int, array<string, mixed>>
      */
-    public function build(array $declared, bool $hasInput, bool $authenticated, bool $csrfProtected, bool $hasMethods, bool $rateLimited, array &$usedSchemas): array
+    public function build(array $declared, bool $hasInput, bool $authenticated, bool $csrfProtected, bool $hasMethods, bool $rateLimited, bool $hasUpload, array &$usedSchemas): array
     {
         $responses = ['200' => ['description' => 'Successful response']];
 
@@ -52,6 +52,7 @@ final readonly class ResponsesBuilder
         $this->addIfMissing($responses, 403, $csrfProtected, 'Forbidden (invalid request token)');
         $this->addIfMissing($responses, 404, true, 'Not Found');
         $this->addIfMissing($responses, 405, $hasMethods, 'Method Not Allowed');
+        $this->addIfMissing($responses, 413, $hasUpload, 'Content Too Large');
         $this->addIfMissing($responses, 429, $rateLimited, 'Too Many Requests');
 
         return $responses;

@@ -290,6 +290,17 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function documentsThe413OfAnUploadOperation(): void
+    {
+        $paths = $this->features()['paths'];
+
+        self::assertSame('Content Too Large', $paths['/api/upload']['post']['responses'][413]['description']);
+        self::assertArrayHasKey(413, $paths['/api/attachments']['post']['responses']);
+        self::assertArrayNotHasKey(413, $paths['/api/attachments']['put']['responses']);
+        self::assertArrayNotHasKey(413, $paths['/api/note']['post']['responses']);
+    }
+
+    #[Test]
     public function describesAnUploadOnPostOnly(): void
     {
         $put = $this->features()['paths']['/api/attachments']['put'];

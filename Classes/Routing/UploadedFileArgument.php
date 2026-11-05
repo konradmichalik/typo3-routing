@@ -17,9 +17,9 @@ use KonradMichalik\Typo3Routing\Http\HttpProblemException;
 use Psr\Http\Message\{ServerRequestInterface, UploadedFileInterface};
 use RuntimeException;
 
-use function ctype_digit;
 use function ini_get;
 use function ini_parse_quantity;
+use function preg_match;
 use function sprintf;
 
 /**
@@ -47,7 +47,7 @@ final class UploadedFileArgument
         }
 
         $contentLength = $request->getHeaderLine('Content-Length');
-        if (ctype_digit($contentLength) && (int) $contentLength > $postMaxSize) {
+        if (1 === preg_match('/^\d+$/', $contentLength) && (int) $contentLength > $postMaxSize) {
             throw new HttpProblemException(413, 'Request body exceeds the server\'s post_max_size');
         }
     }

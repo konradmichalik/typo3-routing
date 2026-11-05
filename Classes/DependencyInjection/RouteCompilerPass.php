@@ -322,6 +322,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $contributions = $this->argumentSpecs->paramContributions($method, $arguments, $path, $route->requirements, $route->defaults, $serviceId);
         $requirements = [...$requirements, ...$contributions['requirements']];
         $defaults = [...$defaults, ...$contributions['defaults']];
+        ParamConstraintGuard::assertRouteDefaults($arguments, $defaults, $serviceId.'::'.$method->getName().'()');
         $collected->paramDescriptions[$name] = $contributions['descriptions'];
         $collected->optionalInputs[$name] = $contributions['optional'];
 

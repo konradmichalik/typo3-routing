@@ -18,8 +18,13 @@ use KonradMichalik\Typo3Routing\Routing\ArgumentConstraints;
 use LogicException;
 
 use function array_filter;
+use function array_key_exists;
 use function in_array;
 use function is_finite;
+use function is_float;
+use function is_int;
+use function is_numeric;
+use function is_string;
 use function sprintf;
 use function var_export;
 
@@ -57,6 +62,35 @@ final class ParamConstraintGuard
         }
 
         return $constraints;
+    }
+
+    /**
+     * A #[Route] default comes back through the matcher like a request value, so it has to pass the
+     * same constraints. It is compared after the coercion the runtime would apply.
+     *
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs
+     * @param array<string, mixed>                                                                                                                                                               $defaults
+     */
+    public static function assertRouteDefaults(array $specs, array $defaults, string $where): void
+    {
+        foreach ($specs as $spec) {
+            if (!in_array($spec['source'], ['path', 'host'], true) || !array_key_exists($spec['name'], $defaults)) {
+                continue;
+            }
+            $default = $defaults[$spec['name']];
+            if (ArgumentConstraints::violates(self::coerced($default, $spec['type']), $spec)) {
+                throw new LogicException(sprintf('#[Route] default for "%s" on "%s" is %s, which breaks the #[Param] constraints of that parameter. Fix the default or the constraints.', $spec['name'], $where, var_export($default, true)), 1750000064);
+            }
+        }
+    }
+
+    private static function coerced(mixed $value, ?string $type): mixed
+    {
+        return match (true) {
+            in_array($type, ['int', 'float'], true) && is_string($value) && is_numeric($value) => (float) $value,
+            'string' === $type && (is_int($value) || is_float($value)) => (string) $value,
+            default => $value,
+        };
     }
 
     private static function assertRange(Param $param, ?string $type, string $parameterName, string $where): void

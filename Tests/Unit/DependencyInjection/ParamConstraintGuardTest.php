@@ -170,6 +170,67 @@ final class ParamConstraintGuardTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, mixed}>
+     */
+    public static function routeDefaultsBreakingTheConstraints(): iterable
+    {
+        yield 'int above the maximum' => ['path', 500];
+        yield 'numeric string above the maximum' => ['path', '500'];
+        yield 'host placeholder above the maximum' => ['host', 500];
+    }
+
+    #[Test]
+    #[DataProvider('routeDefaultsBreakingTheConstraints')]
+    public function rejectsARouteDefaultBreakingTheConstraints(string $source, mixed $default): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000064);
+        $this->expectExceptionMessage('#[Route] default for "limit" on "ctrl::list()" is');
+
+        ParamConstraintGuard::assertRouteDefaults([$this->spec('limit', 'int', $source, ['max' => 100])], ['limit' => $default], 'ctrl::list()');
+    }
+
+    #[Test]
+    public function rejectsANumericRouteDefaultTooLongForAStringParameter(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000064);
+
+        ParamConstraintGuard::assertRouteDefaults([$this->spec('code', 'string', 'path', ['maxLength' => 2])], ['code' => 12345], 'ctrl::list()');
+    }
+
+    /**
+     * @return iterable<string, array{string, mixed}>
+     */
+    public static function routeDefaultsNotChecked(): iterable
+    {
+        yield 'within the range' => ['path', 100];
+        yield 'an input default the matcher never returns' => ['input', 500];
+    }
+
+    #[Test]
+    #[DataProvider('routeDefaultsNotChecked')]
+    public function acceptsARouteDefaultThatCannotFail(string $source, mixed $default): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        ParamConstraintGuard::assertRouteDefaults([
+            $this->spec('limit', 'int', $source, ['max' => 100]),
+            $this->spec('page', 'int', 'path', ['min' => 1]),
+        ], ['limit' => $default], 'ctrl::list()');
+    }
+
+    /**
+     * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints
+     *
+     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}
+     */
+    private function spec(string $name, string $type, string $source, array $constraints): array
+    {
+        return ['name' => $name, 'type' => $type, 'source' => $source, 'nullable' => false, 'hasDefault' => false, 'default' => null, ...$constraints];
+    }
+
+    /**
      * @return array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int}
      */
     private function constraints(Param $param, ?string $type, mixed $default = null): array

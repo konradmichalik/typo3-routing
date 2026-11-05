@@ -18,6 +18,7 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Throwable;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Http\ImmediateResponseException;
+use TYPO3\CMS\Core\Log\LogManager;
 
 use function array_flip;
 use function array_intersect_key;
@@ -44,6 +45,7 @@ final readonly class ControllerInvoker
     public function __construct(
         private RouteRegistry $registry,
         private ControllerArgumentResolver $argumentResolver,
+        private LogManager $logManager,
     ) {}
 
     /**
@@ -88,6 +90,12 @@ final readonly class ControllerInvoker
             if (!$this->registry->isJsonErrorRoute($routeName)) {
                 throw $exception;
             }
+
+            // Converted, it never reaches TYPO3's exception handling, so this is its only trace.
+            $this->logManager->getLogger(self::class)->error(
+                sprintf('Uncaught exception in route "%s" converted to a 500 JSON error response.', $routeName),
+                ['exception' => $exception],
+            );
 
             // Outside Development, never the exception's own message or trace: this path exists
             // specifically for exceptions nobody anticipated, so its detail is unvetted and

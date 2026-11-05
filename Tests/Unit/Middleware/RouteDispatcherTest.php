@@ -1371,7 +1371,7 @@ final class RouteDispatcherTest extends TestCase
             RouteMatcher::class => static fn (): RouteMatcher => $matcher,
             ResponseCacheManager::class => fn (): ResponseCacheManager => $this->responseCache,
             RateLimitCheck::class => fn (): RateLimitCheck => $this->rateLimitCheck,
-            ControllerInvoker::class => fn (): ControllerInvoker => new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class))),
+            ControllerInvoker::class => fn (): ControllerInvoker => new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)),
             AccessGuard::class => static fn (): AccessGuard => $accessGuard,
             CorsHandler::class => static fn (): CorsHandler => $cors,
             CorsPreflightResolver::class => static fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors),

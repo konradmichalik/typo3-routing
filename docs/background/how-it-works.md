@@ -2,6 +2,15 @@
 
 Two phases, and the split between them is the whole design: everything that can be decided without a request is decided once, at container build time, so a request only ever reads pre-computed tables.
 
+Table of contents:
+
+- [Compile time](#compile-time)
+  - [The one thing that is not compiled](#the-one-thing-that-is-not-compiled)
+- [Encoded vs. decoded paths](#encoded-vs-decoded-paths)
+- [Runtime](#runtime)
+- [What every response from this middleware carries](#what-every-response-from-this-middleware-carries)
+- [Reading further](#reading-further)
+
 ## Compile time
 
 [`RouteCompilerPass`](../../Classes/DependencyInjection/RouteCompilerPass.php) scans every service definition, picks those implementing `RouteControllerInterface`, reflects their `#[Route]` attributes **and method parameter signatures** into plain arrays, and injects those plus a `ServiceLocator` of the controllers into [`RouteRegistry`](../../Classes/Routing/RouteRegistry.php). The route collection is also dumped into Symfony's `CompiledUrlMatcher` format, so request-time matching runs on pre-compiled tables instead of re-compiling every route's regex per request.
@@ -12,9 +21,9 @@ There is no extra cache. Invalidation rides on the DI container cache, which TYP
 
 ### The one thing that is not compiled
 
-Routes opting into [`caseInsensitive`](../routes/route-attribute.md#case-insensitive-paths) are matched in a **separate collection, by the plain `UrlMatcher`**, never through the dumped one. `CompiledUrlMatcherDumper` resolves placeholder-free routes through an exact-match table that no regex modifier can reach, so a compiled route could not be made case-tolerant at all.
+Routes opting into [`caseInsensitive`](../routes/path-tolerance.md#case-insensitive-paths) are matched in a **separate collection, by the plain `UrlMatcher`**, never through the dumped one. `CompiledUrlMatcherDumper` resolves placeholder-free routes through an exact-match table that no regex modifier can reach, so a compiled route could not be made case-tolerant at all.
 
-That fallback is consulted only after the exact path and the trailing-slash retry have both already failed, which is why a route requested in its declared casing measures identically to a plain one. [Performance](performance.md#case-insensitive-paths) has the figures for both directions.
+That fallback is consulted only after the exact path and the trailing-slash retry have both already failed, which is why a route requested in its declared casing measures identically to a plain one.
 
 ## Encoded vs. decoded paths
 
@@ -39,14 +48,14 @@ Two consequences follow directly from where that boundary sits:
 | 2 | [CORS preflight](../features/cors.md) — an `OPTIONS` request announcing a cross-origin call | Answered with `204` before credentials are ever required |
 | 3 | Matching, via the compiled matcher | `404` (or the page router, unless an [exclusive prefix](../operating/configuration.md#exclusive-path-prefixes) claims the path) / `405` with an `Allow` header |
 | 4 | [Environment filter](../operating/configuration.md#environment-bound-routes) — is the route's `env` the current context? | `404`, as if the route did not exist |
-| 5 | [Site/language scope](../routes/route-attribute.md#site--and-language-bound-routes) — is the route reachable from the request's site/language? | `404`, as if the route did not exist |
-| 6 | [Canonical redirect](../routes/route-attribute.md#redirecting-instead-of-tolerating) (opt-in) — did the request only match a tolerated path variant? | `308` to the declared path |
-| 7 | [Scheme redirect](../routes/route-attribute.md#schemes) — did the request match everything but the route's declared `schemes`? | `308` to the same URL under the declared scheme |
+| 5 | [Site/language scope](../routes/host-and-scope.md#site--and-language-bound-routes) — is the route reachable from the request's site/language? | `404`, as if the route did not exist |
+| 6 | [Canonical redirect](../routes/path-tolerance.md#redirecting-instead-of-tolerating) (opt-in) — did the request only match a tolerated path variant? | `308` to the declared path |
+| 7 | [Scheme redirect](../routes/host-and-scope.md#schemes) — did the request match everything but the route's declared `schemes`? | `308` to the same URL under the declared scheme |
 | 8 | Request body shape (malformed JSON / unsupported content type) | `400` / `415` |
 | 9 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
 | 10 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
 | 11 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
-| 12 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/route-attribute.md#automatic-json-errors-for-jsonresponse-routes) |
+| 12 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/error-responses.md#automatic-json-errors-for-jsonresponse-routes) |
 
 Several ordering decisions in there are deliberate rather than incidental:
 
@@ -55,11 +64,11 @@ Several ordering decisions in there are deliberate rather than incidental:
 - **Rate limiting runs before authentication**, so a coarse per-IP limit absorbs token brute-force attempts before any authentication logic executes.
 - **The response cache is consulted after the rate limit**, so a cacheable response cannot be used to bypass the limit.
 
-Every response reaching this decoration stage — a matched dispatch, but also an early error response from step 4 onward above — also gets the [deprecation headers](../routes/route-attribute.md#deprecating-a-route) of the route it came from (a no-op unless it opted in) stamped on afterward. The CORS preflight response (step 2) and a path-gate or matcher miss falling through to page rendering (steps 1 and 3) never reach this stage.
+Every response reaching this decoration stage — a matched dispatch, but also an early error response from step 4 onward above — also gets the [deprecation headers](../routes/route-lifecycle.md#deprecating-a-route) of the route it came from (a no-op unless it opted in) stamped on afterward. The CORS preflight response (step 2) and a path-gate or matcher miss falling through to page rendering (steps 1 and 3) never reach this stage.
 
 ## What every response from this middleware carries
 
-`400`, `401`, `403`, `404`, `405`, `415` and `429` emitted by this middleware, controller-thrown [`HttpProblemException`](../routes/route-attribute.md#error-responses-from-controllers), and the `500` from a route's [automatic JSON errors](../routes/route-attribute.md#automatic-json-errors-for-jsonresponse-routes), are all emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details: `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}`, where `detail` is omitted when it would only repeat the title — the `500` case omits it outside the `Development` application context, since the underlying exception's message is otherwise never surfaced; in `Development`, it's included alongside `exception`, `code`, `file`, `line` and `trace` as extension members (see [automatic JSON errors](../routes/route-attribute.md#automatic-json-errors-for-jsonresponse-routes)). A path that falls through to page rendering (steps 1 and 3) is not this middleware's response, so it is not held to this format. The **success** response format is entirely the controller's choice.
+`400`, `401`, `403`, `404`, `405`, `415` and `429` emitted by this middleware, controller-thrown [`HttpProblemException`](../routes/error-responses.md), and the `500` from a route's [automatic JSON errors](../routes/error-responses.md#automatic-json-errors-for-jsonresponse-routes), are all emitted as [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details: `application/problem+json` with `{"type": "about:blank", "title": …, "status": …, "detail"?: …}`, where `detail` is omitted when it would only repeat the title — the `500` case omits it outside the `Development` application context, since the underlying exception's message is otherwise never surfaced; in `Development`, it's included alongside `exception`, `code`, `file`, `line` and `trace` as extension members (see [automatic JSON errors](../routes/error-responses.md#automatic-json-errors-for-jsonresponse-routes)). A path that falls through to page rendering (steps 1 and 3) is not this middleware's response, so it is not held to this format. The **success** response format is entirely the controller's choice.
 
 Every response reaching the decoration stage above, success or error, also carries an `X-Request-ID` header — echoed back when the client sent one, otherwise generated, so a single id correlates a request across logs and proxies.
 

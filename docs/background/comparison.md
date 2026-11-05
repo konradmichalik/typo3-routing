@@ -10,6 +10,12 @@ There are several ways to answer a frontend HTTP request in TYPO3. This extensio
 | [**Extbase plugin / `typeNum`**](https://docs.typo3.org/m/typo3/reference-typoscript/main/en-us/TopLevelObjects/Page/Index.html) | Content-bound output | Heavyweight for a JSON endpoint; tied to a page and the rendering chain |
 | **`typo3_routing`** | Attribute-declared FE endpoints | `#[Route]` on a service method — DI, typed arguments, URL generation, opt-in cache & rate limit |
 
+Table of contents:
+
+- [When to reach for something else](#when-to-reach-for-something-else)
+- [Symfony routing features deliberately not adopted](#symfony-routing-features-deliberately-not-adopted)
+- [Laravel routing features deliberately not adopted](#laravel-routing-features-deliberately-not-adopted)
+
 ## When to reach for something else
 
 Three cases where one of the alternatives is the better answer, stated plainly because they do not change:
@@ -42,7 +48,7 @@ Routes are matched by [`symfony/routing`](https://symfony.com/doc/current/routin
 | Laravel feature | Why not |
 |---|---|
 | `Route::view()` | Renders a template for a path with no controller in between. That is a page, and pages belong to TYPO3's rendering chain rather than to a route. See [when to reach for something else](#when-to-reach-for-something-else). |
-| `Route::redirect()`, `permanentRedirect()` | The case that actually occurs is a renamed or retired endpoint, and [`canonical`, `legacyPaths` and `#[DeprecatedRoute]`](../routes/route-attribute.md#legacy-paths-for-renamed-routes) already redirect it inside the dispatcher. A controller-less route declaration would be a second shape of route for the one case that is covered. |
+| `Route::redirect()`, `permanentRedirect()` | The case that actually occurs is a renamed or retired endpoint, and [`canonical`, `legacyPaths` and `#[DeprecatedRoute]`](../routes/route-lifecycle.md#legacy-paths-for-renamed-routes) already redirect it inside the dispatcher. A controller-less route declaration would be a second shape of route for the one case that is covered. |
 | Form method spoofing (`_method`) | Takes the intended verb from a field in a POST body so an HTML form can reach a `PUT` or `DELETE` route. It makes the method a property of the payload instead of the request, which weakens both method gating and the CSRF reasoning behind [`#[RequireRequestToken]`](../features/authentication.md). A browser form posting into TYPO3 is a plugin's job. |
 | Resource controllers (`Route::apiResource`, singleton resources) | Derives a set of CRUD routes from a model name. It presumes the record, query and serialisation layer this extension deliberately does not have; the same ground is covered explicitly by the [records recipe](../routes/records.md). |
 | Per-route middleware (`->middleware()`, `withoutMiddleware()`) | Route features here are a fixed set of attributes running in a [documented order](../features/README.md#where-they-take-effect), two positions of which carry a security decision (rate limit before authentication, response cache last). An arbitrary middleware list per route would turn that order into a per-route property, and the guarantee is the point. |

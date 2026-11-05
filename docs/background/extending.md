@@ -2,6 +2,18 @@
 
 This page is for tooling built **on top of** this extension — a documentation generator, a static analyzer, an API client generator, or a satellite package like a planned MCP server that turns registered routes into callable tools. If you only want to *declare* routes, see [Defining routes](../routes/README.md) instead; this page is about *reading* the routes another package has declared.
 
+Table of contents:
+
+- [The public surface](#the-public-surface)
+- [Invoking a route without an HTTP request](#invoking-a-route-without-an-http-request)
+  - [What it replicates, and what it skips](#what-it-replicates-and-what-it-skips)
+  - [The two boundaries this shifts to you](#the-two-boundaries-this-shifts-to-you)
+- [Describing an argument as JSON Schema](#describing-an-argument-as-json-schema)
+- [Replacing the dispatcher's 404](#replacing-the-dispatchers-404)
+- [Reference consumer: the OpenAPI export](#reference-consumer-the-openapi-export)
+- [What's deliberately not exposed](#whats-deliberately-not-exposed)
+- [BC promise](#bc-promise)
+
 ## The public surface
 
 Every class in `Classes/` carries either `@api` or `@internal` in its docblock. `@api` is the only surface covered by semver from `1.0.0` — `@internal` classes (and the `@internal`-marked methods described below) may change in a minor release without notice.
@@ -45,7 +57,7 @@ $response = $this->invoker->invoke('example_item', ['id' => 42], $request);
 `invoke(string $routeName, array $input, ServerRequestInterface $request): ResponseInterface`
 
 - **`$routeName`** — a name from `getRoutes()`. An unknown name is a programming error rather than an HTTP condition, so it throws `InvalidArgumentException` instead of answering 404.
-- **`$input`** — a flat map of argument values, keyed by the **wire name** the argument is read under: `getArguments()`'s `name`, which `#[Param(name: …)]` may have set to something other than the PHP parameter name. Each value is placed where that argument's `source` expects it (path segment, query parameter, JSON body, or the uploaded files), so all seven sources — `path`, `query`, `body`, `input`, `request`, `variadic`, `upload` — resolve exactly as they would for an inbound request. An `upload` value must be a `Psr\Http\Message\UploadedFileInterface` or `null` (absent); anything else answers `400`. With a file among the inputs, the body fields travel as the parsed body of a `multipart/form-data` request instead of a JSON payload, as they would over HTTP. Keys no argument and no requirement claims are ignored. The eighth source, `host`, is the exception: `RouteInvoker` does not generate URLs for routes whose [`host`](../routes/route-attribute.md#wildcards-and-multiple-hosts) carries a placeholder, so such routes answer `404` here even when `$input` contains the host value.
+- **`$input`** — a flat map of argument values, keyed by the **wire name** the argument is read under: `getArguments()`'s `name`, which `#[Param(name: …)]` may have set to something other than the PHP parameter name. Each value is placed where that argument's `source` expects it (path segment, query parameter, JSON body, or the uploaded files), so all seven sources — `path`, `query`, `body`, `input`, `request`, `variadic`, `upload` — resolve exactly as they would for an inbound request. An `upload` value must be a `Psr\Http\Message\UploadedFileInterface` or `null` (absent); anything else answers `400`. With a file among the inputs, the body fields travel as the parsed body of a `multipart/form-data` request instead of a JSON payload, as they would over HTTP. Keys no argument and no requirement claims are ignored. The eighth source, `host`, is the exception: `RouteInvoker` does not generate URLs for routes whose [`host`](../routes/host-and-scope.md#wildcards-and-multiple-hosts) carries a placeholder, so such routes answer `404` here even when `$input` contains the host value.
 - **`$request`** — the calling request. It supplies the context a controller may depend on (`site`, `language`, the authenticated user, the credentials) and is deliberately required: there is no sensible default for *which site* a programmatic invocation happens in. A caller without an inbound request (a CLI process, say) has to build one.
 
 The request the controller finally sees is synthesised from it: the route's first declared method, the route's own URL as the request target, the inputs in query and body, path placeholders additionally exposed as request attributes, the route name under `routing.route` — and always a fresh body stream, so nothing of the calling request's own payload can bleed into a body-sourced argument.

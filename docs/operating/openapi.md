@@ -19,6 +19,12 @@ vendor/bin/typo3 routing:openapi --pretty > openapi.json
 | `--server=…`        | Server base URL; omitted by default, which per the OpenAPI spec means `/` — correct, since route paths are exported in full |
 | `--pretty`          | Pretty-print the JSON                                             |
 
+Table of contents:
+
+- [What is derived from the attributes](#what-is-derived-from-the-attributes)
+- [Declaring a response schema](#declaring-a-response-schema)
+- [Swagger UI (development only)](#swagger-ui-development-only)
+
 ## What is derived from the attributes
 
 - **Paths & operations** — one operation per HTTP method; `{placeholder}` path segments become path parameters.

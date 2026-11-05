@@ -602,6 +602,18 @@ final class RouteDispatcherTest extends TestCase
         self::assertSame(404, $response->getStatusCode());
     }
 
+    /**
+     * The route's own headers would reveal it, so a hidden route's 404 carries those of a missing path.
+     */
+    #[Test]
+    public function keepsTheHeadersOfAHiddenRouteOffItsNotFoundResponse(): void
+    {
+        $response = $this->dispatch($this->request('GET', 'https://example.com/api/scoped-site-other'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertFalse($response->hasHeader('Deprecation'));
+    }
+
     #[Test]
     public function answersASiteHiddenRouteWithTheResponseOfAListener(): void
     {
@@ -1583,6 +1595,7 @@ final class RouteDispatcherTest extends TestCase
             'cached' => ['since' => 1700000000, 'sunset' => 1800000000, 'successor' => 'count', 'documentation' => null],
             'guarded' => ['since' => 1700000000, 'sunset' => null, 'successor' => null, 'documentation' => null],
             'deprecatedRenamed' => ['since' => 1700000000, 'sunset' => null, 'successor' => null, 'documentation' => null],
+            'scopedSiteOther' => ['since' => 1700000000, 'sunset' => null, 'successor' => null, 'documentation' => null],
         ];
 
         $locator = new ServiceLocator([

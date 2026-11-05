@@ -152,6 +152,9 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
         if (!$this->services->invoker()->isVisibleInCurrentContext($match['_env'] ?? null)) {
+            // Its own deprecation and CORS headers would reveal the route, so forget it for the 404.
+            $corsConfig = $routeName = null;
+
             return $this->notFound($request, $path);
         }
 
@@ -160,6 +163,9 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         //     redirect must never reveal a route invisible in the current context.
         if (!$this->services->siteLanguageScope()->isVisibleForSite($match['_sites'] ?? null, $request)
             || !$this->services->siteLanguageScope()->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
+            // Its own deprecation and CORS headers would reveal the route, so forget it for the 404.
+            $corsConfig = $routeName = null;
+
             return $this->notFound($request, $path);
         }
 

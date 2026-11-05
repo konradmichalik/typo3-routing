@@ -137,6 +137,10 @@ $schema = $this->schemas->objectSchemaForClass(CourseDto::class);
 - **Empty schemas are `stdClass` objects** inside the returned array, so `json_encode()` writes `{}` rather than `[]`: an unconstrained property, the `items` of an `array`, and the `properties` of a DTO without public properties. Compare such values as JSON rather than with `===`. `schemaForType('mixed')` itself still returns the empty array `[]`; convert it with `(object) []` before you embed it in a document.
 - **The one-argument call still works, but its output changed** in the release that added `$referenced`: untyped, interface, union and pseudo-typed properties now yield `{}`, `anyOf` or `const` instead of `{"type": "string"}`, empty schemas and empty `properties` are `stdClass` instead of `[]`, and a cycle yields a `$ref` that the caller has to resolve through `$referenced` instead of overflowing the stack.
 
+## Replacing the dispatcher's 404
+
+[`UnmatchedRouteResponseEvent`](../../Classes/Event/UnmatchedRouteResponseEvent.php) (`@api`) is a PSR-14 event dispatched before the dispatcher sends its own `404`: an unmatched path inside an exclusive prefix, or a route hidden by `env`, `sites` or `languages`. `getRequest()` and `getPath()` describe the request, `setResponse()` replaces the default. See [Shaping the 404](../operating/configuration.md#shaping-the-404) for a listener.
+
 ## Reference consumer: the OpenAPI export
 
 [`Classes/OpenApi/OpenApiGenerator.php`](../../Classes/OpenApi/OpenApiGenerator.php) (internal) is the extension's own reference consumer of this API — it builds an OpenAPI 3.1 document purely from `RouteRegistry::getRoutes()`, `getArguments()`, `getAuthenticators()`, `getRequestTokenScope()`, `getCacheConfig()`, `getRateLimit()`, `getReturns()`, and `getDeprecation()`, with no access to anything `@internal`. Reading it end to end is the fastest way to see the metadata API used for something non-trivial: parameter/request-body construction from argument specs, security scheme mapping from authenticators, response-schema construction from `#[Returns]`, and error-response generation from which modifiers are present.

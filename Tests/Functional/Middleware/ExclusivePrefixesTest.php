@@ -59,6 +59,15 @@ final class ExclusivePrefixesTest extends FunctionalTestCase
         self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
     }
 
+    #[Test]
+    public function answersAnUnmatchedPathWithTheResponseOfAnEventListener(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/documented/missing'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"error":"No endpoint at /api/documented/missing","documentation":"https://example.com/docs"}', (string) $response->getBody());
+    }
+
     /**
      * The claim reaches paths the derived gate never covers: no route begins with `/api/nothing`, so
      * only the configured prefix can pull this path into the dispatcher at all.

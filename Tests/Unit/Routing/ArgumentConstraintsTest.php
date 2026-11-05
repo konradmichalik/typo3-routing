@@ -61,6 +61,15 @@ final class ArgumentConstraintsTest extends TestCase
     }
 
     #[Test]
+    public function treatsOnlyAnEmptyNonBoolValueWithADefaultAsAbsent(): void
+    {
+        self::assertTrue(ArgumentConstraints::isEmptyWithDefault('', ['type' => 'string', 'hasDefault' => true]));
+        self::assertFalse(ArgumentConstraints::isEmptyWithDefault('', ['type' => 'bool', 'hasDefault' => true]));
+        self::assertFalse(ArgumentConstraints::isEmptyWithDefault('', ['type' => 'string', 'hasDefault' => false]));
+        self::assertFalse(ArgumentConstraints::isEmptyWithDefault('0', ['type' => 'int', 'hasDefault' => true]));
+    }
+
+    #[Test]
     public function countsUtf8CharactersWhateverTheInternalEncoding(): void
     {
         $previous = mb_internal_encoding();

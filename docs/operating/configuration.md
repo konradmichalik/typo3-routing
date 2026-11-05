@@ -65,6 +65,32 @@ A path that matches a route's shape but the wrong HTTP method always gets a hard
 
 Reach for `exclusivePrefixes` when API clients should receive machine-readable errors for mistyped endpoints. Leave it empty when your routes coexist with ordinary pages.
 
+### Shaping the 404
+
+The dispatcher dispatches [`UnmatchedRouteResponseEvent`](../../Classes/Event/UnmatchedRouteResponseEvent.php) before it sends this `404`, so a listener can answer with its own body, for example a link to the API documentation:
+
+```php
+use KonradMichalik\Typo3Routing\Event\UnmatchedRouteResponseEvent;
+use TYPO3\CMS\Core\Attribute\AsEventListener;
+use TYPO3\CMS\Core\Http\JsonResponse;
+
+#[AsEventListener]
+final class ApiNotFound
+{
+    public function __invoke(UnmatchedRouteResponseEvent $event): void
+    {
+        if (str_starts_with($event->getPath(), '/api/')) {
+            $event->setResponse(new JsonResponse(['error' => 'No endpoint at '.$event->getPath(), 'documentation' => 'https://example.com/api-docs'], 404));
+        }
+    }
+}
+```
+
+- **It fires after every matcher tier.** A trailing-slash or case variant, a legacy path or a scheme redirect still reaches its route.
+- **It also covers hidden routes.** A route hidden by [`env`](#environment-bound-routes), `sites` or `languages` answers through the same event, and the event carries no route data, so a hidden route stays indistinguishable from a missing one.
+- **It does not cover a controller's own `404`**, such as an [entity](../routes/arguments.md#entity-resolution) without a matching record, or a path outside any exclusive prefix, which falls through to page rendering.
+- Without a listener response, the default JSON `404` is sent. The usual headers (request id, CORS) are added either way.
+
 ## Environment-bound routes
 
 A route with `env: 'Development'` only exists while the top-level application context matches (case-insensitive). Outside that context the route behaves as if it does not exist (`404`) — no ExpressionLanguage, just a match-time check against `Environment::getContext()`.

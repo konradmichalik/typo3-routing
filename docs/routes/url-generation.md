@@ -10,6 +10,8 @@ Use the `routing` Fluid ViewHelper to generate URLs — no need to hardcode the 
 </script>
 ```
 
+The `routing` namespace is registered globally, so a template needs no `xmlns:routing` or `{namespace}` declaration.
+
 With path parameters:
 
 ```html
@@ -29,8 +31,6 @@ Need several URLs in JavaScript at once? `routing:uris` renders a JSON map of th
 ```
 
 Generated URLs automatically include the current site/language base, so they are reachable as-is.
-
-Table of contents:
 
 - [Absolute URLs](#absolute-urls)
 - [Without a request](#without-a-request)

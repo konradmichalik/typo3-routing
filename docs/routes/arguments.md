@@ -32,8 +32,6 @@ public function show(int $id, int $page = 1, ?string $sort = null, ServerRequest
 >
 > Unsupported parameter shapes (union/intersection types, non-request objects, pure non-backed enums) are rejected at compile time with a clear `LogicException`, so misuse surfaces during container build, not at runtime.
 
-Table of contents:
-
 - [Backed enums](#backed-enums)
 - [Entity resolution](#entity-resolution)
 - [Variadics](#variadics)

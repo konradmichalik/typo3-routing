@@ -16,8 +16,6 @@ All of them live under **Settings → Extension Configuration → typo3_routing*
 | `cors.maxAge` | `3600` | [CORS](../features/cors.md#global-configuration) |
 | `swaggerUi` | `0` | [OpenAPI export](openapi.md#swagger-ui-development-only) |
 
-Table of contents:
-
 - [Path gate](#path-gate)
 - [Trailing slashes](#trailing-slashes)
 - [Exclusive path prefixes](#exclusive-path-prefixes)

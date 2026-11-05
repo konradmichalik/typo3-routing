@@ -2,8 +2,6 @@
 
 Two phases, and the split between them is the whole design: everything that can be decided without a request is decided once, at container build time, so a request only ever reads pre-computed tables.
 
-Table of contents:
-
 - [Compile time](#compile-time)
   - [The one thing that is not compiled](#the-one-thing-that-is-not-compiled)
 - [Encoded vs. decoded paths](#encoded-vs-decoded-paths)

@@ -2,8 +2,6 @@
 
 A controller answers an expected failure with the same [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem response the dispatcher uses for its own `404` or `400`, and a `JsonResponse` route keeps answering JSON when an unexpected exception escapes. The dispatcher's own `404` for unmatched paths is shaped through an event instead, see [Shaping the 404](../operating/configuration.md#shaping-the-404).
 
-Table of contents:
-
 - [Throwing `HttpProblemException`](#throwing-httpproblemexception)
 - [Automatic JSON errors for `JsonResponse` routes](#automatic-json-errors-for-jsonresponse-routes)
 

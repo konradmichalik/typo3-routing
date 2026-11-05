@@ -28,7 +28,6 @@ The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxR
 - [**URL generation**](docs/routes/url-generation.md): a Fluid ViewHelper and a PHP generator, so a path lives in one place
 - [**Opt-in route features**](docs/features/README.md): caching, rate limiting, authentication with CSRF protection, and CORS, each as its own attribute
 - [**Tooling**](docs/operating/commands.md): `routing:debug` lists and audits every route, `routing:openapi` exports an OpenAPI 3.1 document
-- [**Measured overhead**](docs/background/performance.md): about 0.63 ms per matched request compared to a hand-written middleware
 
 ## 🔥 Installation
 
@@ -95,7 +94,7 @@ See [The `#[Route]` attribute](docs/routes/route-attribute.md) for the full refe
 
 ## 📚 Documentation
 
-Full documentation lives in [`docs/`](docs/README.md), grouped into four parts:
+Full documentation lives in [`docs/`](docs/README.md), grouped into four parts. The performance figures have a row of their own:
 
 | Part | What's inside |
 |------|---------------|
@@ -103,6 +102,7 @@ Full documentation lives in [`docs/`](docs/README.md), grouped into four parts:
 | [Route features](docs/features/README.md) | The opt-in attributes: `#[Authenticate]`, `#[Cache]`, `#[RateLimit]`, `#[Cors]`, and how they interact |
 | [Operating it](docs/operating/README.md) | Every extension setting, the `routing:debug`, `routing:match` and `routing:lint` commands, and the OpenAPI export |
 | [Background](docs/background/README.md) | How it compares to the alternatives, how it works underneath, measured performance, and the `@api` surface for tooling |
+| [Performance](docs/background/performance.md) | About 0.63 ms per matched request compared to a hand-written middleware, about 0.19 ms on an ordinary page request, and how to reproduce both |
 
 > [!TIP]
 > Want to expose these routes to AI agents/MCP clients? <img src="https://github.com/konradmichalik/typo3-routing-mcp/raw/main/Resources/Public/Icons/Extension.png?raw=true" width="16" height="16" alt=""> [`typo3-routing-mcp`](https://github.com/konradmichalik/typo3-routing-mcp) adds a `#[McpTool]` attribute next to an existing `#[Route]` and serves it over Streamable HTTP.

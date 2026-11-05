@@ -11,8 +11,6 @@ vendor/bin/typo3 routing:lint [--json] [--strict]
 
 A fourth command, `routing:openapi`, exports the same registry as an API document and has its own page: [OpenAPI export](openapi.md).
 
-Table of contents:
-
 - [`routing:debug`](#routingdebug)
   - [Filtering and inspecting](#filtering-and-inspecting)
 - [`routing:match`](#routingmatch)

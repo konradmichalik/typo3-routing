@@ -29,8 +29,6 @@ public function show(int $id): ResponseInterface { /* … */ }
 
 Parameters that need more than a table row are explained below or on their own page: [Hosts, schemes, sites and languages](host-and-scope.md), [Case-insensitive paths and canonical redirects](path-tolerance.md), [Renaming and deprecating a route](route-lifecycle.md). Returning an error from a controller is [Error responses](error-responses.md). Also not on this page: how the controller method's signature is fed from the request — type coercion, enums, entity binding, variadics and `#[Param]` — which is [Typed controller arguments](arguments.md).
 
-Table of contents:
-
 - [Requirements](#requirements)
   - [Named requirement patterns](#named-requirement-patterns)
   - [Inline placeholder syntax](#inline-placeholder-syntax)

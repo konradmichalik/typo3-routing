@@ -25,8 +25,6 @@ final class CourseController implements RouteControllerInterface
 }
 ```
 
-Table of contents:
-
 - [How the values combine](#how-the-values-combine)
 - [Exclusive class-level claim](#exclusive-class-level-claim)
 - [Sharing routes through an abstract base controller](#sharing-routes-through-an-abstract-base-controller)

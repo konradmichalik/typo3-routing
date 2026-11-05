@@ -2,8 +2,6 @@
 
 Four [`#[Route]`](route-attribute.md) parameters narrow where a route answers: `schemes` and `host` filter the request URI, `sites` and `languages` the TYPO3 site and language the request resolved to. Out of scope means `404`, except for a scheme mismatch, which redirects.
 
-Table of contents:
-
 - [Schemes](#schemes)
 - [Host](#host)
   - [Wildcards and multiple hosts](#wildcards-and-multiple-hosts)

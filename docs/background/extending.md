@@ -2,8 +2,6 @@
 
 This page is for tooling built **on top of** this extension — a documentation generator, a static analyzer, an API client generator, or a satellite package like a planned MCP server that turns registered routes into callable tools. If you only want to *declare* routes, see [Defining routes](../routes/README.md) instead; this page is about *reading* the routes another package has declared.
 
-Table of contents:
-
 - [The public surface](#the-public-surface)
 - [Invoking a route without an HTTP request](#invoking-a-route-without-an-http-request)
   - [What it replicates, and what it skips](#what-it-replicates-and-what-it-skips)

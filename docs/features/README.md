@@ -19,8 +19,6 @@ public function export(ServerRequestInterface $request): ResponseInterface { /* 
 | [Rate limiting](rate-limiting.md) | `#[RateLimit]` | Throttle per client IP or per logged-in user |
 | [CORS](cors.md) | `#[Cors]` | Allow cross-origin browser access, globally or per route |
 
-Table of contents:
-
 - [Where they take effect](#where-they-take-effect)
 - [How they interact](#how-they-interact)
 - [`#[Cors]`, `#[RateLimit]` and `#[Authenticate]` are inheritable](#cors-ratelimit-and-authenticate-are-inheritable)

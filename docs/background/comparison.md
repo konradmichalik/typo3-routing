@@ -10,8 +10,6 @@ There are several ways to answer a frontend HTTP request in TYPO3. This extensio
 | [**Extbase plugin / `typeNum`**](https://docs.typo3.org/m/typo3/reference-typoscript/main/en-us/TopLevelObjects/Page/Index.html) | Content-bound output | Heavyweight for a JSON endpoint; tied to a page and the rendering chain |
 | **`typo3_routing`** | Attribute-declared FE endpoints | `#[Route]` on a service method — DI, typed arguments, URL generation, opt-in cache & rate limit |
 
-Table of contents:
-
 - [When to reach for something else](#when-to-reach-for-something-else)
 - [Symfony routing features deliberately not adopted](#symfony-routing-features-deliberately-not-adopted)
 - [Laravel routing features deliberately not adopted](#laravel-routing-features-deliberately-not-adopted)

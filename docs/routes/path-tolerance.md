@@ -2,8 +2,6 @@
 
 A route matches its declared path exactly, apart from the trailing slash, which is tolerated by default (see [Trailing slashes](../operating/configuration.md#trailing-slashes)). `caseInsensitive` widens that tolerance to letter case, and `canonical` turns any tolerated variant into a `308` redirect to the declared path.
 
-Table of contents:
-
 - [Case-insensitive paths](#case-insensitive-paths)
 - [Redirecting instead of tolerating](#redirecting-instead-of-tolerating)
 

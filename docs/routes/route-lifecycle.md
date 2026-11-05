@@ -2,8 +2,6 @@
 
 Two tools for changing a route that clients already use: `legacyPaths` keeps an old path reachable after a rename, and `#[DeprecatedRoute]` announces the end of a route through standard response headers.
 
-Table of contents:
-
 - [Legacy paths for renamed routes](#legacy-paths-for-renamed-routes)
 - [Deprecating a route](#deprecating-a-route)
 

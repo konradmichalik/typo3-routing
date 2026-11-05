@@ -5,8 +5,6 @@ Two optional attributes protect a route: `#[Authenticate]` decides who may call 
 > [!IMPORTANT]
 > Routes are **public by default**. Nothing is protected until you add one of them.
 
-Table of contents:
-
 - [`#[Authenticate]`](#authenticate)
 - [Class-level `#[Authenticate]`](#class-level-authenticate)
 - [Built-in authenticators](#built-in-authenticators)

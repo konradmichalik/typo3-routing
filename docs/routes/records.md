@@ -2,8 +2,6 @@
 
 This is a recipe, not a feature: the extension ships no record, query, or serialisation layer, and does not plan to add one (see [Decision: why this is documentation, not a feature](#decision-why-this-is-documentation-not-a-feature)). Everything below combines pieces documented elsewhere. What follows is how to combine them for the recurring case of exposing a database table as a list and a detail endpoint.
 
-Table of contents:
-
 - [The base-class pattern](#the-base-class-pattern)
 - [What the consumer owns](#what-the-consumer-owns)
 - [Pitfalls](#pitfalls)

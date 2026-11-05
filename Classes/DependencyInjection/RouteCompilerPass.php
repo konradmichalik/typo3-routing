@@ -398,7 +398,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             return;
         }
 
-        ParamConstraintGuard::assertNotIgnoredByCache($collected->arguments[$name], $cache['ignoreParams'], $serviceId.'::'.$method->getName().'()');
+        $route = $collected->routes[$name];
+        ParamConstraintGuard::assertNotIgnoredByCache($collected->arguments[$name], $route['requirements'], $route['path'], $route['host'] ?? null, $cache['ignoreParams'], $serviceId.'::'.$method->getName().'()');
         $collected->cacheConfigs[$name] = $cache;
 
         if ([] !== $auth) {

@@ -255,7 +255,46 @@ final class ParamConstraintGuardTest extends TestCase
         $this->expectExceptionCode(1750000066);
         $this->expectExceptionMessage('#[Cache(ignoreParams:)] on "ctrl::list()" names "limit", which has a #[Param] value constraint');
 
-        ParamConstraintGuard::assertNotIgnoredByCache([$this->spec('limit', 'int', 'input', ['max' => 100])], ['limit'], 'ctrl::list()');
+        ParamConstraintGuard::assertNotIgnoredByCache([$this->spec('limit', 'int', 'input', ['max' => 100])], [], '/list', null, ['limit'], 'ctrl::list()');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function requirementPatterns(): iterable
+    {
+        yield 'regex' => ['\w+'];
+        yield 'presence only' => [''];
+    }
+
+    #[Test]
+    #[DataProvider('requirementPatterns')]
+    public function rejectsACacheIgnoringARequiredInput(string $pattern): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000068);
+        $this->expectExceptionMessage('#[Cache(ignoreParams:)] on "ctrl::list()" names "q", which has a requirement');
+
+        // No argument spec: the runtime checks every requirement that is not a placeholder, bound or not.
+        ParamConstraintGuard::assertNotIgnoredByCache([], ['q' => $pattern], '/list', null, ['q'], 'ctrl::list()');
+    }
+
+    /**
+     * @return iterable<string, array{string, string|null}>
+     */
+    public static function requirementsTheCacheMayIgnore(): iterable
+    {
+        yield 'path placeholder' => ['/list/{q}', null];
+        yield 'host placeholder' => ['/list', '{q}.example.com'];
+    }
+
+    #[Test]
+    #[DataProvider('requirementsTheCacheMayIgnore')]
+    public function acceptsACacheIgnoringARequiredPlaceholder(string $path, ?string $host): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        ParamConstraintGuard::assertNotIgnoredByCache([], ['q' => '\w+', 'page' => '\d+'], $path, $host, ['q'], 'ctrl::list()');
     }
 
     /**
@@ -280,7 +319,7 @@ final class ParamConstraintGuardTest extends TestCase
         ParamConstraintGuard::assertNotIgnoredByCache([
             $this->spec('limit', 'int', $source, $constraints),
             $this->spec('page', 'int', 'input', ['min' => 1]),
-        ], ['limit'], 'ctrl::list()');
+        ], ['page' => '\d+'], '/list', null, ['limit'], 'ctrl::list()');
     }
 
     /**

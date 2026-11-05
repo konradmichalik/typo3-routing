@@ -167,5 +167,5 @@ Rejected at build time, so the route definition never contradicts itself:
 - `min` greater than `max`, `minLength` greater than `maxLength`, or a negative length: no value could pass.
 - A `min` or `max` of `INF`, `-INF` or `NAN`: it bounds nothing and cannot be exported to JSON.
 - A float `min` or `max` on an `int` parameter, even a whole number like `5.0`. `min: 1.1, max: 1.9` holds no integer, and a float beyond 2^53 cannot be compared exactly. Write the bound as an int.
-- A constrained query or body parameter listed in [`#[Cache(ignoreParams:)]`](../features/caching.md). The cache answers before the check runs, so an invalid value would get the cached `200`.
+- A constrained query or body parameter listed in [`#[Cache(ignoreParams:)]`](../features/caching.md). The cache answers before the check runs, so an invalid value would get the cached `200`. The same goes for any name in `ignoreParams` that has a `requirement`, from a `#[Param]`, the method's `#[Route]` or the class-level `#[Route]`, unless it is a path or host placeholder.
 - A PHP default outside the bounds on a path or host placeholder, such as `/list/{limit}` with `#[Param(max: 100)] int $limit = 500`. The router fills a left-out segment with the default, which would then answer `400`. The same applies to a `#[Route(defaults:)]` entry for that placeholder, on the method or the class.

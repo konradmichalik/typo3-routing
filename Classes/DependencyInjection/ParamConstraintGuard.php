@@ -27,6 +27,7 @@ use function is_int;
 use function is_numeric;
 use function is_string;
 use function sprintf;
+use function str_contains;
 use function var_export;
 
 /**
@@ -90,10 +91,14 @@ final class ParamConstraintGuard
      * parameter would get the cached 200 instead of its 400. A placeholder is part of the path or host,
      * which the cache key always includes.
      *
+     * Requirements are checked by name rather than per argument, because the runtime validates every
+     * requirement that is not a placeholder, whether a method argument binds it or not.
+     *
      * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs
+     * @param array<string, string>                                                                                                                                                              $requirements
      * @param list<string>                                                                                                                                                                       $ignoreParams
      */
-    public static function assertNotIgnoredByCache(array $specs, array $ignoreParams, string $where): void
+    public static function assertNotIgnoredByCache(array $specs, array $requirements, string $path, ?string $host, array $ignoreParams, string $where): void
     {
         foreach ($specs as $spec) {
             if (!in_array($spec['name'], $ignoreParams, true) || in_array($spec['source'], ['path', 'host'], true)) {
@@ -102,6 +107,15 @@ final class ParamConstraintGuard
             if ([] !== array_intersect_key($spec, ['min' => 0, 'max' => 0, 'minLength' => 0, 'maxLength' => 0])) {
                 throw new LogicException(sprintf('#[Cache(ignoreParams:)] on "%s" names "%s", which has a #[Param] value constraint. A cached response would be served without checking it. Remove it from ignoreParams or drop the constraint.', $where, $spec['name']), 1750000066);
             }
+        }
+
+        foreach ($ignoreParams as $name) {
+            // The path only admits the plain {name} form; a host placeholder with an inline requirement is not
+            // recognized here and fails the build, which is the safe side.
+            if (!array_key_exists($name, $requirements) || str_contains($path.($host ?? ''), '{'.$name.'}')) {
+                continue;
+            }
+            throw new LogicException(sprintf('#[Cache(ignoreParams:)] on "%s" names "%s", which has a requirement. A cached response would be served without checking it. Remove it from ignoreParams or drop the requirement.', $where, $name), 1750000068);
         }
     }
 

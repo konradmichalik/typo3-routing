@@ -153,6 +153,34 @@ final class ParamConstraintGuardTest extends TestCase
         $this->constraints(new Param(max: $bound), 'float');
     }
 
+    /**
+     * @return iterable<string, array{Param}>
+     */
+    public static function fractionalBoundsOnInt(): iterable
+    {
+        yield 'fractional min' => [new Param(min: 1.1)];
+        yield 'fractional max' => [new Param(max: 1.9)];
+        yield 'whole-number float' => [new Param(max: 5.0)];
+        yield 'float beyond 2^53' => [new Param(max: 1e20)];
+    }
+
+    #[Test]
+    #[DataProvider('fractionalBoundsOnInt')]
+    public function rejectsAFloatBoundOnAnIntParameter(Param $param): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000065);
+        $this->expectExceptionMessage('#[Param] on "$limit" of "ctrl::list()": an int parameter needs int bounds');
+
+        $this->constraints($param, 'int');
+    }
+
+    #[Test]
+    public function acceptsAnIntBoundOnAFloatParameter(): void
+    {
+        self::assertSame(['min' => 1, 'max' => 1.5], $this->constraints(new Param(min: 1, max: 1.5), 'float'));
+    }
+
     #[Test]
     public function acceptsADefaultWithinTheConstraints(): void
     {

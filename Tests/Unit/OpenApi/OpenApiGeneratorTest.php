@@ -113,6 +113,21 @@ final class OpenApiGeneratorTest extends TestCase
 
         // A host placeholder is not part of the path template, so OpenAPI has no place for it.
         self::assertArrayNotHasKey('parameters', $operation);
+        self::assertArrayNotHasKey(400, $operation['responses']);
+    }
+
+    #[Test]
+    public function documentsTheBadRequestOfAConstrainedHostPlaceholder(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, host?: string|null}> $routes */
+        $routes = ['tenant' => ['path' => '/api/status', 'methods' => ['GET'], 'controller' => 'ctrl::status', 'env' => null, 'requirements' => [], 'host' => '{subdomain}.example.com']];
+        $arguments = ['tenant' => [['name' => 'subdomain', 'type' => 'string', 'source' => 'host', 'nullable' => false, 'hasDefault' => false, 'default' => null, 'maxLength' => 20]]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), arguments: $arguments);
+
+        $operation = $this->generator($registry)->generate('My API', '2.0.0', '/api/')['paths']['/api/status']['get'];
+
+        self::assertArrayNotHasKey('parameters', $operation);
+        self::assertArrayHasKey(400, $operation['responses']);
     }
 
     #[Test]

@@ -22,9 +22,11 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, RouteNameController, ThrowingController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Http\{ImmediateResponseException, ServerRequest, Stream};
+use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 use function json_decode;
@@ -109,6 +111,32 @@ final class ControllerInvokerTest extends TestCase
         self::assertJsonPath((string) $response->getBody(), 'title', 'Internal Server Error');
         // Never the exception's own detail: that information is unvetted and possibly sensitive.
         self::assertJsonMissingPaths((string) $response->getBody(), ['detail', 'exception', 'code', 'file', 'line', 'trace']);
+    }
+
+    #[Test]
+    public function logsTheUncaughtExceptionBeforeConvertingItOnAFlaggedRoute(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('error')
+            ->with(
+                self::stringContains('"jsonError"'),
+                self::callback(static fn (array $context): bool => $context['exception'] instanceof RuntimeException
+                    && 'sensitive internal detail nobody should see in a response' === $context['exception']->getMessage()),
+            );
+
+        $this->invoker($this->logManager($logger))->invoke($this->match('jsonError'), $this->request());
+    }
+
+    #[Test]
+    public function doesNotLogAnExceptionItRethrowsOnAnUnflaggedRoute(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+
+        $this->expectException(RuntimeException::class);
+
+        $this->invoker($this->logManager($logger))->invoke($this->match('plainError'), $this->request());
     }
 
     #[Test]
@@ -389,9 +417,22 @@ final class ControllerInvokerTest extends TestCase
         self::assertTrue($this->invoker()->isVisibleInCurrentContext('Development'));
     }
 
-    private function invoker(): ControllerInvoker
+    private function invoker(?LogManager $logManager = null): ControllerInvoker
     {
-        return new ControllerInvoker($this->registry(), new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)));
+        return new ControllerInvoker(
+            $this->registry(),
+            new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)),
+            $logManager ?? $this->createMock(LogManager::class),
+        );
+    }
+
+    private function logManager(LoggerInterface $logger): LogManager
+    {
+        $logManager = $this->createMock(LogManager::class);
+        // The docs name this logger, so site writer configuration keys on it.
+        $logManager->method('getLogger')->with(ControllerInvoker::class)->willReturn($logger);
+
+        return $logManager;
     }
 
     /**
@@ -440,7 +481,7 @@ final class ControllerInvokerTest extends TestCase
 
         // Only 'optional' has its requirement contributed by #[Param] on a defaulted parameter.
         // 'jsonError' and 'shortCircuit' both opted into converting an uncaught exception to a
-        // generic JSON error — 'shortCircuit' proves an ImmediateResponseException is excluded
+        // generic JSON error. 'shortCircuit' proves an ImmediateResponseException is excluded
         // from that conversion even so.
         // Only the path and host matter here: they tell a placeholder from a name that just has a default.
         $routes = [

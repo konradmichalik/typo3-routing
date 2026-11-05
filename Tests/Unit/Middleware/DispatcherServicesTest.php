@@ -58,7 +58,7 @@ final class DispatcherServicesTest extends TestCase
         $matcher = new RouteMatcher($registry, $extensionConfiguration);
         $cache = $this->createResponseCacheManager();
         $rateLimitCheck = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()));
-        $invoker = new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)));
+        $invoker = new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class));
         $accessGuard = new AccessGuard($registry, $context);
         $cors = new CorsHandler($extensionConfiguration);
         $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors);

@@ -359,6 +359,8 @@ public function show(Order $order): JsonResponse
 }
 ```
 
+Since the converted exception never reaches TYPO3's exception handling, it is logged at `error` level through the TYPO3 logging framework (logger `KonradMichalik\Typo3Routing\Routing\ControllerInvoker`, exception under the `exception` context key) before the response is built.
+
 Outside the `Development` application context, the response body never includes the exception's own message or a stack trace — only the fixed `title: 'Internal Server Error'` — since an unanticipated exception's detail is unvetted and possibly sensitive. In `Development`, the response includes the exception's message as `detail`, plus `exception`, `code`, `file`, `line` and `trace` as RFC 9457 extension members:
 
 ```json

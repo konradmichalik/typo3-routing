@@ -21,10 +21,12 @@ use KonradMichalik\Typo3Routing\OpenApi\{JsonSchemaMapper, OpenApiGenerator, Res
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\UriInterface;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Site\Entity\SiteInterface;
 
 /**
  * SwaggerUiControllerTest.
@@ -144,6 +146,23 @@ final class SwaggerUiControllerTest extends TestCase
         self::assertMatchesRegularExpression('#<link rel="icon" type="image/png" sizes="32x32" href="[^"]*swagger-ui-dist@\d+\.\d+\.\d+/favicon-32x32\.png" integrity="sha384-[A-Za-z0-9+/]+" crossorigin="anonymous">#', $html);
         self::assertMatchesRegularExpression('#<link rel="icon" type="image/png" sizes="16x16" href="[^"]*swagger-ui-dist@\d+\.\d+\.\d+/favicon-16x16\.png" integrity="sha384-[A-Za-z0-9+/]+" crossorigin="anonymous">#', $html);
         self::assertStringContainsString('crossorigin="anonymous"', $html);
+    }
+
+    #[Test]
+    public function docsHexEscapesTagsInTheSpecUrl(): void
+    {
+        $controller = $this->controller('1');
+        // TYPO3's Uri percent-encodes a real site base, so the stub stands in for a future unencoded source.
+        $base = self::createStub(UriInterface::class);
+        $base->method('getPath')->willReturn('/</script>');
+        $site = self::createStub(SiteInterface::class);
+        $site->method('getBase')->willReturn($base);
+        $request = (new ServerRequest('https://example.com/'))->withAttribute('site', $site);
+
+        $html = (string) $controller->docs($request)->getBody();
+
+        self::assertStringContainsString('url: "/\\u003C/script\\u003E/api/example/openapi.json",', $html);
+        self::assertStringNotContainsString('/</script>/api', $html);
     }
 
     private function controller(string $swaggerUiFlag): SwaggerUiController

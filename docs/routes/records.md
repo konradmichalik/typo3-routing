@@ -2,6 +2,11 @@
 
 This is a recipe, not a feature: the extension ships no record, query, or serialisation layer, and does not plan to add one (see [Decision: why this is documentation, not a feature](#decision-why-this-is-documentation-not-a-feature)). Everything below combines pieces documented elsewhere. What follows is how to combine them for the recurring case of exposing a database table as a list and a detail endpoint.
 
+- [The base-class pattern](#the-base-class-pattern)
+- [What the consumer owns](#what-the-consumer-owns)
+- [Pitfalls](#pitfalls)
+- [Decision: why this is documentation, not a feature](#decision-why-this-is-documentation-not-a-feature)
+
 ## The base-class pattern
 
 [Sharing route definitions through a base class](route-groups.md#sharing-route-definitions-through-a-base-class) fits a resource controller well: the list and detail routes are declared once, and each concrete resource supplies only its own path/name prefix.

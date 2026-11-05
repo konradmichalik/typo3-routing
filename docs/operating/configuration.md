@@ -16,11 +16,18 @@ All of them live under **Settings → Extension Configuration → typo3_routing*
 | `cors.maxAge` | `3600` | [CORS](../features/cors.md#global-configuration) |
 | `swaggerUi` | `0` | [OpenAPI export](openapi.md#swagger-ui-development-only) |
 
+- [Path gate](#path-gate)
+- [Trailing slashes](#trailing-slashes)
+- [Exclusive path prefixes](#exclusive-path-prefixes)
+  - [Shaping the 404](#shaping-the-404)
+- [Environment-bound routes](#environment-bound-routes)
+- [Middleware placement](#middleware-placement)
+
 ## Path gate
 
 The dispatcher only reaches the matcher for paths that could plausibly belong to a route. That gate is **derived from your `#[Route]` paths at container compile time** — the static leading segment of every path (plus its slashless form where it ends in a slash, so the [trailing-slash tolerance](#trailing-slashes) below can do its work), baked into the compiled container next to the compiled matcher, merged with the [exclusive path prefixes](#exclusive-path-prefixes) below (configured and class-level alike) — an exclusively claimed path space must reach the dispatcher even where it holds no route at all. It needs no configuration and cannot drift out of sync with your routes: put an endpoint at `/webhook/stripe` and the gate covers it automatically.
 
-A path outside the gate falls through to normal page rendering at zero cost. With no routes registered and no exclusive prefix configured, the gate is empty and rejects everything, so the dispatcher costs a single string comparison per page request. [Performance](../background/performance.md#traffic-that-is-not-an-api-request) puts a number on that.
+A path outside the gate falls through to normal page rendering. With no routes registered and no exclusive prefix configured, the gate is empty and rejects everything. The gate decision itself takes well under a microsecond; what a page request still pays is constructing the middleware, see [What an unrelated page request costs](../background/performance.md#what-an-unrelated-page-request-costs).
 
 > [!NOTE]
 > A route whose path starts with a placeholder (e.g. `/{slug}`) has no static prefix, so it opens the gate for every path — the matcher then decides. That is unavoidable and correct: such a route can match anywhere.
@@ -42,7 +49,7 @@ Two things stay untouched by it:
 - **The declared form stays canonical.** Generated URLs ([`{routing:uri()}`, `RouteUrlGenerator`](../routes/url-generation.md)) keep exactly the form you wrote, and so do the route exports that report it — [`routing:debug`](commands.md#routingdebug) and the [OpenAPI document](openapi.md).
 - **`405` beats the retry.** A path that matches a route under the active `trailingSlash` policy but uses the wrong HTTP method answers `405` with its `Allow` header. With `trailingSlash: 0`, the opposite-slash form is not a path match at all and stays a plain `404`, not a `405`.
 
-Case is a separate matter and has no global switch: a route opts into it individually with `#[Route(caseInsensitive: true)]`, see [Case-insensitive paths](../routes/route-attribute.md#case-insensitive-paths).
+Case is a separate matter and has no global switch: a route opts into it individually with `#[Route(caseInsensitive: true)]`, see [Case-insensitive paths](../routes/path-tolerance.md#case-insensitive-paths).
 
 ## Exclusive path prefixes
 

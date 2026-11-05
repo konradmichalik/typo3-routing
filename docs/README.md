@@ -10,40 +10,12 @@ The everyday surface: what you write on a controller to make an endpoint exist.
 
 | Page | What's inside |
 |------|---------------|
-| [The `#[Route]` attribute](routes/route-attribute.md) | Every parameter: `requirements`, priority, optional placeholders, schemes, host, case tolerance, and how a controller returns an error |
+| [The `#[Route]` attribute](routes/route-attribute.md) | Every parameter at a glance, plus `requirements`, priority, optional placeholders, description and the matched route name |
+| [Hosts, schemes, sites and languages](routes/host-and-scope.md) | Restricting where a route answers: `schemes` with its redirect, `host` with wildcards, `sites` and `languages` |
+| [Case-insensitive paths and canonical redirects](routes/path-tolerance.md) | `caseInsensitive` and `canonical`: tolerating a variant of the path, or redirecting it to the declared one |
+| [Renaming and deprecating a route](routes/route-lifecycle.md) | `legacyPaths` for an old path after a rename, `#[DeprecatedRoute]` with its standard headers |
+| [Error responses from controllers](routes/error-responses.md) | `HttpProblemException` for expected failures, automatic JSON errors for `JsonResponse` routes |
 | [Route groups](routes/route-groups.md) | A class-level `#[Route]` as a shared prefix, which parameters inherit from it, and sharing route definitions through a base class |
-| [Typed controller arguments](routes/arguments.md) | How a method signature is fed from the request: type coercion, backed enums, entity binding, variadics, uploaded files, `#[Param]` |
+| [Typed controller arguments](routes/arguments.md) | Type coercion, backed enums, Extbase entity binding, variadics, uploaded files, and overriding the source with `#[Param]` |
 | [URL generation](routes/url-generation.md) | `routing:uri` / `routing:uris` Fluid ViewHelpers and the PHP generator, so a path is never duplicated |
-| [Records](routes/records.md) | A recipe for list/detail endpoints over database records, and why it stays a recipe |
-
-## [Route features](features/README.md)
-
-Opt-in behaviour, declared as its own attribute next to `#[Route]`. Nothing here applies unless you ask for it.
-
-| Page | What's inside |
-|------|---------------|
-| [Authentication & CSRF](features/authentication.md) | `#[Authenticate]`, the built-in authenticators, `#[RequireRequestToken]` with the `routing:requestToken` ViewHelper that issues its token, and the Bearer deployment traps |
-| [Caching](features/caching.md) | `#[Cache]`, tag-based invalidation, ETag / conditional GET, and what must never be cached |
-| [Rate limiting](features/rate-limiting.md) | `#[RateLimit]`, throttling per IP or per user, and the quota headers on every response |
-| [CORS](features/cors.md) | Global configuration, per-route `#[Cors]`, and automatic preflight handling |
-
-## [Operating it](operating/README.md)
-
-What an installation is configured with, and the tooling that inspects it.
-
-| Page | What's inside |
-|------|---------------|
-| [Configuration](operating/configuration.md) | Every extension setting in one table, plus the derived path gate, trailing slashes, exclusive prefixes, environment-bound routes and middleware placement |
-| [Console commands](operating/commands.md) | `routing:debug` to list and audit routes, `routing:match` to ask which route claims a path |
-| [OpenAPI export](operating/openapi.md) | `routing:openapi`, what it derives from your attributes, and the development-only Swagger UI |
-
-## [Background](background/README.md)
-
-Why it exists, how it works, what it costs, and how to build on it.
-
-| Page | What's inside |
-|------|---------------|
-| [How it compares](background/comparison.md) | When to reach for this versus `AjaxRoutes`, custom middleware, `eID`, or Extbase plugins |
-| [How it works](background/how-it-works.md) | Compile-time discovery, the runtime dispatch pipeline step by step, and the response contract |
-| [Performance](background/performance.md) | What a matched route costs against a hand-written middleware, what an unrelated page request costs, and how to reproduce both |
-| [Extending](background/extending.md) | Building tooling on the route metadata (`RouteRegistry`, `RouteInvoker`), the `@api`/`@internal` surface, and the BC promise |
+| [List/detail endpoints for database records](routes/records.md) | A recipe combining the above for exposing a table, and why that stays a recipe rather than a feature |

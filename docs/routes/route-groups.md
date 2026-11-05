@@ -25,6 +25,14 @@ final class CourseController implements RouteControllerInterface
 }
 ```
 
+- [How the values combine](#how-the-values-combine)
+- [Exclusive class-level claim](#exclusive-class-level-claim)
+- [Sharing routes through an abstract base controller](#sharing-routes-through-an-abstract-base-controller)
+- [What else can sit on the class](#what-else-can-sit-on-the-class)
+- [Sharing route definitions through a base class](#sharing-route-definitions-through-a-base-class)
+  - [Every concrete controller needs its own class-level `#[Route]`](#every-concrete-controller-needs-its-own-class-level-route)
+  - [Declare the route methods `final`](#declare-the-route-methods-final)
+
 ## How the values combine
 
 Not every [`#[Route]` parameter](route-attribute.md) inherits the same way, and the differences are deliberate rather than incidental:
@@ -49,7 +57,7 @@ The three in the middle are the ones worth remembering: `methods`, `schemes` and
 A controller class can claim its own prefix exclusively, without touching extension configuration: `#[Route(path: '/api/reports', exclusive: true)]` on the class claims `/api/reports` — a request whose path is nested under it and matches none of the class's own routes gets a JSON `404`, scoped to that one class instead of a global setting (see [Exclusive path prefixes](../operating/configuration.md#exclusive-path-prefixes) for the extension-configuration equivalent). The claim is bound to that path segment: a sibling path that merely starts with the same characters (e.g. `/api/reports-archive`) is unaffected, unlike a hand-written `exclusivePrefixes` entry, where the operator is responsible for a trailing `/` if that boundary matters. It only takes effect on the class-level `#[Route]`; setting it on a method route is a build-time error, and a class path with no static prefix beyond the root (e.g. one starting with a placeholder, or one that is empty or just `/`) is rejected at build time too, since it would otherwise claim every unmatched path site-wide.
 
 > [!NOTE]
-> A class combining `exclusive: true` with [`caseInsensitive: true`](route-attribute.md#case-insensitive-paths) claims only the path's declared casing today: `/api/reports/unknown` gets the JSON `404`, but `/API/REPORTS/unknown` falls through to page rendering instead. Known limitation, not yet implemented.
+> A class combining `exclusive: true` with [`caseInsensitive: true`](path-tolerance.md#case-insensitive-paths) claims only the path's declared casing today: `/api/reports/unknown` gets the JSON `404`, but `/API/REPORTS/unknown` falls through to page rendering instead. Known limitation, not yet implemented.
 
 ## Sharing routes through an abstract base controller
 

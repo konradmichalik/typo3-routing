@@ -365,7 +365,7 @@ final class RouteMatcherTest extends TestCase
     }
 
     /**
-     * Known limitation, documented in docs/routes/route-attribute.md#schemes: the case-insensitive
+     * Known limitation, documented in docs/routes/host-and-scope.md#schemes: the case-insensitive
      * tolerance and the scheme-redirect tier are not combined, so a request that is both wrongly cased
      * and on the wrong scheme finds no matcher tier that accepts it, rather than redirecting.
      */

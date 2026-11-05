@@ -4,6 +4,11 @@ Dispatching a matched route costs about **0.63 ms** more than a hand-written mid
 
 On the machine these figures come from, a warm request to a minimal JSON endpoint has a time-to-first-byte of roughly 20 ms, so the routing layer is about 3% of it, and proportionally less for any endpoint that touches the database.
 
+- [What this means for your case](#what-this-means-for-your-case)
+- [What an unrelated page request costs](#what-an-unrelated-page-request-costs)
+- [Reproducing](#reproducing)
+- [Caveats](#caveats)
+
 ## What this means for your case
 
 | If you… | Expect |

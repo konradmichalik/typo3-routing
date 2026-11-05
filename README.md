@@ -23,19 +23,11 @@ The frontend has no equivalent to the backend-only [`Configuration/Backend/AjaxR
 
 ## ✨ Features
 
-- [**Attribute routing**](docs/routes/route-attribute.md): declare an endpoint with `#[Route]` directly on a controller method
-- [**Route groups**](docs/routes/route-groups.md): a class-level `#[Route]` prefixes every method route, e.g. for API versioning; an abstract base controller can share methods when each concrete subclass declares its own prefix
-- [**Typed arguments**](docs/routes/arguments.md): methods receive type-cast path/query/body values, no manual request reading
-- [**Zero-config discovery**](docs/background/how-it-works.md): routes are collected at container compile time, no extra cache
-- [**Measured overhead**](docs/background/performance.md): dispatching a matched route costs ~0.63 ms more than a hand-written middleware, about 3% of a minimal JSON endpoint; a request that cannot be a route costs ~0.19 ms, nearly all of it container construction
-- [**URL generation**](docs/routes/url-generation.md): a Fluid ViewHelper so the path lives *once*, not duplicated as a PHP constant and a JS string
-- [**Opt-in caching**](docs/features/caching.md): cache responses with `#[Cache]`, with tag-based invalidation
-- [**Opt-in rate limiting**](docs/features/rate-limiting.md): throttle requests per client IP with `#[RateLimit]`
-- [**Opt-in authentication & CSRF**](docs/features/authentication.md): protect routes with `#[Authenticate]` (bearer token / FE / BE user) and `#[RequireRequestToken]`
-- [**CORS**](docs/features/cors.md): opt-in cross-origin support with automatic preflight handling, configured globally or per route with `#[Cors]`
-- [**Debug command**](docs/operating/commands.md): list every registered route as a table or JSON, including an `--unprotected` audit
-- [**OpenAPI export**](docs/operating/openapi.md): generate an OpenAPI 3.1 document from your routes with `routing:openapi`
-- [**Swagger UI**](docs/operating/openapi.md#swagger-ui-development-only): opt-in, development-only Swagger UI served over the same OpenAPI export
+- [**Attribute routing**](docs/routes/route-attribute.md): declare an endpoint with `#[Route]` on a controller method, grouped by a class-level prefix if needed
+- [**Typed arguments**](docs/routes/arguments.md): methods receive type-cast path, query and body values, with optional value constraints
+- [**URL generation**](docs/routes/url-generation.md): a Fluid ViewHelper and a PHP generator, so a path lives in one place
+- [**Opt-in route features**](docs/features/README.md): caching, rate limiting, authentication with CSRF protection, and CORS, each as its own attribute
+- [**Tooling**](docs/operating/commands.md): `routing:debug` lists and audits every route, `routing:openapi` exports an OpenAPI 3.1 document
 
 ## 🔥 Installation
 
@@ -102,14 +94,15 @@ See [The `#[Route]` attribute](docs/routes/route-attribute.md) for the full refe
 
 ## 📚 Documentation
 
-Full documentation lives in [`docs/`](docs/README.md), grouped into four parts:
+Full documentation lives in [`docs/`](docs/README.md), grouped into four parts. The performance figures have a row of their own:
 
 | Part | What's inside |
 |------|---------------|
 | [Defining routes](docs/routes/README.md) | The `#[Route]` attribute, route groups, typed controller arguments, and URL generation — the only part you need to ship an endpoint |
 | [Route features](docs/features/README.md) | The opt-in attributes: `#[Authenticate]`, `#[Cache]`, `#[RateLimit]`, `#[Cors]`, and how they interact |
-| [Operating it](docs/operating/README.md) | Every extension setting, the `routing:debug` / `routing:match` commands, and the OpenAPI export |
+| [Operating it](docs/operating/README.md) | Every extension setting, the `routing:debug`, `routing:match` and `routing:lint` commands, and the OpenAPI export |
 | [Background](docs/background/README.md) | How it compares to the alternatives, how it works underneath, measured performance, and the `@api` surface for tooling |
+| [Performance](docs/background/performance.md) | About 0.63 ms per matched request compared to a hand-written middleware, about 0.19 ms on an ordinary page request, and how to reproduce both |
 
 > [!TIP]
 > Want to expose these routes to AI agents/MCP clients? <img src="https://github.com/konradmichalik/typo3-routing-mcp/raw/main/Resources/Public/Icons/Extension.png?raw=true" width="16" height="16" alt=""> [`typo3-routing-mcp`](https://github.com/konradmichalik/typo3-routing-mcp) adds a `#[McpTool]` attribute next to an existing `#[Route]` and serves it over Streamable HTTP.

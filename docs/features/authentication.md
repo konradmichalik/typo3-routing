@@ -1,7 +1,21 @@
 # Authentication & CSRF
 
+Two optional attributes protect a route: `#[Authenticate]` decides who may call it, and `#[RequireRequestToken]` adds CSRF protection to state-changing endpoints.
+
 > [!IMPORTANT]
-> Routes are **public by default**. Add the optional `#[Authenticate]` attribute to require authentication, and `#[RequireRequestToken]` to add CSRF protection to state-changing endpoints.
+> Routes are **public by default**. Nothing is protected until you add one of them.
+
+- [`#[Authenticate]`](#authenticate)
+- [Class-level `#[Authenticate]`](#class-level-authenticate)
+- [Built-in authenticators](#built-in-authenticators)
+  - [`BearerTokenAuthenticator`](#bearertokenauthenticator)
+  - [`FrontendUserAuthenticator`](#frontenduserauthenticator)
+  - [`BackendUserAuthenticator`](#backenduserauthenticator)
+  - [Custom authenticators](#custom-authenticators)
+- [Caching authenticated routes](#caching-authenticated-routes)
+- [`#[RequireRequestToken]` (CSRF)](#requirerequesttoken-csrf)
+  - [Issuing the token](#issuing-the-token)
+- [Deployment notes (Bearer)](#deployment-notes-bearer)
 
 ## `#[Authenticate]`
 

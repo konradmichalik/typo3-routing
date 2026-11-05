@@ -6,7 +6,7 @@ Instead of reading values off the request by hand, declare them as **typed metho
 |-----------------------------------|----------------------------------------|
 | `ServerRequestInterface $request` | The PSR-7 request itself.              |
 | A name matching a path `{placeholder}` | The matched path segment.         |
-| A name matching a [`host`](route-attribute.md#wildcards-and-multiple-hosts) `{placeholder}` | The matched host label. |
+| A name matching a [`host`](host-and-scope.md#wildcards-and-multiple-hosts) `{placeholder}` | The matched host label. |
 | `UploadedFileInterface $file`     | The [uploaded file](#uploaded-files) of that name. |
 | Any other scalar name             | Query string, then request body.       |
 
@@ -31,6 +31,15 @@ public function show(int $id, int $page = 1, ?string $sort = null, ServerRequest
 > [`requirements`](route-attribute.md#requirements) validates the *format* (regex) of inputs and runs first; typed parameters handle the *type* mapping. Use them together: a placeholder constrained by `requirements: ['id' => '\d+']` plus an `int $id` parameter gives you a guaranteed, type-safe value.
 >
 > Unsupported parameter shapes (union/intersection types, non-request objects, pure non-backed enums) are rejected at compile time with a clear `LogicException`, so misuse surfaces during container build, not at runtime.
+
+- [Backed enums](#backed-enums)
+- [Entity resolution](#entity-resolution)
+- [Variadics](#variadics)
+- [Uploaded files](#uploaded-files)
+- [Overriding the source with `#[Param]`](#overriding-the-source-with-param)
+  - [Declaring the constraint at the parameter](#declaring-the-constraint-at-the-parameter)
+  - [Documenting the parameter](#documenting-the-parameter)
+  - [Value constraints](#value-constraints)
 
 ## Backed enums
 

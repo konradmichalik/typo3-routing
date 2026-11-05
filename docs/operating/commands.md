@@ -11,6 +11,12 @@ vendor/bin/typo3 routing:lint [--json] [--strict]
 
 A fourth command, `routing:openapi`, exports the same registry as an API document and has its own page: [OpenAPI export](openapi.md).
 
+- [`routing:debug`](#routingdebug)
+  - [Filtering and inspecting](#filtering-and-inspecting)
+- [`routing:match`](#routingmatch)
+  - [The requirement-mismatch report](#the-requirement-mismatch-report)
+- [`routing:lint`](#routinglint)
+
 ## `routing:debug`
 
 Lists every registered route.
@@ -82,7 +88,7 @@ Filters narrow the table (and `--json`) and combine with AND. The active filters
 | `--cached`       | have response caching                               |
 | `--rate-limited` | have rate limiting                                  |
 | `--csrf`         | require a CSRF request token                        |
-| `--deprecated`   | are marked deprecated (see [Deprecating a route](../routes/route-attribute.md#deprecating-a-route)) |
+| `--deprecated`   | are marked deprecated (see [Deprecating a route](../routes/route-lifecycle.md#deprecating-a-route)) |
 
 ```bash
 vendor/bin/typo3 routing:debug --method=POST --protected   # protected write endpoints
@@ -99,13 +105,13 @@ vendor/bin/typo3 routing:match /api/item/42                         # placeholde
 vendor/bin/typo3 routing:match /api/orders --method=POST --host=api.example.com
 ```
 
-Give the path **without the site base** (exactly as written in `#[Route]`); the leading slash is optional. `--method` (default `GET`), `--scheme` (default `https`) and `--host` (default `localhost`) simulate the request, so [`schemes`](../routes/route-attribute.md#schemes) / [`host`](../routes/route-attribute.md#host) constraints and [priority](../routes/route-attribute.md#priority) overlaps can be debugged. `--site` and `--language` simulate the request's site identifier and language id, so a [`sites`/`languages`](../routes/route-attribute.md#site--and-language-bound-routes) constraint that would reject the request is reported the same way a `requirements` mismatch is, instead of silently matching.
+Give the path **without the site base** (exactly as written in `#[Route]`); the leading slash is optional. `--method` (default `GET`), `--scheme` (default `https`) and `--host` (default `localhost`) simulate the request, so [`schemes`](../routes/host-and-scope.md#schemes) / [`host`](../routes/host-and-scope.md#host) constraints and [priority](../routes/route-attribute.md#priority) overlaps can be debugged. `--site` and `--language` simulate the request's site identifier and language id, so a [`sites`/`languages`](../routes/host-and-scope.md#site--and-language-bound-routes) constraint that would reject the request is reported the same way a `requirements` mismatch is, instead of silently matching.
 
 A match prints the route name, controller, resolved path parameters and — for an [environment-bound route](configuration.md#environment-bound-routes) — a note that it is only reachable in that context (the matcher itself ignores `env`; the dispatcher enforces it at request time). A path that matches nothing exits non-zero with `No route matches`; a path that matches but rejects the method reports the allowed methods.
 
 ### The requirement-mismatch report
 
-One miss gets its own report, because `No route matches` would be misleading: a [case-insensitive route](../routes/route-attribute.md#case-insensitive-paths) whose path was found but whose `requirements` then rejected a placeholder value.
+One miss gets its own report, because `No route matches` would be misleading: a [case-insensitive route](../routes/path-tolerance.md#case-insensitive-paths) whose path was found but whose `requirements` then rejected a placeholder value.
 
 ```text
  [WARNING] Path "/API/Courses/Intro-To-Php" matches route "course_show_by_slug", but the

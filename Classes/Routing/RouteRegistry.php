@@ -692,7 +692,7 @@ final class RouteRegistry
      *
      * Never compiled with CaseInsensitiveRouteCompiler, unlike getCaseInsensitiveCollection() — a route
      * combining `caseInsensitive` with `schemes` only redirects on the declared case, see
-     * docs/routes/route-attribute.md#schemes. Same limitation caseInsensitive already has with legacy
+     * docs/routes/host-and-scope.md#schemes. Same limitation caseInsensitive already has with legacy
      * paths.
      */
     private function getSchemeRedirectCollection(): RouteCollection

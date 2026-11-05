@@ -80,6 +80,20 @@ final class ResponseCacheManagerTest extends TestCase
     }
 
     #[Test]
+    public function flushByTagsRemovesEveryEntryTaggedWithOneOfThem(): void
+    {
+        $this->subject->store('route_news', new Response('php://temp', 200), 3600, ['tx_news']);
+        $this->subject->store('route_teaser', new Response('php://temp', 200), 3600, ['teaser']);
+        $this->subject->store('route_other', new Response('php://temp', 200), 3600, ['other']);
+
+        $this->subject->flushByTags(['tx_news', 'teaser']);
+
+        self::assertNull($this->subject->get('route_news'));
+        self::assertNull($this->subject->get('route_teaser'));
+        self::assertNotNull($this->subject->get('route_other'));
+    }
+
+    #[Test]
     public function withETagAddsAStrongBodyHashAndIsIdempotent(): void
     {
         $response = new Response('php://temp', 200);

@@ -460,6 +460,30 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function aSuccessfulWriteRouteFlushesTheCachedGetResponse(): void
+    {
+        $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $cached = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $write = $this->process($this->request('POST', 'https://example.com/api/example/invalidate'));
+        $after = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+
+        self::assertSame('HIT', $cached->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame(200, $write->getStatusCode());
+        self::assertSame('MISS', $after->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function aRejectedWriteRouteLeavesTheCachedGetResponse(): void
+    {
+        $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $write = $this->process($this->request('POST', 'https://example.com/api/example/invalidate-rejected'));
+        $after = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+
+        self::assertSame(422, $write->getStatusCode());
+        self::assertSame('HIT', $after->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
     public function headSharesTheCacheEntryAGetRequestWrote(): void
     {
         $get = $this->process($this->request('GET', 'https://example.com/api/example/cached'));

@@ -16,6 +16,7 @@ namespace KonradMichalik\Typo3Routing\Routing;
 use InvalidArgumentException;
 use JsonException;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
+use KonradMichalik\Typo3Routing\Cache\CacheInvalidator;
 use KonradMichalik\Typo3Routing\Http\{JsonErrorResponse, RouteUrlGenerator};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface, UploadedFileInterface, UriInterface};
 use Symfony\Component\Routing\Exception\{InvalidParameterException, MissingMandatoryParametersException};
@@ -46,6 +47,8 @@ final readonly class RouteInvoker
         private AccessGuard $accessGuard,
         private RouteUrlGenerator $urlGenerator,
         private SiteLanguageScope $siteLanguageScope,
+        // Optional so instances built by hand before #[InvalidatesCache] existed keep working; they skip the flush.
+        private ?CacheInvalidator $cacheInvalidator = null,
     ) {}
 
     /**
@@ -54,6 +57,9 @@ final readonly class RouteInvoker
      * transport. Replicated are the steps belonging to the route's own contract (env filter, path and
      * input requirements, authentication); skipped are those belonging to the HTTP transport (CORS,
      * rate limiting, response caching, and the CSRF request token — no browser is involved).
+     *
+     * A successful invocation still flushes the route's #[InvalidatesCache] tags: the write happened, so
+     * the cached responses it touched are stale regardless of the transport.
      *
      * Authentication is checked against the credentials the calling request carries. Rate limiting
      * being absent means a consumer re-exposing these routes owns abuse control on its own transport.
@@ -129,8 +135,11 @@ final readonly class RouteInvoker
         }
 
         // 5. Dispatch. Rate limiting and the response cache stay out: both are HTTP-transport
-        //    mechanisms, not part of the route's correctness contract.
-        return $this->invoker->invoke($match, $synthetic);
+        //    mechanisms, not part of the route's correctness contract. Invalidation is not, see above.
+        $response = $this->invoker->invoke($match, $synthetic);
+        $this->cacheInvalidator?->afterResponse($routeName, $response);
+
+        return $response;
     }
 
     /**

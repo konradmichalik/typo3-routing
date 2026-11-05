@@ -82,6 +82,9 @@ final class CollectedRoutes
      */
     public array $jsonErrorRoutes = [];
 
+    /** @var array<string, list<string>> Route name → #[Cache] tags flushed after a 2xx or 3xx response */
+    public array $cacheInvalidations = [];
+
     /**
      * Kept here rather than inlined at the call site: a compiler pass with dozens of small collection
      * steps stays within its own cognitive-complexity budget only by pushing each step's own branching

@@ -792,6 +792,19 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function exposesTheCacheTagsARouteInvalidates(): void
+    {
+        $registry = new RouteRegistry(
+            [],
+            new ServiceLocator([]),
+            cacheInvalidations: ['news_create' => ['tx_news_domain_model_news']],
+        );
+
+        self::assertSame(['tx_news_domain_model_news'], $registry->getInvalidatedCacheTags('news_create'));
+        self::assertSame([], $registry->getInvalidatedCacheTags('other'));
+    }
+
+    #[Test]
     public function exposesDeclaredReturnsPerRouteName(): void
     {
         $returns = [['status' => 200, 'schema' => CourseDto::class, 'collection' => false, 'description' => null]];

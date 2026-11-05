@@ -23,6 +23,7 @@ public function __construct(
 | `getAuthenticators(string $routeName): list<array{service, options}>` | OR-combined authenticators; empty means public |
 | `getRequestTokenScope(string $routeName): ?string` | The expected CSRF scope, or `null` |
 | `getCacheConfig(string $routeName): ?array{lifetime, tags, ignoreParams}` | Response-cache config, or `null` |
+| `getInvalidatedCacheTags(string $routeName): list<string>` | The `#[InvalidatesCache]` tags flushed after a 2xx or 3xx response; empty when none |
 | `getRateLimit(string $routeName): ?array{limit, interval, policy, keyBy}` | Rate-limit config, or `null` |
 | `getCorsConfig(string $routeName): ?array{allowedOrigins, allowedHeaders, allowCredentials, exposeHeaders, maxAge}` | The route's own `#[Cors]` override, or `null` when it falls back to the global CORS configuration |
 
@@ -64,6 +65,7 @@ One consequence is worth spelling out: a violated path requirement is the single
 | CORS, including preflight | **skipped** | no browser, no origin to negotiate |
 | Rate limiting (`#[RateLimit]`) | **skipped** | HTTP-transport abuse control, not correctness |
 | Response cache (`#[Cache]`, ETag, conditional GET) | **skipped** | a transport-level performance mechanism; an invocation always sees fresh output |
+| Cache invalidation (`#[InvalidatesCache]`) | enforced after a 2xx or 3xx response | the write happened, so the cached responses it touched are stale whichever transport triggered it |
 
 Exception handling is the dispatcher's, so error semantics match a real call to the same route: an unresolvable argument is a 400, a missing entity a 404, a controller-thrown [`HttpProblemException`](../../Classes/Http/HttpProblemException.php) keeps its own status, and every other exception stays untouched for TYPO3's error handling. `Tests/Functional/Routing/RouteInvokerTest.php` pins that agreement route by route.
 

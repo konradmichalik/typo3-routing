@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
-use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
+use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, CacheInvalidator, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, DeprecationHeaders, RouteUrlGenerator};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
 use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, RouteMatcher, SiteLanguageScope};
@@ -94,6 +94,11 @@ final readonly class DispatcherServices
     public function cacheBypass(): CacheBypassGuard
     {
         return $this->service(CacheBypassGuard::class);
+    }
+
+    public function cacheInvalidator(): CacheInvalidator
+    {
+        return $this->service(CacheInvalidator::class);
     }
 
     public function clientKeyResolver(): ClientKeyResolver

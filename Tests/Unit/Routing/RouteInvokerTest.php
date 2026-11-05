@@ -18,17 +18,18 @@ use KonradMichalik\RoutingTest\Controller\ExampleController;
 use KonradMichalik\Ttt\Assertion\JsonAssertions;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
+use KonradMichalik\Typo3Routing\Cache\{CacheInvalidator, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteInvoker, RouteRegistry, SiteLanguageScope};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, HeaderAuthenticator, PassAuthenticator};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController, InvokerProbeController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EntityController, InvokerProbeController};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\UploadedFileInterface;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Context\Context;
-use TYPO3\CMS\Core\Http\{ServerRequest, Stream, UploadedFile};
+use TYPO3\CMS\Core\Http\{Response, ServerRequest, Stream, UploadedFile};
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Site\SiteFinder;
@@ -42,7 +43,37 @@ use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 #[CoversClass(RouteInvoker::class)]
 final class RouteInvokerTest extends TestCase
 {
+    use CreatesResponseCacheManager;
     use JsonAssertions;
+
+    private ResponseCacheManager $responseCache;
+
+    protected function setUp(): void
+    {
+        $this->responseCache = $this->createResponseCacheManager();
+    }
+
+    #[Test]
+    public function aSuccessfulInvocationFlushesTheTagsTheRouteInvalidates(): void
+    {
+        $this->responseCache->store('entry', new Response('php://temp', 200), 3600, ['pages']);
+
+        $response = $this->invoker()->invoke('submit', [], $this->request());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertNull($this->responseCache->get('entry'));
+    }
+
+    #[Test]
+    public function anInstanceBuiltWithoutAnInvalidatorInvokesWithoutFlushing(): void
+    {
+        $this->responseCache->store('entry', new Response('php://temp', 200), 3600, ['pages']);
+
+        $response = $this->invoker(withInvalidator: false)->invoke('submit', [], $this->request());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertNotNull($this->responseCache->get('entry'));
+    }
 
     #[Test]
     public function invokesTheControllerOfTheNamedRoute(): void
@@ -485,7 +516,7 @@ final class RouteInvokerTest extends TestCase
         self::assertSame(404, $response->getStatusCode());
     }
 
-    private function invoker(?Context $context = null): RouteInvoker
+    private function invoker(?Context $context = null, bool $withInvalidator = true): RouteInvoker
     {
         $registry = $this->registry();
 
@@ -495,6 +526,7 @@ final class RouteInvokerTest extends TestCase
             new AccessGuard($registry, $context ?? new Context()),
             new RouteUrlGenerator($registry, new SiteBasePathResolver()),
             new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class)),
+            $withInvalidator ? new CacheInvalidator($registry, $this->responseCache) : null,
         );
     }
 
@@ -617,7 +649,7 @@ final class RouteInvokerTest extends TestCase
             HeaderAuthenticator::class => static fn (): HeaderAuthenticator => new HeaderAuthenticator(),
         ]);
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator);
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, cacheInvalidations: ['submit' => ['pages']]);
     }
 
     private function site(): Site

@@ -18,7 +18,7 @@ use KonradMichalik\Ttt\Assertion\JsonAssertions;
 use KonradMichalik\Ttt\Attribute\WithEnvironment;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
-use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
+use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, CacheInvalidator, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, DeprecationHeaders, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\{DispatcherServices, RouteDispatcher};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
@@ -790,6 +790,18 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function aSuccessfulWriteFlushesTheTagsItInvalidates(): void
+    {
+        $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+        $write = $this->dispatch($this->request('POST', 'https://example.com/api/invalidating'));
+        $second = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
+
+        self::assertSame(200, $write->getStatusCode());
+        self::assertSame('MISS', $second->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertNotSame((string) $first->getBody(), (string) $second->getBody());
+    }
+
+    #[Test]
     public function regeneratesCachedResponseAfterTagFlush(): void
     {
         $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
@@ -1376,6 +1388,7 @@ final class RouteDispatcherTest extends TestCase
             CorsHandler::class => static fn (): CorsHandler => $cors,
             CorsPreflightResolver::class => static fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors),
             CacheBypassGuard::class => static fn (): CacheBypassGuard => new CacheBypassGuard($context),
+            CacheInvalidator::class => fn (): CacheInvalidator => new CacheInvalidator($registry, $this->responseCache),
             ClientKeyResolver::class => static fn (): ClientKeyResolver => new ClientKeyResolver($context),
             RouteUrlGenerator::class => static fn (): RouteUrlGenerator => new RouteUrlGenerator($registry, new SiteBasePathResolver()),
             SiteLanguageScope::class => $this->siteLanguageScope(...),
@@ -1434,6 +1447,7 @@ final class RouteDispatcherTest extends TestCase
             'renamedItem' => ['path' => '/api/renamed-item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+'], 'legacyPaths' => ['/api/old-item/{id}']],
             'aliasedLegacy' => ['path' => '/api/aliased', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/old-aliased'], 'legacyAlias' => true],
             'deprecatedRenamed' => ['path' => '/api/deprecated-renamed', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/old-deprecated'], 'legacyAlias' => true],
+            'invalidating' => ['path' => '/api/invalidating', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []],
             'scopedRenamed' => ['path' => '/api/scoped-renamed', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'sites' => ['other-site'], 'legacyPaths' => ['/api/old-scoped-renamed'], 'legacyAlias' => true],
         ];
 
@@ -1495,6 +1509,7 @@ final class RouteDispatcherTest extends TestCase
             'renamedItem' => [$id],
             'aliasedLegacy' => [],
             'scopedRenamed' => [],
+            'invalidating' => [$request],
         ];
 
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
@@ -1527,7 +1542,7 @@ final class RouteDispatcherTest extends TestCase
             DenyAuthenticator::class => static fn (): DenyAuthenticator => new DenyAuthenticator(),
         ]);
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, corsConfigs: $corsConfigs, deprecations: $deprecations);
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, corsConfigs: $corsConfigs, deprecations: $deprecations, cacheInvalidations: ['invalidating' => ['pages']]);
     }
 
     private function frontendUserContext(int $uid): Context

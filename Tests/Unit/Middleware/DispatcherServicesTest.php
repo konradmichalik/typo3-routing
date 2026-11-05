@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Middleware;
 
 use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
-use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, ResponseCacheManager};
+use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, CacheInvalidator, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, DeprecationHeaders, RouteUrlGenerator, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Middleware\DispatcherServices;
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
@@ -63,6 +63,7 @@ final class DispatcherServicesTest extends TestCase
         $cors = new CorsHandler($extensionConfiguration);
         $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors);
         $cacheBypass = new CacheBypassGuard($context);
+        $cacheInvalidator = new CacheInvalidator($registry, $cache);
         $clientKeyResolver = new ClientKeyResolver($context);
         $urlGenerator = new RouteUrlGenerator($registry, new SiteBasePathResolver());
         $siteLanguageScope = new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
@@ -77,6 +78,7 @@ final class DispatcherServicesTest extends TestCase
             CorsHandler::class => static fn (): CorsHandler => $cors,
             CorsPreflightResolver::class => static fn (): CorsPreflightResolver => $corsPreflight,
             CacheBypassGuard::class => static fn (): CacheBypassGuard => $cacheBypass,
+            CacheInvalidator::class => static fn (): CacheInvalidator => $cacheInvalidator,
             ClientKeyResolver::class => static fn (): ClientKeyResolver => $clientKeyResolver,
             RouteUrlGenerator::class => static fn (): RouteUrlGenerator => $urlGenerator,
             SiteLanguageScope::class => static fn (): SiteLanguageScope => $siteLanguageScope,
@@ -91,6 +93,7 @@ final class DispatcherServicesTest extends TestCase
         self::assertSame($cors, $services->cors());
         self::assertSame($corsPreflight, $services->corsPreflight());
         self::assertSame($cacheBypass, $services->cacheBypass());
+        self::assertSame($cacheInvalidator, $services->cacheInvalidator());
         self::assertSame($clientKeyResolver, $services->clientKeyResolver());
         self::assertSame($urlGenerator, $services->urlGenerator());
         self::assertSame($siteLanguageScope, $services->siteLanguageScope());

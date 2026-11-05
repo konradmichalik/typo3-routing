@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CacheIgnoresConstrainedParamController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ClassLevelAuthenticateController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InlinePlaceholderController, InlinePlaceholderLegacyPathController, InvalidAuthenticatorController, InvalidClassLevelAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, JsonErrorRouteController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RouteDefaultBreaksConstraintController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AuthenticatedController, BrokenAuthenticatorController, CacheIgnoresConstrainedParamController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ClassLevelAuthenticateController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InlinePlaceholderController, InlinePlaceholderLegacyPathController, InvalidAuthenticatorController, InvalidClassLevelAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, InvalidatesCacheController, JsonErrorRouteController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedInvalidatesCacheController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RouteDefaultBreaksConstraintController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -1008,6 +1008,30 @@ final class RouteCompilerPassTest extends TestCase
         $this->expectExceptionMessageMatches('/#\[Returns\].*without a #\[Route\]/');
 
         $this->discover($this->buildContainer(['orphaned' => OrphanedReturnsController::class]));
+    }
+
+    #[Test]
+    public function throwsWhenInvalidatesCacheIsUsedWithoutARoute(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000013);
+        $this->expectExceptionMessageMatches('/#\[InvalidatesCache\].*without a #\[Route\]/');
+
+        $this->discover($this->buildContainer(['orphaned' => OrphanedInvalidatesCacheController::class]));
+    }
+
+    #[Test]
+    public function bakesDeclaredCacheInvalidationsIntoTheRegistry(): void
+    {
+        $container = $this->buildContainer(['news' => InvalidatesCacheController::class]);
+        $warnings = $this->captureWarnings($container);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('Route "news_create" invalidates the response cache tag(s) "tx_news_domain_model_news", "news_list", but no #[Cache] route declares them', $warnings[0]);
+        self::assertSame(
+            ['news_create' => ['tx_news_domain_model_news', 'news_list']],
+            $container->getDefinition(RouteRegistry::class)->getArgument('$cacheInvalidations'),
+        );
     }
 
     #[Test]

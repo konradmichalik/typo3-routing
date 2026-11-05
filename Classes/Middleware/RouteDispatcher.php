@@ -401,6 +401,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         $response = $this->services->invoker()->invoke($match, $request);
+        $this->services->cacheInvalidator()->afterResponse($routeName, $response);
         // The real body is stored (and returned) here; process() empties it for HEAD afterwards — a HEAD
         // request must prime the same cache entry a subsequent GET reads, not an empty one.
         $response = $this->writeCache($cacheConfig, $routeName, $request, $response);

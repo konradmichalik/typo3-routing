@@ -1,6 +1,18 @@
 parameters:
 	ignoreErrors:
 		-
+			message: '#^Error suppression via "@" should not be used\.$#'
+			identifier: ergebnis.noErrorSuppression
+			count: 1
+			path: ../../Classes/OpenApi/JsonSchemaMapper.php
+
+		-
+			message: '#^Error suppression via "@" should not be used\.$#'
+			identifier: ergebnis.noErrorSuppression
+			count: 2
+			path: ../Functional/Fixtures/Extensions/routing_benchmark/Resources/Private/Scripts/benchmark.php
+
+		-
 			message: '#^Call to static method PHPUnit\\Framework\\Assert\:\:assertSame\(\) with array\{n\: 1\} and array\{n\: 1\} will always evaluate to true\.$#'
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1

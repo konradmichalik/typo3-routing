@@ -18,9 +18,6 @@ parameters:
 		- ../../Tests/Functional/Fixtures/Extensions/*/vendor (?)
 		- ../../Tests/Functional/Fixtures/Extensions/*/ext_emconf.php
 
-	type_coverage:
-		constant: 0 # TODO: Set to 100, when PHP 8.3 is minimum requirement
-
 	typo3:
 		requestGetAttributeMapping:
 			id: 'string'
@@ -31,21 +28,6 @@ parameters:
 	cognitive_complexity:
 		class: 48
 		function: 13
-
-	# The preset enables every ergebnis/phpstan-rules check it doesn't explicitly disable. These four
-	# conflict with this extension's core design rather than flagging real issues: #[Route]/#[Cache]/
-	# #[Cors] and RouteRegistry are named-arg, optional-param APIs by design; the OpenApi generator
-	# builds its schema/response maps via by-reference accumulator parameters; and JsonSchemaMapper
-	# deliberately suppresses the warning from probing a route requirement regex for validity.
-	ergebnis:
-		noNamedArgument:
-			enabled: false
-		noConstructorParameterWithDefaultValue:
-			enabled: false
-		noParameterPassedByReference:
-			enabled: false
-		noErrorSuppression:
-			enabled: false
 
 	# These base controllers are deliberately overridden by concrete fixtures to test route
 	# inheritance (see docs/routes/route-groups.md) — marking them final would break that override.

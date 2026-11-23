@@ -41,7 +41,7 @@ final class CacheTagFlusherTest extends TestCase
         $cache = $this->createCache($frontend);
         $cache->store('route_news', new Response('php://temp', 200), 3600, [self::NEWS]);
         $subject = $this->createSubject($cache, [self::NEWS]);
-        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler = $this->createDataHandler();
 
         $subject->processDatamap_afterDatabaseOperations('update', self::NEWS, 1, [], $dataHandler);
         self::assertNotNull($cache->get('route_news'), 'Flushing waits for the end of the run.');
@@ -57,7 +57,7 @@ final class CacheTagFlusherTest extends TestCase
         $cache = $this->createCache(new InMemoryCacheFrontend());
         $cache->store('route_news', new Response('php://temp', 200), 3600, [self::NEWS]);
         $subject = $this->createSubject($cache, [self::NEWS]);
-        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler = $this->createDataHandler();
 
         $subject->processCmdmap_postProcess('delete', self::NEWS, 1, '', $dataHandler);
         $subject->processCmdmap_afterFinish($dataHandler);
@@ -72,7 +72,7 @@ final class CacheTagFlusherTest extends TestCase
         $frontend->expects(self::once())->method('flushByTags')->with([self::NEWS, 'pages']);
         $frontend->expects(self::never())->method('flushByTag');
         $subject = $this->createSubject($this->createCache($frontend), [self::NEWS, 'pages']);
-        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler = $this->createDataHandler();
 
         foreach ([1, 2, 3] as $uid) {
             $subject->processDatamap_afterDatabaseOperations('update', self::NEWS, $uid, [], $dataHandler);
@@ -90,7 +90,7 @@ final class CacheTagFlusherTest extends TestCase
         $frontend->expects(self::never())->method('flushByTags');
         $frontend->expects(self::never())->method('flushByTag');
         $subject = $this->createSubject($this->createCache($frontend), [self::NEWS]);
-        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler = $this->createDataHandler();
 
         $subject->processDatamap_afterDatabaseOperations('update', 'tt_content', 1, [], $dataHandler);
         $subject->processDatamap_afterAllOperations($dataHandler);
@@ -105,18 +105,14 @@ final class CacheTagFlusherTest extends TestCase
         $frontend->expects(self::never())->method('flushByTags');
         $frontend->expects(self::never())->method('flushByTag');
         $subject = $this->createSubject($this->createCache($frontend), []);
-        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler = $this->createDataHandler();
 
         $subject->processDatamap_afterDatabaseOperations('update', 'pages', 1, [], $dataHandler);
         $subject->processDatamap_afterAllOperations($dataHandler);
     }
 
-    /**
-     * The flusher is a shared service, so a nested DataHandler (e.g. the one a copy command spawns)
-     * must not flush, and thereby clear, the tags its outer run is still collecting.
-     */
     #[Test]
-    public function keepsTheTagsOfEachDataHandlerRunApart(): void
+    public function nestedDataHandlerRunsFlushWithTheirOuterMostRun(): void
     {
         $frontend = $this->createMock(FrontendInterface::class);
         $flushed = [];
@@ -124,16 +120,26 @@ final class CacheTagFlusherTest extends TestCase
             $flushed[] = $tags;
         });
         $subject = $this->createSubject($this->createCache($frontend), [self::NEWS, 'pages']);
-        $outer = $this->createMock(DataHandler::class);
-        $inner = $this->createMock(DataHandler::class);
+        $outer = $this->createDataHandler();
+
+        foreach (['NEW1', 'NEW2'] as $id) {
+            $inner = $this->createDataHandler(outerMost: false);
+            $subject->processDatamap_afterDatabaseOperations('new', self::NEWS, $id, [], $inner);
+            $subject->processDatamap_afterAllOperations($inner);
+        }
+        self::assertSame([], $flushed);
 
         $subject->processCmdmap_postProcess('copy', 'pages', 1, 2, $outer);
-        $subject->processDatamap_afterDatabaseOperations('new', self::NEWS, 'NEW1', [], $inner);
-        $subject->processDatamap_afterAllOperations($inner);
-        self::assertSame([[self::NEWS]], $flushed);
-
         $subject->processCmdmap_afterFinish($outer);
-        self::assertSame([[self::NEWS], ['pages']], $flushed);
+        self::assertSame([[self::NEWS, 'pages']], $flushed);
+    }
+
+    private function createDataHandler(bool $outerMost = true): DataHandler
+    {
+        $dataHandler = $this->createMock(DataHandler::class);
+        $dataHandler->method('isOuterMostInstance')->willReturn($outerMost);
+
+        return $dataHandler;
     }
 
     private function createCache(FrontendInterface $frontend): ResponseCacheManager

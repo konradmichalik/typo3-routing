@@ -71,18 +71,14 @@ final readonly class RouteMatcher
             return $this->matchTiers($path, $context, null);
         }
 
-        // The compiled matcher cannot leave routes out, so its answer is trusted wherever hiding routes
-        // could not change it: a visible match, or a plain miss. Only otherwise are the tiers repeated
-        // without the hidden routes, which costs a plain UrlMatcher, but only on that error path.
+        // Hiding routes cannot change a visible match or a plain miss, so only a hidden match, a 405 or a
+        // requirement mismatch repeats the tiers without the hidden routes.
         try {
             $match = $this->matchTiers($path, $context, null);
             if ($this->scope->isMatchVisible($match, $request)) {
                 return $match;
             }
-        } catch (MethodNotAllowedException|RequirementMismatchException $exception) {
-            if (!$this->hidesAnyRoute($request)) {
-                throw $exception;
-            }
+        } catch (MethodNotAllowedException|RequirementMismatchException) {
         }
 
         return $this->matchTiers($path, $context, fn (array $defaults): bool => $this->scope->isMatchVisible($defaults, $request));
@@ -106,17 +102,6 @@ final readonly class RouteMatcher
                 ?? $this->matchWrongScheme($path, $context, $keep)
                 ?? throw $exception;
         }
-    }
-
-    private function hidesAnyRoute(ServerRequestInterface $request): bool
-    {
-        foreach ($this->registry->getRoutes() as $route) {
-            if (!$this->scope->isRouteVisible($route, $request)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

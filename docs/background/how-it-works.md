@@ -43,7 +43,7 @@ Two consequences follow directly from where that boundary sits:
 | # | Step | Outcome when it does not pass |
 |---|------|-------------------------------|
 | 1 | [Path gate](../operating/configuration.md#path-gate) — could this path belong to any route at all? | Falls through to page rendering, at the cost of one string comparison |
-| 2 | [CORS preflight](../features/cors.md) — an `OPTIONS` request announcing a cross-origin call | Answered with `204` before credentials are ever required |
+| 2 | [CORS preflight](../features/cors.md) — an `OPTIONS` request announcing a cross-origin call | Answered with `204` before credentials are ever required. A route invisible in the current context (steps 4 and 5) is answered like a missing path |
 | 3 | Matching, via the compiled matcher | `404` (or the page router, unless an [exclusive prefix](../operating/configuration.md#exclusive-path-prefixes) claims the path) / `405` with an `Allow` header |
 | 4 | [Environment filter](../operating/configuration.md#environment-bound-routes) — is the route's `env` the current context? | `404`, as if the route did not exist |
 | 5 | [Site/language scope](../routes/host-and-scope.md#site--and-language-bound-routes) — is the route reachable from the request's site/language? | `404`, as if the route did not exist |

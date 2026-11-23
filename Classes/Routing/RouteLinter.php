@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, FrontendUserAuthenticator};
+
+use function array_column;
 use function array_diff;
 use function array_intersect;
 use function array_map;
@@ -52,7 +55,50 @@ final readonly class RouteLinter
             ...$this->missingDigitsRequirementFindings($registry, $routes),
             ...$this->unsupportedPlaceholderFindings($routes),
             ...$this->unusedExclusivePrefixFindings($routes, $exclusivePrefixes),
+            ...$this->missingRequestTokenFindings($registry, $routes),
         ];
+    }
+
+    /**
+     * A cookie-session route that accepts a state-changing method without `#[RequireRequestToken]` is
+     * guarded only by the SameSite attribute of TYPO3's session cookie: form-encoded bodies need no
+     * CORS preflight, so a cross-site form POST reaches it. Custom authenticators are not considered,
+     * since the linter cannot tell whether they are cookie-based.
+     *
+     * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}> $routes
+     *
+     * @return list<array{severity: 'warning'|'info', check: string, route: string|null, controller: string|null, message: string}>
+     */
+    private function missingRequestTokenFindings(RouteRegistry $registry, array $routes): array
+    {
+        $findings = [];
+        foreach ($routes as $name => $route) {
+            if (!$this->lacksRequestToken($registry, $name, $route['methods'])) {
+                continue;
+            }
+
+            $findings[] = [
+                'severity' => 'warning',
+                'check' => 'missing-request-token',
+                'route' => $name,
+                'controller' => $route['controller'],
+                'message' => 'Route authenticates through a cookie session and accepts a state-changing method, but has no #[RequireRequestToken]; only the SameSite cookie attribute stands between it and a cross-site form POST.',
+            ];
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @param list<string> $methods
+     */
+    private function lacksRequestToken(RouteRegistry $registry, string $name, array $methods): bool
+    {
+        $services = array_column($registry->getAuthenticators($name), 'service');
+
+        return null === $registry->getRequestTokenScope($name)
+            && $this->methodsOverlap($methods, ['POST', 'PUT', 'PATCH', 'DELETE'])
+            && [] !== array_intersect($services, [FrontendUserAuthenticator::class, BackendUserAuthenticator::class]);
     }
 
     /**

@@ -15,7 +15,6 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures;
 
 use KonradMichalik\Typo3Routing\Attribute\{Cache, Param, Route};
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
 
 /**
@@ -31,12 +30,5 @@ final class CacheIgnoresUndeclaredParamController implements RouteControllerInte
     public function search(#[Param(name: 'q')] string $search = ''): JsonResponse
     {
         return new JsonResponse(['search' => $search]);
-    }
-
-    #[Route(path: '/api/feed', name: 'cache_ignores_undeclared_request')]
-    #[Cache(lifetime: 60, ignoreParams: ['utm_source'])]
-    public function feed(ServerRequestInterface $request): JsonResponse
-    {
-        return new JsonResponse(['path' => $request->getUri()->getPath()]);
     }
 }

@@ -172,6 +172,20 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['token' => bin2hex(random_bytes(8))]);
     }
 
+    #[Route(path: '/api/example/cached-page', name: 'example_cached_page', caseInsensitive: true)]
+    #[Cache(lifetime: 3600, tags: ['pages'])]
+    public function cachedPage(int $page = 1): JsonResponse
+    {
+        return new JsonResponse(['page' => $page, 'token' => bin2hex(random_bytes(8))]);
+    }
+
+    #[Route(path: '/api/example/cached-request', name: 'example_cached_request')]
+    #[Cache(lifetime: 3600, tags: ['pages'])]
+    public function cachedRequest(ServerRequestInterface $request): JsonResponse
+    {
+        return new JsonResponse(['query' => $request->getQueryParams(), 'token' => bin2hex(random_bytes(8))]);
+    }
+
     #[Route(path: '/api/example/invalidate', methods: ['POST'], name: 'example_invalidate')]
     #[InvalidatesCache(tags: ['pages'])]
     public function invalidate(): JsonResponse

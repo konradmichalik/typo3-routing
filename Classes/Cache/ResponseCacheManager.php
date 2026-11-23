@@ -13,12 +13,19 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Cache;
 
+use KonradMichalik\Typo3Routing\Http\RequestBody;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Http\Response;
-use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
+use TYPO3\CMS\Core\Site\Entity\{SiteInterface, SiteLanguage};
 
+use function array_column;
+use function array_diff_key;
+use function array_filter;
+use function array_flip;
+use function array_key_exists;
+use function in_array;
 use function is_array;
 
 /**
@@ -122,28 +129,26 @@ final class ResponseCacheManager
     }
 
     /**
-     * The host is part of the key: in a multi-site install the same route can serve several sites
-     * whose controller output differs per site, and those must never share a cache entry.
+     * Keyed on what the route consumes, read the way ControllerArgumentResolver reads it, so a client cannot
+     * create entries at will. Host and site are part of it, so two sites never share an entry.
      *
-     * @param list<string> $ignoreParams
+     * @param array<string, mixed>                      $match        the matcher result
+     * @param list<string>                              $ignoreParams
+     * @param list<array{name: string, source: string}> $arguments    the route's argument specs, see RouteRegistry::getArguments()
      */
-    public function buildKey(string $routeName, ServerRequestInterface $request, array $ignoreParams): string
+    public function buildKey(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): string
     {
-        $query = $request->getQueryParams();
-        foreach ($ignoreParams as $param) {
-            unset($query[$param]);
-        }
-        ksort($query);
-
         $language = $request->getAttribute('language');
         $languageId = $language instanceof SiteLanguage ? $language->getLanguageId() : 0;
+        $site = $request->getAttribute('site');
 
         return 'route_'.hash('sha256', implode('|', [
-            $routeName,
+            (string) ($match['_route'] ?? ''),
             $this->cacheableMethod($request),
             $request->getUri()->getHost(),
-            $request->getUri()->getPath(),
-            http_build_query($query),
+            $site instanceof SiteInterface ? $site->getIdentifier() : '',
+            // serialize(), not json_encode(): it never throws on invalid UTF-8 or INF and keeps every value distinct.
+            serialize(self::consumedInputs($match, $request, $ignoreParams, $arguments)),
             (string) $languageId,
         ]));
     }
@@ -155,6 +160,51 @@ final class ResponseCacheManager
     public function cacheableMethod(ServerRequestInterface $request): string
     {
         return 'HEAD' === $request->getMethod() ? 'GET' : $request->getMethod();
+    }
+
+    /**
+     * A controller taking the request may read the raw path and any parameter itself, so for such a route
+     * those count; otherwise only the values its arguments bind, from the same place the resolver takes them.
+     *
+     * @param array<string, mixed>                      $match
+     * @param list<string>                              $ignoreParams
+     * @param list<array{name: string, source: string}> $arguments
+     *
+     * @return array<string, mixed>
+     */
+    private static function consumedInputs(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): array
+    {
+        $ignored = array_flip($ignoreParams);
+        $query = array_diff_key($request->getQueryParams(), $ignored);
+        $body = array_diff_key(RequestBody::toArray($request), $ignored);
+
+        if (in_array('request', array_column($arguments, 'source'), true)) {
+            return self::sorted(['path' => $request->getUri()->getPath(), 'query' => self::sorted($query), 'body' => self::sorted($body)]);
+        }
+
+        $inputs = array_merge($query, $body);
+        $sources = ['path' => $match, 'host' => $match, 'query' => $query, 'body' => $body, 'input' => $inputs, 'variadic' => $inputs];
+        $consumed = [];
+        foreach ($arguments as $argument) {
+            $values = $sources[$argument['source']] ?? [];
+            if (array_key_exists($argument['name'], $values)) {
+                $consumed[$argument['source'].':'.$argument['name']] = $values[$argument['name']];
+            }
+        }
+
+        return self::sorted($consumed);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     *
+     * @return array<string, mixed>
+     */
+    private static function sorted(array $values): array
+    {
+        ksort($values);
+
+        return $values;
     }
 
     private function cache(): FrontendInterface

@@ -6,10 +6,10 @@ Add the optional `#[Cache]` attribute next to a `#[Route]` to cache the response
 use KonradMichalik\Typo3Routing\Attribute\Cache;
 use KonradMichalik\Typo3Routing\Attribute\Route;
 
-// e.g. GET /api/news?page=2&search=foo
-//   → cached per "page", but the volatile "search" query parameter is excluded from the cache key
+// e.g. GET /api/news?page=2&utm_source=mail
+//   → cached per "page"; "utm_source" is no declared argument and does not vary the cache key
 #[Route(path: '/api/news', name: 'news_list')]
-#[Cache(lifetime: 3600, tags: ['tx_news_domain_model_news'], ignoreParams: ['search'])]
+#[Cache(lifetime: 3600, tags: ['tx_news_domain_model_news'])]
 public function list(int $page = 1): ResponseInterface
 {
     // $page ← ?page=… query param, defaults to 1 (see Typed controller arguments in Usage)
@@ -21,9 +21,10 @@ public function list(int $page = 1): ResponseInterface
 |----------------|----------------|---------|-----------------------------------------------------------------------------------|
 | `lifetime`     | `int`          | `86400` | Time to live in seconds (fallback when no tag is invalidated).                    |
 | `tags`         | `list<string>` | `[]`    | Static cache tags. A tag `{table}` is flushed automatically when a record of that table changes through the DataHandler, a fixed tag `{table}_{uid}` (e.g. `tx_news_domain_model_news_5`) when that one record does. A tag cannot take a value from a path parameter, so a detail route has no per-record tag. A tag the TYPO3 cache rejects (anything but letters, digits, `_`, `%`, `-` and `&`, or longer than 250 characters) fails the build. |
-| `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key, such as tracking parameters (`utm_source`).  |
+| `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key. Mainly for routes whose controller takes the request, which otherwise vary on every query parameter (e.g. `utm_source`). |
 
-- Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, path, query string (minus `ignoreParams`) and language, so host/query/language variants are cached separately — in a multi-site install two sites never share a cache entry.
+- Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, site, language and the values the controller's arguments consume (path placeholders, query, body, read the same way the arguments are resolved, minus `ignoreParams`). Host, site and language variants are cached separately and two sites never share a cache entry. Path variants the matcher accepts for one route (trailing slash, case, repeated leading slashes) share one entry.
+- An undeclared parameter (`?cb=123`) never creates a second entry. A controller that takes the request (`ServerRequestInterface $request`) may read anything, so its route varies on the raw path and on every query and body parameter except `ignoreParams`. A controller or template that reads the query some other way, e.g. through the global request, has to take the request as an argument.
 - A parameter with a [`#[Param]` value constraint](../routes/arguments.md) (`min`, `max`, `minLength`, `maxLength`) cannot be listed in `ignoreParams`, the build fails. The cache answers before arguments are checked, so a request with an invalid value would get the cached `200` instead of `400`.
 - List only parameters the controller does not read. An ignored parameter that binds a controller argument gets the response cached for another value, and an invalid value (`?page=abc` on `int $page`) gets that cached `200` instead of `400`. The build does not catch this for unconstrained parameters.
 - Invalidation rides on the TYPO3 caching framework: the response cache `typo3_routing` is in cache group `pages`, so the core DataHandler flushes it exactly like the page cache. Once its run finishes, it flushes the tags `{table}` and `{table}_{uid}` of every changed record; `lifetime` is the fallback. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).

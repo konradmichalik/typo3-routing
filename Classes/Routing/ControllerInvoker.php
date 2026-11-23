@@ -159,6 +159,7 @@ final readonly class ControllerInvoker
         // A route default lands in $match as well, so its input may be absent but is checked when present.
         $optional = [...$this->registry->getOptionalInputs($routeName), ...array_keys($match)];
         $route = $this->registry->getRoutes()[$routeName] ?? null;
+        $utf8 = $this->registry->routeNeedsUtf8($routeName);
 
         foreach (is_array($requirements) ? $requirements : [] as $name => $pattern) {
             $key = (string) $name;
@@ -175,7 +176,7 @@ final readonly class ControllerInvoker
 
                 return sprintf('Missing required parameter: %s', $key);
             }
-            if (is_string($pattern) && $this->anyInputViolatesPattern($pattern, $values, $this->registry->routeNeedsUtf8($routeName))) {
+            if (is_string($pattern) && $this->anyInputViolatesPattern($pattern, $values, $utf8)) {
                 return sprintf('Invalid value for parameter: %s', $key);
             }
         }

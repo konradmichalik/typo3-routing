@@ -1,8 +1,8 @@
 name: Tests
 on:
   push:
-    branches:
-      - '**'
+    branches: [main, 'renovate/**']
+  pull_request: ~
 
 jobs:
   tests:

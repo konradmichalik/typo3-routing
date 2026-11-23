@@ -1,8 +1,8 @@
 name: CGL
 on:
   push:
-    branches:
-      - '**'
+    branches: [main, 'renovate/**']
+  pull_request: ~
 
 jobs:
   cgl:

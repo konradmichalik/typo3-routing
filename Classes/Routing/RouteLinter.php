@@ -80,7 +80,7 @@ final readonly class RouteLinter
                 'check' => 'missing-request-token',
                 'route' => $name,
                 'controller' => $route['controller'],
-                'message' => 'Route authenticates through a cookie session and accepts a state-changing method, but has no #[RequireRequestToken]; only the SameSite cookie attribute stands between it and a cross-site form POST. A route accepting any method has to list its methods explicitly before #[RequireRequestToken] is allowed.',
+                'message' => 'Route authenticates through a cookie session and accepts a state-changing method, but has no #[RequireRequestToken]; only the SameSite cookie attribute stands between it and a cross-site form POST. Add #[RequireRequestToken].',
             ];
         }
 

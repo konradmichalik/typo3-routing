@@ -131,7 +131,7 @@ public function update(ServerRequestInterface $request): ResponseInterface { /* 
 |-----------|---------------|------------------------|------------------------------------------------------|
 | `scope`   | `string\|null`| `routing/<routeName>`  | Token scope; derived from the route name when omitted. |
 
-- Only enforced for `POST`/`PUT`/`PATCH`/`DELETE`; safe methods are not CSRF-relevant. Putting it on a **GET-only** route is a build-time error.
+- Only enforced for `POST`/`PUT`/`PATCH`/`DELETE` (compared case-insensitively, like route matching); safe methods are not CSRF-relevant. On a route accepting any method (`methods: []`), the token is required for exactly those methods. Putting it on a route that lists none of them (e.g. **GET-only**) is a build-time error.
 - It is **redundant for Bearer-protected** routes (harmless, but unnecessary).
 - [`routing:lint`](../operating/commands.md#routinglint) reports a `FrontendUserAuthenticator` or `BackendUserAuthenticator` route that accepts a state-changing method without it as `missing-request-token`.
 

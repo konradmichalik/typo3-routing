@@ -212,14 +212,70 @@ final class ResponseCacheManagerTest extends TestCase
     #[Test]
     public function buildKeyVariesByRouteAndPlaceholderValueButNotByMetaKeys(): void
     {
-        $base = $this->subject->buildKey(self::match(['id' => '1']), Requests::get('https://example.com/api/x/1')->build(), [], []);
-        $otherValue = $this->subject->buildKey(self::match(['id' => '2']), Requests::get('https://example.com/api/x/2')->build(), [], []);
-        $otherRoute = $this->subject->buildKey(['_route' => 'other', 'id' => '1'], Requests::get('https://example.com/api/x/1')->build(), [], []);
-        $extraMeta = $this->subject->buildKey(self::match(['id' => '1', '_canonicalVariant' => true]), Requests::get('https://example.com/api/x/1/')->build(), [], []);
+        $arguments = [self::argument('id', 'path')];
+        $base = $this->subject->buildKey(self::match(['id' => '1']), Requests::get('https://example.com/api/x/1')->build(), [], $arguments);
+        $otherValue = $this->subject->buildKey(self::match(['id' => '2']), Requests::get('https://example.com/api/x/2')->build(), [], $arguments);
+        $otherRoute = $this->subject->buildKey(['_route' => 'other', 'id' => '1'], Requests::get('https://example.com/api/x/1')->build(), [], $arguments);
+        $extraMeta = $this->subject->buildKey(self::match(['id' => '1', '_canonicalVariant' => true]), Requests::get('https://example.com/api/x/1/')->build(), [], $arguments);
 
         self::assertNotSame($base, $otherValue);
         self::assertNotSame($base, $otherRoute);
         self::assertSame($base, $extraMeta);
+    }
+
+    #[Test]
+    public function buildKeyVariesOnAnUnderscorePrefixedPlaceholder(): void
+    {
+        $arguments = [self::argument('_id', 'path')];
+        $one = $this->subject->buildKey(self::match(['_id' => '1']), Requests::get('https://example.com/api/items/1')->build(), [], $arguments);
+        $two = $this->subject->buildKey(self::match(['_id' => '2']), Requests::get('https://example.com/api/items/2')->build(), [], $arguments);
+
+        self::assertNotSame($one, $two);
+    }
+
+    #[Test]
+    public function buildKeyVariesOnABodyValueTheResolverPrefersOverTheQuery(): void
+    {
+        // The resolver merges query and body for "input", the body wins: a GET with a JSON body must not
+        // be stored under the key of its query value.
+        $arguments = [self::argument('id', 'input')];
+        $queryOnly = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x')->withQueryParams(['id' => '1'])->build(), [], $arguments);
+        $bodyOverride = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x')->withQueryParams(['id' => '1'])->withJsonBody(['id' => 5])->build(), [], $arguments);
+
+        self::assertNotSame($queryOnly, $bodyOverride);
+    }
+
+    #[Test]
+    public function buildKeyAcceptsInvalidUtf8AndNonFiniteValues(): void
+    {
+        $arguments = [self::argument('id', 'input')];
+        $invalidUtf8 = $this->subject->buildKey(self::match(), $this->requestWithQuery(['id' => "\xff"]), [], $arguments);
+        $otherBytes = $this->subject->buildKey(self::match(), $this->requestWithQuery(['id' => "\xfe"]), [], $arguments);
+        $infinite = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x')->withParsedBody(['id' => \INF])->build(), [], $arguments);
+
+        self::assertNotSame($invalidUtf8, $otherBytes);
+        self::assertStringStartsWith('route_', $infinite);
+    }
+
+    #[Test]
+    public function buildKeyVariesOnABodyArgument(): void
+    {
+        $arguments = [self::argument('title', 'body')];
+        $one = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x')->withJsonBody(['title' => 'a'])->build(), [], $arguments);
+        $two = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x')->withJsonBody(['title' => 'b'])->build(), [], $arguments);
+
+        self::assertNotSame($one, $two);
+    }
+
+    #[Test]
+    public function buildKeyKeepsTheRawPathWhenTheControllerTakesTheRequest(): void
+    {
+        // The controller may read the URI itself (e.g. a self link), so its path variants stay apart.
+        $arguments = [self::argument('request', 'request')];
+        $declared = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x')->build(), [], $arguments);
+        $trailingSlash = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x/')->build(), [], $arguments);
+
+        self::assertNotSame($declared, $trailingSlash);
     }
 
     #[Test]

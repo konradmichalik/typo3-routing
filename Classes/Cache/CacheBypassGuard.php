@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Cache;
 
-use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Context\Context;
 
 /**
@@ -30,25 +29,11 @@ final readonly class CacheBypassGuard
     ) {}
 
     /**
-     * A backend user previewing draft/unpublished content must never be served a stored response, since the
-     * cache key does not vary by preview state. A client "Cache-Control" header is deliberately ignored, so no
-     * client can skip the cache and force a controller run.
+     * A logged-in backend user previewing draft/unpublished content neither reads nor writes the cache: the
+     * key does not vary by preview state, so a stored entry would leak between editors and public visitors.
+     * Nothing a client sends, "Cache-Control" included, bypasses the cache, so no client can force a controller run.
      */
-    public function skipsRead(ServerRequestInterface $request): bool
-    {
-        return $this->isBackendUser();
-    }
-
-    /**
-     * A backend user's response must never be stored either, since it may carry preview/draft content that a
-     * public visitor must not receive on the next cache miss.
-     */
-    public function skipsWrite(ServerRequestInterface $request): bool
-    {
-        return $this->isBackendUser();
-    }
-
-    private function isBackendUser(): bool
+    public function isBypassed(): bool
     {
         // TYPO3 always resolves "backend.user" to a UserAspect, lazily creating a logged-out one when unset.
         return $this->context->getAspect('backend.user')->isLoggedIn();

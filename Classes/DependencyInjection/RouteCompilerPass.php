@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\Attribute\{Authenticate, Cache, Cors, DeprecatedRoute, InvalidatesCache, RateLimit, RequireRequestToken, Returns, Route};
+use KonradMichalik\Typo3Routing\Cache\CacheTagPlaceholders;
 use KonradMichalik\Typo3Routing\Routing\{RouteControllerInterface, RouteRegistry};
 use LogicException;
 use Override;
@@ -378,7 +379,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->deprecationResolver->apply($deprecation, $name, $serviceId, $method->getName(), $collected);
         $this->rateLimitResolver->apply($rateLimit, $name, $serviceId, $method->getName(), $collected);
         $this->returnsResolver->apply($method, $serviceId, $name, $collected);
-        $this->invalidatesCacheResolver->apply($method, $methods, $serviceId, $name, $collected);
+        $this->invalidatesCacheResolver->apply($method, $methods, $path, $serviceId, $name, $collected);
     }
 
     /**
@@ -408,6 +409,12 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         }
 
         ParamConstraintGuard::assertNotIgnoredByCache($collected->arguments[$name], $cache['ignoreParams'], $serviceId.'::'.$method->getName().'()');
+        // Checked per route, so a method with several #[Route]s needs the placeholder in every path.
+        $path = $collected->routes[$name]['path'];
+        $unbound = CacheTagPlaceholders::unbound($cache['tags'], $path);
+        if ([] !== $unbound) {
+            throw new LogicException(sprintf('#[Cache] on "%s::%s()" (route "%s") uses the cache tag placeholder(s) "{%s}", but its path "%s" declares no such parameter. Tag placeholders resolve from path parameters only, never from query or body values.', $serviceId, $method->getName(), $name, implode('}", "{', $unbound), $path), 1750000069);
+        }
         $collected->cacheConfigs[$name] = $cache;
 
         if ([] !== $auth) {
@@ -454,8 +461,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $cache = $attributes[0]->newInstance();
         foreach ($cache->tags as $tag) {
             // The cache frontend rejects such a tag only at the first set(), after the controller already ran.
-            if (1 !== preg_match(FrontendInterface::PATTERN_TAG, $tag)) {
-                throw new LogicException(sprintf('#[Cache] on "%s::%s()" declares the invalid cache tag "%s": tags may only contain letters, digits, "_", "%%", "-" and "&", at most 250 characters.', $serviceId, $method->getName(), $tag), 1750000068);
+            if (1 !== preg_match(FrontendInterface::PATTERN_TAG, CacheTagPlaceholders::withStandIns($tag))) {
+                throw new LogicException(sprintf('#[Cache] on "%s::%s()" declares the invalid cache tag "%s": tags may only contain letters, digits, "_", "%%", "-" and "&", at most 250 characters, a placeholder counting as 64.', $serviceId, $method->getName(), $tag), 1750000068);
             }
         }
 

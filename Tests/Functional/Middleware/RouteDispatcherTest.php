@@ -16,6 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Functional\Middleware;
 use KonradMichalik\Ttt\Assertion\JsonAssertions;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Ttt\Traits\EnvVarSandbox;
+use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Http\RouteUrlGenerator;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use PHPUnit\Framework\Attributes\{DataProvider, Test};
@@ -525,6 +526,53 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertSame('HIT', $cached->getHeaderLine('X-TYPO3-API-Cache'));
         self::assertSame(200, $write->getStatusCode());
         self::assertSame('MISS', $after->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function storesAResponseUnderTheTagItsPathPlaceholderResolvesTo(): void
+    {
+        $this->process($this->request('GET', 'https://example.com/api/example/record/5'));
+        $this->process($this->request('GET', 'https://example.com/api/example/record/6'));
+
+        $this->get(ResponseCacheManager::class)->flushByTags(['tx_routingtest_domain_model_item_5']);
+
+        self::assertSame('MISS', $this->process($this->request('GET', 'https://example.com/api/example/record/5'))->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $this->process($this->request('GET', 'https://example.com/api/example/record/6'))->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function aWriteRouteFlushesOnlyTheRecordItsPathMatched(): void
+    {
+        $this->process($this->request('GET', 'https://example.com/api/example/record/5'));
+        $this->process($this->request('GET', 'https://example.com/api/example/record/6'));
+
+        $write = $this->process($this->request('POST', 'https://example.com/api/example/record/5'));
+
+        self::assertSame(200, $write->getStatusCode());
+        self::assertSame('MISS', $this->process($this->request('GET', 'https://example.com/api/example/record/5'))->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $this->process($this->request('GET', 'https://example.com/api/example/record/6'))->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function storesAnUnsafePathValueUnderItsHashedTag(): void
+    {
+        $this->process($this->request('GET', 'https://example.com/api/example/record/a.b'));
+
+        $this->get(ResponseCacheManager::class)->flushByTags(['tx_routingtest_domain_model_item_h'.substr(hash('sha256', 'a.b'), 0, 16)]);
+
+        self::assertSame('MISS', $this->process($this->request('GET', 'https://example.com/api/example/record/a.b'))->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function aWriteRouteFlushesTheHashedTagAnUnsafePathValueWasStoredUnder(): void
+    {
+        $this->process($this->request('GET', 'https://example.com/api/example/record/a.b'));
+        $this->process($this->request('GET', 'https://example.com/api/example/record/a-b'));
+
+        $this->process($this->request('POST', 'https://example.com/api/example/record/a.b'));
+
+        self::assertSame('MISS', $this->process($this->request('GET', 'https://example.com/api/example/record/a.b'))->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $this->process($this->request('GET', 'https://example.com/api/example/record/a-b'))->getHeaderLine('X-TYPO3-API-Cache'));
     }
 
     #[Test]

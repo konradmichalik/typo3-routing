@@ -33,18 +33,20 @@ final readonly class CacheInvalidator
     /**
      * Flushes the route's #[InvalidatesCache] tags once it answered with a 2xx or 3xx status: a write
      * answering POST-redirect-GET succeeded too. A failed write changed nothing, so its error response
-     * must not empty the cache.
+     * must not empty the cache. Tag placeholders resolve from the write route's own path values.
+     *
+     * @param array<string, mixed> $match the matcher result
      */
-    public function afterResponse(string $routeName, ResponseInterface $response): void
+    public function afterResponse(array $match, ResponseInterface $response): void
     {
         $status = $response->getStatusCode();
         if ($status < 200 || $status >= 400) {
             return;
         }
 
-        $tags = $this->registry->getInvalidatedCacheTags($routeName);
+        $tags = $this->registry->getInvalidatedCacheTags((string) ($match['_route'] ?? ''));
         if ([] !== $tags) {
-            $this->cache->flushByTags($tags);
+            $this->cache->flushByTags(CacheTagPlaceholders::resolve($tags, $match));
         }
     }
 }

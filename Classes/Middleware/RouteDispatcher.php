@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Middleware;
 
+use KonradMichalik\Typo3Routing\Cache\CacheTagPlaceholders;
 use KonradMichalik\Typo3Routing\Event\UnmatchedRouteResponseEvent;
 use KonradMichalik\Typo3Routing\Http\{ConditionalGet, JsonErrorResponse, RequestIdResolver, SiteBasePathResolver};
 use KonradMichalik\Typo3Routing\Routing\{PathPrefixGate, RouteRegistry};
@@ -446,7 +447,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         $response = $this->services->invoker()->invoke($match, $request);
-        $this->services->cacheInvalidator()->afterResponse($routeName, $response);
+        $this->services->cacheInvalidator()->afterResponse($match, $response);
         // The real body is stored (and returned) here; process() empties it for HEAD afterwards — a HEAD
         // request must prime the same cache entry a subsequent GET reads, not an empty one.
         $response = $this->writeCache($cacheConfig, $match, $request, $response);
@@ -503,7 +504,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         // Attach the ETag before storing so this first response and later cache hits share the validator.
         $response = $this->services->cache()->withETag($response);
-        $this->services->cache()->store($this->cacheKey($cacheConfig, $match, $request), $response, $cacheConfig['lifetime'], $cacheConfig['tags']);
+        $this->services->cache()->store($this->cacheKey($cacheConfig, $match, $request), $response, $cacheConfig['lifetime'], CacheTagPlaceholders::resolve($cacheConfig['tags'], $match));
 
         return $response;
     }

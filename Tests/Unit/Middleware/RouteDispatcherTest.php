@@ -1456,7 +1456,7 @@ final class RouteDispatcherTest extends TestCase
             ControllerInvoker::class => fn (): ControllerInvoker => new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)),
             AccessGuard::class => static fn (): AccessGuard => $accessGuard,
             CorsHandler::class => static fn (): CorsHandler => $cors,
-            CorsPreflightResolver::class => fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)), $this->siteLanguageScope()),
+            CorsPreflightResolver::class => fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors, $this->siteLanguageScope()),
             CacheBypassGuard::class => static fn (): CacheBypassGuard => new CacheBypassGuard($context),
             CacheInvalidator::class => fn (): CacheInvalidator => new CacheInvalidator($registry, $this->responseCache),
             ClientKeyResolver::class => static fn (): ClientKeyResolver => new ClientKeyResolver($context),

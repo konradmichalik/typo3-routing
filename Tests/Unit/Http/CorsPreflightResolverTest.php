@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Http;
 use KonradMichalik\Ttt\Attribute\WithEnvironment;
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver};
-use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry, SiteLanguageScope};
+use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry, SiteLanguageScope};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
@@ -26,7 +26,6 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Site\SiteFinder;
-use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
  * CorsPreflightResolverTest.
@@ -182,7 +181,6 @@ final class CorsPreflightResolverTest extends TestCase
             $registry,
             new RouteMatcher($registry, $extensionConfiguration),
             new CorsHandler($extensionConfiguration),
-            new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)),
             new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class)),
         );
     }

@@ -175,26 +175,16 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $routeName = (string) ($match['_route'] ?? '');
         $corsConfig = $this->registry->getCorsConfig($routeName);
 
-        // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
-        if (!$this->services->invoker()->isVisibleInCurrentContext($match['_env'] ?? null)) {
+        // 3. Visibility (env, sites, languages): a route invisible in the current context does not exist.
+        //    Checked before either redirect below: a redirect must never reveal such a route.
+        if (!$this->services->siteLanguageScope()->isMatchVisible($match, $request)) {
             // Its own deprecation and CORS headers would reveal the route, so forget it for the 404.
             $corsConfig = $routeName = null;
 
             return $this->notFound($request, $path);
         }
 
-        // 3b. Site/language scope: a route not bound to the current site or language is invisible too.
-        //     Checked before either redirect below for the same reason as the env filter above: a
-        //     redirect must never reveal a route invisible in the current context.
-        if (!$this->services->siteLanguageScope()->isVisibleForSite($match['_sites'] ?? null, $request)
-            || !$this->services->siteLanguageScope()->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
-            // Its own deprecation and CORS headers would reveal the route, so forget it for the 404.
-            $corsConfig = $routeName = null;
-
-            return $this->notFound($request, $path);
-        }
-
-        // 3c. Legacy path (opt-in): a request that reached this route through one of its old paths
+        // 3a. Legacy path (opt-in): a request that reached this route through one of its old paths
         //     either redirects (default) or is served directly (`legacyAlias: true`). Checked before the
         //     canonical-variant redirect below: a legacy path's redirect behaviour is governed
         //     exclusively by `legacyAlias`, never by whether the target route separately opted into
@@ -204,7 +194,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $redirect;
         }
 
-        // 3d. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
+        // 3b. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
         //     or case) answers 308 to its declared form instead of serving directly, so exactly one URL
         //     survives for caches and search indexing. Checked before the checks below so a client on
         //     the wrong URL is redirected instead of getting a body/requirement error for a request it
@@ -215,7 +205,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $redirect;
         }
 
-        // 3e. Scheme redirect: the path matched, only the route's declared `schemes` did not. Answered
+        // 3c. Scheme redirect: the path matched, only the route's declared `schemes` did not. Answered
         //     with the same URL under the declared scheme instead of the 404 a plain miss would get.
         //     Reached last of the three redirects because both of those already generate their target
         //     through RouteUrlGenerator, which targets the declared scheme on its own — so a request

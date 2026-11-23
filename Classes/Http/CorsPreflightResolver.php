@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Http;
 
-use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, RouteMatcher, RouteRegistry, SiteLanguageScope};
+use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry, SiteLanguageScope};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
 use Symfony\Component\Routing\RequestContext;
@@ -33,7 +33,6 @@ final readonly class CorsPreflightResolver
         private RouteRegistry $registry,
         private RouteMatcher $matcher,
         private CorsHandler $cors,
-        private ControllerInvoker $invoker,
         private SiteLanguageScope $siteLanguageScope,
     ) {}
 
@@ -66,7 +65,7 @@ final readonly class CorsPreflightResolver
             return null;
         }
 
-        if (!$this->isVisible($match, $request)) {
+        if (!$this->siteLanguageScope->isMatchVisible($match, $request)) {
             // Not null: the caller would go on to answer OPTIONS on the route's path with a 405 and its
             // Allow header, where a missing path gets a 404. The caller must treat it as a missing path.
             throw new ResourceNotFoundException();
@@ -81,17 +80,5 @@ final readonly class CorsPreflightResolver
         $methods = $this->registry->getRoutes()[$routeName]['methods'] ?? [];
 
         return $this->cors->preflightResponse($methods, $request, $corsConfig);
-    }
-
-    /**
-     * The same env and site/language filters the dispatcher applies to the real request.
-     *
-     * @param array<string, mixed> $match
-     */
-    private function isVisible(array $match, ServerRequestInterface $request): bool
-    {
-        return $this->invoker->isVisibleInCurrentContext($match['_env'] ?? null)
-            && $this->siteLanguageScope->isVisibleForSite($match['_sites'] ?? null, $request)
-            && $this->siteLanguageScope->isVisibleForLanguage($match['_languages'] ?? null, $request);
     }
 }

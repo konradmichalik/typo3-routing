@@ -185,21 +185,6 @@ final readonly class ControllerInvoker
     }
 
     /**
-     * Whether a route bound to an application context is visible right now. An env-less route
-     * (null or empty) is visible everywhere.
-     */
-    public function isVisibleInCurrentContext(mixed $env): bool
-    {
-        if (!is_string($env) || '' === $env) {
-            return true;
-        }
-
-        $current = explode('/', (string) Environment::getContext())[0];
-
-        return strtolower($current) === strtolower($env);
-    }
-
-    /**
      * RFC 9457 extension members for a Development-context 500: exception class, code, origin and
      * trace. Frame `args` are deliberately dropped — argument values can carry secrets (passwords,
      * tokens) that Development doesn't excuse exposing in an HTTP response.

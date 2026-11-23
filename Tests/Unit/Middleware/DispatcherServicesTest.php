@@ -63,7 +63,7 @@ final class DispatcherServicesTest extends TestCase
         $accessGuard = new AccessGuard($registry, $context);
         $cors = new CorsHandler($extensionConfiguration);
         $siteLanguageScope = new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
-        $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors, $invoker, $siteLanguageScope);
+        $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors, $siteLanguageScope);
         $cacheBypass = new CacheBypassGuard($context);
         $cacheInvalidator = new CacheInvalidator($registry, $cache);
         $clientKeyResolver = new ClientKeyResolver($context);

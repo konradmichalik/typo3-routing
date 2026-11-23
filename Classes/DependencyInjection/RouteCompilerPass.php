@@ -22,6 +22,7 @@ use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
+use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 
 use function array_intersect;
 use function array_map;
@@ -30,6 +31,7 @@ use function array_values;
 use function count;
 use function is_a;
 use function is_string;
+use function preg_match;
 use function sprintf;
 use function str_replace;
 use function trigger_error;
@@ -244,7 +246,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
             return false;
         }
 
-        $cache = $this->resolveCache($method);
+        $cache = $this->resolveCache($method, $serviceId);
         $rateLimit = $this->rateLimitResolver->resolveMethod($method, $classRateLimit);
         $auth = $this->authenticateResolver->resolveMethod($method, $serviceId, $container, $collected, $classAuth);
         $requestToken = $this->resolveRequestToken($method);
@@ -442,7 +444,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
     /**
      * @return array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null
      */
-    private function resolveCache(ReflectionMethod $method): ?array
+    private function resolveCache(ReflectionMethod $method, string $serviceId): ?array
     {
         $attributes = $method->getAttributes(Cache::class);
         if ([] === $attributes) {
@@ -450,6 +452,12 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         }
 
         $cache = $attributes[0]->newInstance();
+        foreach ($cache->tags as $tag) {
+            // The cache frontend rejects such a tag only at the first set(), after the controller already ran.
+            if (1 !== preg_match(FrontendInterface::PATTERN_TAG, $tag)) {
+                throw new LogicException(sprintf('#[Cache] on "%s::%s()" declares the invalid cache tag "%s": tags may only contain letters, digits, "_", "%%", "-" and "&", at most 250 characters.', $serviceId, $method->getName(), $tag), 1750000068);
+            }
+        }
 
         return ['lifetime' => $cache->lifetime, 'tags' => $cache->tags, 'ignoreParams' => $cache->ignoreParams];
     }

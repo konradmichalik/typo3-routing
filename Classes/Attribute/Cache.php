@@ -27,7 +27,7 @@ final readonly class Cache
 {
     /**
      * @param int          $lifetime     Time to live in seconds (default: one day)
-     * @param list<string> $tags         Cache tags for invalidation; a tag matching a table name is flushed when a record of that table changes (e.g. ['tx_news_domain_model_news'])
+     * @param list<string> $tags         Static cache tags for invalidation; a tag matching a table name is flushed when a record of that table changes (e.g. ['tx_news_domain_model_news']). A tag outside the TYPO3 tag pattern fails the build
      * @param list<string> $ignoreParams Query parameters excluded from the cache key (e.g. an individual ['search'] parameter)
      */
     public function __construct(

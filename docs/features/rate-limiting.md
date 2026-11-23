@@ -71,4 +71,4 @@ Because rate limiting runs **before** authentication, an anonymous request to a 
 The `typo3_routing_ratelimit` cache uses the TYPO3 default backend (database) unless you configure another one.
 
 - Every request to a rate-limited route costs one read and one write on that backend. Under load, a memory backend such as Redis or APCu is the better choice, configured via `$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['typo3_routing_ratelimit']`.
-- The cache is deliberately outside every cache group, so "Flush all caches" never resets live counters. On the database backend this also means expired buckets are only removed by the scheduler task "Caching framework garbage collection" with the database backend (`Typo3DatabaseBackend`) selected. Without that task the table keeps growing.
+- On the database backend, expired buckets are only removed by the scheduler task "Caching framework garbage collection" with the database backend (`Typo3DatabaseBackend`) selected. Without that task the table keeps growing.

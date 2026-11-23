@@ -398,6 +398,14 @@ final class RouteInvokerTest extends TestCase
     }
 
     #[Test]
+    public function authenticatesBeforeCheckingInputRequirements(): void
+    {
+        $response = $this->invoker()->invoke('deniedGuarded', [], $this->request());
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    #[Test]
     public function handsTheCallingRequestsCredentialsToTheAuthenticator(): void
     {
         $response = $this->invoker()->invoke('header', [], $this->requestWithHeader('Authorization', HeaderAuthenticator::HEADER));
@@ -555,6 +563,7 @@ final class RouteInvokerTest extends TestCase
             'guarded' => ['path' => '/api/guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
             'denied' => ['path' => '/api/denied', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'deniedGuarded' => ['path' => '/api/denied-guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'header' => ['path' => '/api/header', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'token' => ['path' => '/api/token', 'methods' => ['POST'], 'controller' => 'ctrl::token', 'env' => null, 'requirements' => []],
             'cached' => ['path' => '/api/cached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
@@ -580,6 +589,7 @@ final class RouteInvokerTest extends TestCase
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
         $authenticators = [
             'denied' => [['service' => DenyAuthenticator::class, 'options' => []]],
+            'deniedGuarded' => [['service' => DenyAuthenticator::class, 'options' => []]],
             'header' => [['service' => HeaderAuthenticator::class, 'options' => []]],
         ];
 
@@ -626,6 +636,7 @@ final class RouteInvokerTest extends TestCase
             'guarded' => [],
             'dev' => [],
             'denied' => [],
+            'deniedGuarded' => [],
             'header' => [],
             'token' => [],
             'cached' => [],

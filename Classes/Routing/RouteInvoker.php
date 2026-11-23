@@ -54,8 +54,8 @@ final readonly class RouteInvoker
     /**
      * Calls a route's controller for a set of input values, without an inbound HTTP request against
      * the route's own path — the sanctioned seam for tooling that exposes routes over another
-     * transport. Replicated are the steps belonging to the route's own contract (env filter, path and
-     * input requirements, authentication); skipped are those belonging to the HTTP transport (CORS,
+     * transport. Replicated are the steps belonging to the route's own contract (env filter, path
+     * requirements, authentication, input requirements); skipped are those belonging to the HTTP transport (CORS,
      * rate limiting, response caching, and the CSRF request token — no browser is involved).
      *
      * A successful invocation still flushes the route's #[InvalidatesCache] tags: the write happened, so
@@ -120,18 +120,19 @@ final readonly class RouteInvoker
             return JsonErrorResponse::create(400, $exception->getMessage());
         }
 
-        // 3. Input requirements (query/body) → 400, exactly as for an inbound request.
-        $error = $this->invoker->firstInputRequirementError($match, $synthetic);
-        if (null !== $error) {
-            return JsonErrorResponse::create(400, $error);
-        }
-
-        // 4. Authentication (401) against the credentials the calling request carries. The request-token
-        //    check is deliberately skipped: CSRF protects browser-initiated state changes, and this
-        //    invocation has no browser — see docs/background/extending.md.
+        // 3. Authentication (401) against the credentials the calling request carries, before any
+        //    input check, exactly as for an inbound request. The request-token check is deliberately
+        //    skipped: CSRF protects browser-initiated state changes, and this invocation has no
+        //    browser — see docs/background/extending.md.
         $denied = $this->accessGuard->enforceAuthentication($match, $synthetic);
         if (null !== $denied) {
             return $denied;
+        }
+
+        // 4. Input requirements (query/body) → 400, exactly as for an inbound request.
+        $error = $this->invoker->firstInputRequirementError($match, $synthetic);
+        if (null !== $error) {
+            return JsonErrorResponse::create(400, $error);
         }
 
         // 5. Dispatch. Rate limiting and the response cache stay out: both are HTTP-transport

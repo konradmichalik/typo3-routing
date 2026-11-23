@@ -200,21 +200,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $redirect;
         }
 
-        // 4. Request body shape (malformed JSON / unsupported content type) → 400/415, on routes that
-        //    actually read from the body. Checked before requirements so the cause is named correctly
-        //    instead of surfacing as a derived "missing parameter".
-        $bodyError = $this->services->invoker()->firstRequestBodyError($match, $request);
-        if (null !== $bodyError) {
-            return $bodyError;
-        }
-
-        // 5. Input requirements (query/body) → 400. Path requirements are matcher-enforced (404).
-        $error = $this->services->invoker()->firstInputRequirementError($match, $request);
-        if (null !== $error) {
-            return JsonErrorResponse::create(400, $error);
-        }
-
-        // 6. Rate limiting (opt-in). Enforced before auth so a coarse per-IP limit absorbs token
+        // 4. Rate limiting (opt-in). Enforced before auth so a coarse per-IP limit absorbs token
         //    brute-force attempts before any authentication logic runs. Its headers ride on every
         //    response from here on — success or error — so a client always sees its quota.
         $rateLimit = $this->checkRateLimit($match, $request);
@@ -222,10 +208,26 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $this->withHeaders($rateLimit['blocked'], $rateLimit['headers']);
         }
 
-        // 7. Access control (opt-in): authentication (401) then CSRF/request token (403).
+        // 5. Access control (opt-in): authentication (401) then CSRF/request token (403). Before any
+        //    input check, so an unauthenticated client neither learns a protected route's parameter
+        //    contract nor gets its body decoded.
         $denied = $this->services->accessGuard()->enforce($match, $request);
         if (null !== $denied) {
             return $this->withHeaders($denied, $rateLimit['headers']);
+        }
+
+        // 6. Request body shape (malformed JSON / unsupported content type) → 400/415, on routes that
+        //    actually read from the body. Checked before requirements so the cause is named correctly
+        //    instead of surfacing as a derived "missing parameter".
+        $bodyError = $this->services->invoker()->firstRequestBodyError($match, $request);
+        if (null !== $bodyError) {
+            return $this->withHeaders($bodyError, $rateLimit['headers']);
+        }
+
+        // 7. Input requirements (query/body) → 400. Path requirements are matcher-enforced (404).
+        $error = $this->services->invoker()->firstInputRequirementError($match, $request);
+        if (null !== $error) {
+            return $this->withHeaders(JsonErrorResponse::create(400, $error), $rateLimit['headers']);
         }
 
         // 8. Dispatch (with optional opt-in response cache; disabled for authenticated routes).

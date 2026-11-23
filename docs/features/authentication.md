@@ -133,6 +133,7 @@ public function update(ServerRequestInterface $request): ResponseInterface { /* 
 
 - Only enforced for `POST`/`PUT`/`PATCH`/`DELETE`; safe methods are not CSRF-relevant. Putting it on a **GET-only** route is a build-time error.
 - It is **redundant for Bearer-protected** routes (harmless, but unnecessary).
+- [`routing:lint`](../operating/commands.md#routinglint) reports a `FrontendUserAuthenticator` or `BackendUserAuthenticator` route that accepts a state-changing method without it as `missing-request-token`.
 
 ### Issuing the token
 

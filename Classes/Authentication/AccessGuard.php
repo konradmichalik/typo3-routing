@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Authentication;
 
+use KonradMichalik\Typo3Routing\Attribute\RequireRequestToken;
 use KonradMichalik\Typo3Routing\Http\JsonErrorResponse;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -96,7 +97,7 @@ final readonly class AccessGuard
 
         // Not opted in, or a non-state-changing method that is not CSRF-relevant → nothing to verify.
         // Upper-cased because the Symfony matcher matches methods case-insensitively.
-        if (null === $scope || !in_array(strtoupper($request->getMethod()), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        if (null === $scope || !in_array(strtoupper($request->getMethod()), RequireRequestToken::PROTECTED_METHODS, true)) {
             return true;
         }
 

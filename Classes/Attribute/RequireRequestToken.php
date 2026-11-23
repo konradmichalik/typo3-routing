@@ -26,6 +26,11 @@ use Attribute;
 final readonly class RequireRequestToken
 {
     /**
+     * The state-changing methods a request token is verified for.
+     */
+    public const PROTECTED_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+    /**
      * @param string|null $scope token scope; defaults to "routing/<routeName>" when null
      */
     public function __construct(

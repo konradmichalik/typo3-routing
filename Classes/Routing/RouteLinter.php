@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use KonradMichalik\Typo3Routing\Attribute\RequireRequestToken;
 use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, FrontendUserAuthenticator};
 
 use function array_column;
@@ -94,7 +95,7 @@ final readonly class RouteLinter
         $services = array_column($registry->getAuthenticators($name), 'service');
 
         return null === $registry->getRequestTokenScope($name)
-            && $this->methodsOverlap($methods, ['POST', 'PUT', 'PATCH', 'DELETE'])
+            && $this->methodsOverlap($methods, RequireRequestToken::PROTECTED_METHODS)
             && [] !== array_intersect($services, [FrontendUserAuthenticator::class, BackendUserAuthenticator::class]);
     }
 

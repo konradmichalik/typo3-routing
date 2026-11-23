@@ -36,4 +36,10 @@ final class RequireRequestTokenTest extends TestCase
     {
         self::assertSame('routing/account-update', (new RequireRequestToken(scope: 'routing/account-update'))->scope);
     }
+
+    #[Test]
+    public function protectsTheStateChangingMethods(): void
+    {
+        self::assertSame(['POST', 'PUT', 'PATCH', 'DELETE'], RequireRequestToken::PROTECTED_METHODS);
+    }
 }

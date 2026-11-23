@@ -67,15 +67,15 @@ The request the controller finally sees is synthesised from it: the route's firs
 | Env filter (`Route::$env`) | enforced → 404 | a route unreachable over HTTP must stay unreachable |
 | Site/language scope (`Route::$sites`/`$languages`) | enforced → 404 | mirrors the dispatcher: a route out of scope for the calling request's site/language must stay unreachable |
 | Mandatory placeholders, path `requirements` | enforced → 404 | such a path could never have matched, so it must not reach a controller |
-
-One consequence is worth spelling out: a violated path requirement is the single case where the answer *differs* from an HTTP call by design. Over HTTP that path matches no route, so — unless `exclusivePrefixes` claims it — the middleware declines and the page router takes over. An invocation names the route explicitly and has no page to fall back to, so the route's own "no resource for this value" answer stands as a 404.
+| Authentication (`#[Authenticate]`) | enforced → 401, before the input checks | a route's own access rule, independent of transport |
 | Query/body `requirements` | enforced → 400 | part of the route's input contract |
-| Authentication (`#[Authenticate]`) | enforced → 401 | a route's own access rule, independent of transport |
 | Request token (`#[RequireRequestToken]`) | **skipped** | CSRF protects browser-initiated state changes; no browser is involved, and the calling client's token is not the target route's |
 | CORS, including preflight | **skipped** | no browser, no origin to negotiate |
 | Rate limiting (`#[RateLimit]`) | **skipped** | HTTP-transport abuse control, not correctness |
 | Response cache (`#[Cache]`, ETag, conditional GET) | **skipped** | a transport-level performance mechanism; an invocation always sees fresh output |
 | Cache invalidation (`#[InvalidatesCache]`) | enforced after a 2xx or 3xx response | the write happened, so the cached responses it touched are stale whichever transport triggered it |
+
+One consequence is worth spelling out: a violated path requirement is the single case where the answer *differs* from an HTTP call by design. Over HTTP that path matches no route, so — unless `exclusivePrefixes` claims it — the middleware declines and the page router takes over. An invocation names the route explicitly and has no page to fall back to, so the route's own "no resource for this value" answer stands as a 404.
 
 Exception handling is the dispatcher's, so error semantics match a real call to the same route: an unresolvable argument is a 400, a missing entity a 404, a controller-thrown [`HttpProblemException`](../../Classes/Http/HttpProblemException.php) keeps its own status, and every other exception stays untouched for TYPO3's error handling. `Tests/Functional/Routing/RouteInvokerTest.php` pins that agreement route by route.
 

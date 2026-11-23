@@ -654,6 +654,52 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function rejectsAnUnauthenticatedMalformedBodyWith401BeforeReadingIt(): void
+    {
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
+
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/secure-json', '{"title":'));
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function rejectsAnUnauthenticatedRequestMissingARequiredParameterWith401(): void
+    {
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
+
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/secure-json', '{}'));
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function validatesTheBodyOfAnAuthenticatedRequest(): void
+    {
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
+
+        $response = $this->process(
+            $this->jsonRequest('POST', 'https://example.com/api/example/secure-json', '{"title":')
+                ->withHeader('Authorization', 'Bearer super-secret'),
+        );
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonPath((string) $response->getBody(), 'detail', 'Malformed JSON request body');
+    }
+
+    #[Test]
+    public function aBadBodyOnARateLimitedRouteConsumesATokenAndCarriesTheQuotaHeaders(): void
+    {
+        $bad = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/limited-json', '{"title":'));
+        $next = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/limited-json', '{"title":"hello"}'));
+
+        self::assertSame(400, $bad->getStatusCode());
+        self::assertSame('1', $bad->getHeaderLine('X-RateLimit-Limit'));
+        self::assertSame('0', $bad->getHeaderLine('X-RateLimit-Remaining'));
+        self::assertSame(429, $next->getStatusCode());
+    }
+
+    #[Test]
     public function rejectsAStateChangingRequestWithoutARequestToken(): void
     {
         $response = $this->process($this->request('POST', 'https://example.com/api/example/token'));

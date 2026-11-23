@@ -49,10 +49,10 @@ Two consequences follow directly from where that boundary sits:
 | 5 | [Site/language scope](../routes/host-and-scope.md#site--and-language-bound-routes) — is the route reachable from the request's site/language? | `404`, as if the route did not exist |
 | 6 | [Canonical redirect](../routes/path-tolerance.md#redirecting-instead-of-tolerating) (opt-in) — did the request only match a tolerated path variant? | `308` to the declared path |
 | 7 | [Scheme redirect](../routes/host-and-scope.md#schemes) — did the request match everything but the route's declared `schemes`? | `308` to the same URL under the declared scheme |
-| 8 | Request body shape (malformed JSON / unsupported content type) | `400` / `415` |
-| 9 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
-| 10 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
-| 11 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
+| 8 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
+| 9 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
+| 10 | Request body shape (malformed JSON / unsupported content type) | `400` / `415` |
+| 11 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
 | 12 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/error-responses.md#automatic-json-errors-for-jsonresponse-routes) |
 
 Several ordering decisions in there are deliberate rather than incidental:
@@ -60,6 +60,8 @@ Several ordering decisions in there are deliberate rather than incidental:
 - **The env filter and site/language scope run before the canonical redirect**, so a redirect never reveals a route that is otherwise invisible in the current context.
 - **The scheme redirect runs after the canonical and legacy-path ones**, because both of those regenerate their target through `RouteUrlGenerator`, which already points at the declared scheme. A request that is wrong in two ways at once therefore still costs exactly one redirect.
 - **Rate limiting runs before authentication**, so a coarse per-IP limit absorbs token brute-force attempts before any authentication logic executes.
+- **Access control runs before body and input validation**, so an unauthenticated client gets `401` rather than a `400` naming the parameters of a protected route, and its JSON body is never decoded. Those validation errors still count against the rate limit.
+- **The body shape is checked before the requirements**, so a malformed body is named as such instead of surfacing as a derived missing parameter.
 - **The response cache is consulted after the rate limit**, so a cacheable response cannot be used to bypass the limit.
 
 Every response reaching this decoration stage — a matched dispatch, but also an early error response from step 4 onward above — also gets the [deprecation headers](../routes/route-lifecycle.md#deprecating-a-route) of the route it came from (a no-op unless it opted in) stamped on afterward. The CORS preflight response (step 2) and a path-gate or matcher miss falling through to page rendering (steps 1 and 3) never reach this stage.

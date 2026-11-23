@@ -60,6 +60,20 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['limited' => true]);
     }
 
+    #[Route(path: '/api/example/secure-json', methods: ['POST'], name: 'example_secure_json', requirements: ['title' => '\w+'])]
+    #[Authenticate(BearerTokenAuthenticator::class, options: ['envName' => 'ROUTING_TEST_TOKEN'])]
+    public function secureJson(string $title): JsonResponse
+    {
+        return new JsonResponse(['title' => $title]);
+    }
+
+    #[Route(path: '/api/example/limited-json', methods: ['POST'], name: 'example_limited_json')]
+    #[RateLimit(limit: 1, interval: '1 minute', policy: 'sliding_window')]
+    public function limitedJson(string $title): JsonResponse
+    {
+        return new JsonResponse(['title' => $title]);
+    }
+
     #[Route(path: '/api/example/submit', methods: ['POST'], name: 'example_submit')]
     public function submit(ServerRequestInterface $request): JsonResponse
     {

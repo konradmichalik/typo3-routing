@@ -131,16 +131,15 @@ final class ResponseCacheManager
     }
 
     /**
-     * Keyed on what the route consumes, in the form the controller receives it (`?page=1` and `?page=01` on
-     * `int $page` share an entry), so a client cannot create entries at will. Host and site are part of it,
-     * so two sites never share an entry. Null when a consumed value is invalid: it would answer 400, so the
-     * request neither reads nor writes the cache.
+     * Keyed on what the route consumes, as the controller receives it, plus host, site, language and the
+     * resolved tags (so `/flags/true` and `/flags/1` never share an entry a tag flush reaches differently).
      *
      * @param array<string, mixed>                                                                                           $match        the matcher result
      * @param list<string>                                                                                                   $ignoreParams
      * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments    the route's argument specs, see RouteRegistry::getArguments()
+     * @param list<string>                                                                                                   $tags         the route's cache tags with placeholders resolved
      */
-    public function buildKey(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): ?string
+    public function buildKey(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments, array $tags = []): ?string
     {
         $inputs = $this->consumedInputs($match, $request, $ignoreParams, $arguments);
         if (null === $inputs) {
@@ -158,6 +157,7 @@ final class ResponseCacheManager
             $site instanceof SiteInterface ? $site->getIdentifier() : '',
             // serialize(), not json_encode(): it never throws on invalid UTF-8 or INF and keeps every value distinct.
             serialize($inputs),
+            serialize($tags),
             (string) $languageId,
         ]));
     }
@@ -172,10 +172,9 @@ final class ResponseCacheManager
     }
 
     /**
-     * A controller taking the request may read the raw path and any parameter itself, so for such a route
-     * those count, raw; otherwise the values its arguments bind, coerced by the resolver itself (entities
-     * as identifiers, never loaded). Null when the resolver would reject one of them. A declared argument is
-     * never in `ignoreParams` (checked at build time), so that list only narrows the raw branch.
+     * A request-taking controller may read anything, so raw input counts; otherwise the coerced argument
+     * values. A declared argument is never in `ignoreParams` (checked at build time), so that list only
+     * narrows the raw branch.
      *
      * @param array<string, mixed>                                                                                           $match
      * @param list<string>                                                                                                   $ignoreParams
@@ -199,7 +198,7 @@ final class ResponseCacheManager
         $keyed = array_values(array_filter($arguments, static fn (array $argument): bool => 'upload' !== $argument['source']));
 
         try {
-            return $this->argumentResolver->resolve($keyed, $match, $request, false);
+            return $this->argumentResolver->resolve($keyed, $match, $request, loadEntities: false);
         } catch (ArgumentResolutionException) {
             return null;
         }

@@ -242,6 +242,23 @@ final class ResponseCacheManagerTest extends TestCase
     }
 
     #[Test]
+    public function buildKeySeparatesMatchesWhoseResolvedTagsDiffer(): void
+    {
+        $arguments = [self::argument('flag', 'path', 'bool', false)];
+        $true = self::match(['flag' => 'true']);
+        $one = self::match(['flag' => '1']);
+
+        self::assertNotSame(
+            $this->subject->buildKey($true, $this->requestWithQuery([]), [], $arguments, ['flag_true']),
+            $this->subject->buildKey($one, $this->requestWithQuery([]), [], $arguments, ['flag_1']),
+        );
+        self::assertSame(
+            $this->subject->buildKey($true, $this->requestWithQuery([]), [], $arguments, ['flag_x']),
+            $this->subject->buildKey($one, $this->requestWithQuery([]), [], $arguments, ['flag_x']),
+        );
+    }
+
+    #[Test]
     public function buildKeyCoercesAVariadicElementWise(): void
     {
         $arguments = [self::argument('ids', 'variadic', 'int', false)];

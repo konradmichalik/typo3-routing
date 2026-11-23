@@ -457,7 +457,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function readCache(?string $key): ?ResponseInterface
     {
-        if (null === $key || $this->services->cacheBypass()->isBypassed()) {
+        if (null === $key) {
             return null;
         }
 
@@ -475,7 +475,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function writeCache(?array $cacheConfig, ?string $key, array $match, ResponseInterface $response): ResponseInterface
     {
-        if (null === $cacheConfig || null === $key || 200 !== $response->getStatusCode() || $this->services->cacheBypass()->isBypassed()) {
+        if (null === $cacheConfig || null === $key || 200 !== $response->getStatusCode()) {
             return $response;
         }
 
@@ -488,20 +488,20 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
     /**
      * The key of a cacheable GET, null for everything that never touches the cache: no #[Cache], another
-     * method, or a consumed value that is invalid. The latter would answer 400, so it reaches the controller
-     * invoker uncached.
+     * method, a bypassing backend user, or an invalid consumed value (it answers 400 uncached).
      *
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
      * @param array<string, mixed>                                                      $match
      */
     private function cacheKey(?array $cacheConfig, array $match, ServerRequestInterface $request): ?string
     {
-        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request)) {
+        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || $this->services->cacheBypass()->isBypassed()) {
             return null;
         }
 
         $arguments = $this->registry->getArguments((string) ($match['_route'] ?? ''));
+        $tags = CacheTagPlaceholders::resolve($cacheConfig['tags'], $match);
 
-        return $this->services->cache()->buildKey($match, $request, $cacheConfig['ignoreParams'], $arguments);
+        return $this->services->cache()->buildKey($match, $request, $cacheConfig['ignoreParams'], $arguments, $tags);
     }
 }

@@ -556,13 +556,8 @@ final class RouteRegistry
     }
 
     /**
-     * Whether this route's compiled regex carries PCRE's `u` modifier — the same decision
-     * {@see needsUtf8()} made once at collection-build time. `RouteMatcher` consults this when
-     * re-validating a requirement after a case-insensitive match, `ControllerInvoker` when validating
-     * input and `OpenApiGenerator` when narrowing an enum, so each regex agrees with the Unicode mode the
-     * route was actually compiled with.
-     *
-     * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     * Whether the route's compiled regex carries PCRE's `u` modifier, so any regex that re-applies one of
+     * its requirements agrees with the Unicode mode the route was compiled with.
      */
     public function routeNeedsUtf8(string $routeName): bool
     {

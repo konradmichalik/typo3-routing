@@ -18,7 +18,7 @@ use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Ttt\Traits\EnvVarSandbox;
 use KonradMichalik\Typo3Routing\Http\RouteUrlGenerator;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
-use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\{DataProvider, Test};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Cache\Backend\TransientMemoryBackend;
@@ -472,6 +472,44 @@ final class RouteDispatcherTest extends FunctionalTestCase
     {
         $first = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
         $second = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $second->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function clientCacheControlDirectives(): iterable
+    {
+        yield 'no-cache' => ['no-cache'];
+        yield 'no-store' => ['no-store'];
+        yield 'both, mixed case' => ['No-Cache, NO-STORE'];
+    }
+
+    #[Test]
+    #[DataProvider('clientCacheControlDirectives')]
+    public function aClientCacheControlHeaderDoesNotSkipTheCacheRead(string $cacheControl): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached'));
+        $second = $this->process(
+            $this->request('GET', 'https://example.com/api/example/cached')->withHeader('Cache-Control', $cacheControl),
+        );
+
+        self::assertSame('HIT', $second->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame((string) $first->getBody(), (string) $second->getBody());
+    }
+
+    #[Test]
+    #[DataProvider('clientCacheControlDirectives')]
+    public function aClientCacheControlHeaderDoesNotSkipTheCacheWrite(string $cacheControl): void
+    {
+        $first = $this->process(
+            $this->request('GET', 'https://example.com/api/example/cached')->withHeader('Cache-Control', $cacheControl),
+        );
+        $second = $this->process(
+            $this->request('GET', 'https://example.com/api/example/cached')->withHeader('Cache-Control', $cacheControl),
+        );
 
         self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
         self::assertSame('HIT', $second->getHeaderLine('X-TYPO3-API-Cache'));

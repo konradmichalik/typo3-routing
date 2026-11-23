@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Cache\CacheBypassGuard;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\FakeUser;
-use PHPUnit\Framework\Attributes\{CoversClass, Test};
+use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Context\{Context, UserAspect};
 use TYPO3\CMS\Core\Http\ServerRequest;
@@ -39,14 +39,24 @@ final class CacheBypassGuardTest extends TestCase
         self::assertFalse($guard->skipsWrite($request));
     }
 
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function clientCacheControlDirectives(): iterable
+    {
+        yield 'no-cache' => ['no-cache'];
+        yield 'no-store' => ['no-store'];
+    }
+
     #[Test]
-    public function anAnonymousRequestWithNoStoreSkipsBothReadAndWrite(): void
+    #[DataProvider('clientCacheControlDirectives')]
+    public function anAnonymousRequestCannotSkipReadOrWriteViaCacheControl(string $cacheControl): void
     {
         $guard = new CacheBypassGuard(new Context());
-        $request = $this->request('no-store');
+        $request = $this->request($cacheControl);
 
-        self::assertTrue($guard->skipsRead($request));
-        self::assertTrue($guard->skipsWrite($request));
+        self::assertFalse($guard->skipsRead($request));
+        self::assertFalse($guard->skipsWrite($request));
     }
 
     #[Test]

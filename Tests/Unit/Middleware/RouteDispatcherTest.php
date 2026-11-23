@@ -1334,46 +1334,6 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
-    public function bypassesTheCacheWhenTheClientSendsNoCache(): void
-    {
-        $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
-
-        $response = $this->dispatch(
-            $this->request('GET', 'https://example.com/api/cached')->withHeader('Cache-Control', 'no-cache'),
-        );
-
-        self::assertSame('MISS', $response->getHeaderLine('X-TYPO3-API-Cache'));
-    }
-
-    #[Test]
-    public function noCacheStillRefreshesTheStoredEntry(): void
-    {
-        $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
-        $refreshed = $this->dispatch(
-            $this->request('GET', 'https://example.com/api/cached')->withHeader('Cache-Control', 'no-cache'),
-        );
-        $third = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
-
-        self::assertSame('HIT', $third->getHeaderLine('X-TYPO3-API-Cache'));
-        self::assertSame((string) $refreshed->getBody(), (string) $third->getBody());
-    }
-
-    #[Test]
-    public function noStoreNeitherReadsNorWritesTheCache(): void
-    {
-        $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
-        $bypassed = $this->dispatch(
-            $this->request('GET', 'https://example.com/api/cached')->withHeader('Cache-Control', 'no-store'),
-        );
-        $third = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
-
-        self::assertSame('MISS', $bypassed->getHeaderLine('X-TYPO3-API-Cache'));
-        self::assertNotSame((string) $first->getBody(), (string) $bypassed->getBody());
-        // The no-store response was never written back, so the original cached entry still serves the third call.
-        self::assertSame((string) $first->getBody(), (string) $third->getBody());
-    }
-
-    #[Test]
     public function bypassesTheCacheForALoggedInBackendUser(): void
     {
         $backendUserContext = $this->backendUserContext();

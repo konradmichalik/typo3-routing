@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Cache;
 
-use KonradMichalik\Typo3Routing\Http\CacheControlBypass;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Context\Context;
 
@@ -31,23 +30,22 @@ final readonly class CacheBypassGuard
     ) {}
 
     /**
-     * A backend user previewing draft/unpublished content, or a client sending "Cache-Control: no-cache"
-     * or "no-store", must never be served a stored response — the cache key does not vary by identity or
-     * preview state, so a shared entry would leak between them.
+     * A backend user previewing draft/unpublished content must never be served a stored response, since the
+     * cache key does not vary by preview state. A client "Cache-Control" header is deliberately ignored, so no
+     * client can skip the cache and force a controller run.
      */
     public function skipsRead(ServerRequestInterface $request): bool
     {
-        return $this->isBackendUser() || CacheControlBypass::skipsRead($request);
+        return $this->isBackendUser();
     }
 
     /**
-     * A backend user's response must never be stored either, since it may carry preview/draft content
-     * that a public visitor must not receive on the next cache miss. "no-cache" alone still allows the
-     * fresh response to refresh the cache.
+     * A backend user's response must never be stored either, since it may carry preview/draft content that a
+     * public visitor must not receive on the next cache miss.
      */
     public function skipsWrite(ServerRequestInterface $request): bool
     {
-        return $this->isBackendUser() || CacheControlBypass::skipsWrite($request);
+        return $this->isBackendUser();
     }
 
     private function isBackendUser(): bool

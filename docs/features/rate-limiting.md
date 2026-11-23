@@ -24,7 +24,7 @@ public function submit(ServerRequestInterface $request): ResponseInterface
 - Built on [`symfony/rate-limiter`](https://symfony.com/doc/current/rate_limiter.html); buckets are stored in the dedicated `typo3_routing_ratelimit` cache and **survive a "Flush all caches"** (they expire on their own TTL).
 - Applies to **all HTTP methods** of the route. When the limit is exceeded the dispatcher returns `429 Too Many Requests` (RFC 9457 `application/problem+json`) with a `Retry-After` header — and the same value as a `retryAfter` member in the problem body, so clients that only inspect the JSON don't need to parse headers — **before** the response cache is consulted — a cacheable response cannot bypass the limit.
 - Every response from a rate-limited route — accepted or blocked — carries `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` (a Unix timestamp), so a client can see its quota without waiting for a `429`.
-- The client is keyed by the resolved remote address (`normalizedParams`, so reverse-proxy headers are honoured when configured). An unsupported `policy` or `keyBy` raises a build-time exception.
+- The client is keyed by the resolved remote address (`normalizedParams`, so reverse-proxy headers are honoured when configured). IPv6 clients are keyed by their `/64` prefix, because a single client usually controls a whole `/64` and could otherwise get a fresh bucket for every address; different spellings of the same `/64` share one bucket. IPv4 addresses are used as they are, and IPv4-mapped IPv6 addresses (`::ffff:203.0.113.5`) count as the IPv4 address. An unsupported `policy` or `keyBy` raises a build-time exception.
 
 ## Class-level `#[RateLimit]`
 
@@ -64,4 +64,11 @@ Because rate limiting runs **before** authentication, an anonymous request to a 
 > Behind a reverse proxy or CDN, configure `$GLOBALS['TYPO3_CONF_VARS']['SYS']['reverseProxyIP']` so the real client IP is used as the rate-limit key instead of the proxy address.
 
 > [!NOTE]
-> Counters are **best-effort under concurrency**: bucket updates are not cross-process locked, so parallel requests can briefly exceed the configured limit. Treat the limit as a throttle, not as an exact quota or a hard security boundary. The `typo3_routing_ratelimit` cache uses the TYPO3 default backend (database) unless overridden — for busy endpoints, point it at Redis or APCu via `$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['typo3_routing_ratelimit']` to keep the two extra storage round-trips per request off the database.
+> Counters are **best-effort under concurrency**: bucket updates are not cross-process locked, so parallel requests can briefly exceed the configured limit. Treat the limit as a throttle, not as an exact quota or a hard security boundary.
+
+## Storage backend
+
+The `typo3_routing_ratelimit` cache uses the TYPO3 default backend (database) unless you configure another one.
+
+- Every request to a rate-limited route costs one read and one write on that backend. Under load, a memory backend such as Redis or APCu is the better choice, configured via `$GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']['typo3_routing_ratelimit']`.
+- On the database backend, expired buckets are only removed by the scheduler task "Caching framework garbage collection" with the database backend (`Typo3DatabaseBackend`) selected. Without that task the table keeps growing.

@@ -390,7 +390,7 @@ final class RouteInvokerTest extends TestCase
     }
 
     #[Test]
-    public function returnsUnauthorizedForAnAuthenticatedRouteThatDeniesAccess(): void
+    public function returnsUnauthorizedForADeniedRouteBeforeCheckingItsInputRequirements(): void
     {
         $response = $this->invoker()->invoke('denied', [], $this->request());
 
@@ -554,7 +554,7 @@ final class RouteInvokerTest extends TestCase
             'range' => ['path' => '/api/range', 'methods' => ['GET'], 'controller' => 'ctrl::range', 'env' => null, 'requirements' => []],
             'guarded' => ['path' => '/api/guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
-            'denied' => ['path' => '/api/denied', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'denied' => ['path' => '/api/denied', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'header' => ['path' => '/api/header', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
             'token' => ['path' => '/api/token', 'methods' => ['POST'], 'controller' => 'ctrl::token', 'env' => null, 'requirements' => []],
             'cached' => ['path' => '/api/cached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],

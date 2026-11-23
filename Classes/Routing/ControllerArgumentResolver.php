@@ -34,9 +34,9 @@ use function is_int;
 use function is_numeric;
 use function is_string;
 use function is_subclass_of;
-use function preg_match;
 use function sprintf;
 use function strtolower;
+use function trim;
 
 /**
  * ControllerArgumentResolver.
@@ -213,7 +213,7 @@ final readonly class ControllerArgumentResolver
      */
     private function toEntity(mixed $value, string $class, string $name): object
     {
-        if (!is_int($value) && !(is_string($value) && 1 === preg_match('/^-?\d+$/', $value))) {
+        if (!is_int($value) && !(is_string($value) && RequirementPattern::matches('-?\d+', $value))) {
             throw ArgumentResolutionException::invalidValue($name, 1950619448);
         }
 
@@ -230,7 +230,7 @@ final readonly class ControllerArgumentResolver
         if (is_int($value)) {
             return $value;
         }
-        if (is_string($value) && 1 === preg_match('/^-?\d+$/', $value)) {
+        if (is_string($value) && RequirementPattern::matches('-?\d+', $value)) {
             return (int) $value;
         }
 
@@ -239,7 +239,8 @@ final readonly class ControllerArgumentResolver
 
     private function toFloat(mixed $value, string $name): float
     {
-        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value))) {
+        // is_numeric() accepts surrounding whitespace including \f, which trim() keeps without a mask.
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value) && trim($value, " \t\n\r\v\f") === $value)) {
             return (float) $value;
         }
 

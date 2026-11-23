@@ -359,6 +359,15 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function recognisesTheCacheTagsBakedInAtCompileTime(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), cacheTags: ['tx_news']);
+
+        self::assertTrue($registry->isCacheTag('tx_news'));
+        self::assertFalse($registry->isCacheTag('tt_content'));
+    }
+
+    #[Test]
     public function derivesNoClassExclusivePrefixesWithoutAnyOptedInRoute(): void
     {
         self::assertSame([], $this->createRegistry()->getClassExclusivePrefixes());

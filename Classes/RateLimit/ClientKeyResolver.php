@@ -17,7 +17,13 @@ use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Context\Context;
 use TYPO3\CMS\Core\Http\NormalizedParams;
 
+use function inet_ntop;
+use function inet_pton;
 use function is_string;
+use function str_repeat;
+use function str_starts_with;
+use function strlen;
+use function substr;
 
 /**
  * ClientKeyResolver.
@@ -48,7 +54,25 @@ final readonly class ClientKeyResolver
             }
         }
 
-        return 'ip:'.$this->clientIp($request);
+        return 'ip:'.$this->normalizeIp($this->clientIp($request));
+    }
+
+    /**
+     * An IPv6 client usually controls a whole /64, so keying by the full address would hand it a fresh
+     * bucket per request. IPv4-mapped IPv6 keys as the IPv4 address so both notations share one bucket.
+     */
+    private function normalizeIp(string $ip): string
+    {
+        $packed = inet_pton($ip);
+        if (false === $packed || 16 !== strlen($packed)) {
+            return $ip;
+        }
+
+        if (str_starts_with($packed, str_repeat("\0", 10)."\xff\xff")) {
+            return (string) inet_ntop(substr($packed, 12));
+        }
+
+        return inet_ntop(substr($packed, 0, 8).str_repeat("\0", 8)).'/64';
     }
 
     private function clientIp(ServerRequestInterface $request): string

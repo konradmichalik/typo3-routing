@@ -359,6 +359,24 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function returnsBadRequestWhenATypedIntegerCarriesATrailingNewline(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=12%0A'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Invalid value for parameter: from"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsBadRequestWhenAQueryRequirementIsMetOnlyBeforeATrailingNewline(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/search?q=12%0A'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Invalid value for parameter: q"}', (string) $response->getBody());
+    }
+
+    #[Test]
     public function returnsBadRequestNamingTheWireParameterWhenAParamRangeIsViolated(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/paged?limit=101'));
@@ -633,6 +651,52 @@ final class RouteDispatcherTest extends FunctionalTestCase
             ->withHeader('Authorization', 'Bearer anything');
 
         self::assertSame(401, $this->process($request)->getStatusCode());
+    }
+
+    #[Test]
+    public function rejectsAnUnauthenticatedMalformedBodyWith401BeforeReadingIt(): void
+    {
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
+
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/secure-json', '{"title":'));
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function rejectsAnUnauthenticatedRequestMissingARequiredParameterWith401(): void
+    {
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
+
+        $response = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/secure-json', '{}'));
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function validatesTheBodyOfAnAuthenticatedRequest(): void
+    {
+        $this->setEnvVar('ROUTING_TEST_TOKEN', 'super-secret');
+
+        $response = $this->process(
+            $this->jsonRequest('POST', 'https://example.com/api/example/secure-json', '{"title":')
+                ->withHeader('Authorization', 'Bearer super-secret'),
+        );
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonPath((string) $response->getBody(), 'detail', 'Malformed JSON request body');
+    }
+
+    #[Test]
+    public function aBadBodyOnARateLimitedRouteConsumesATokenAndCarriesTheQuotaHeaders(): void
+    {
+        $bad = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/limited-json', '{"title":'));
+        $next = $this->process($this->jsonRequest('POST', 'https://example.com/api/example/limited-json', '{"title":"hello"}'));
+
+        self::assertSame(400, $bad->getStatusCode());
+        self::assertSame('1', $bad->getHeaderLine('X-RateLimit-Limit'));
+        self::assertSame('0', $bad->getHeaderLine('X-RateLimit-Remaining'));
+        self::assertSame(429, $next->getStatusCode());
     }
 
     #[Test]

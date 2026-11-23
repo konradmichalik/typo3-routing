@@ -170,7 +170,11 @@ final class ControllerArgumentResolverTest extends TestCase
     {
         yield 'int from word' => ['int', 'abc'];
         yield 'int from float' => ['int', '1.5'];
+        yield 'int with trailing newline' => ['int', "12\n"];
         yield 'float from word' => ['float', 'abc'];
+        yield 'float with trailing newline' => ['float', "1.5\n"];
+        yield 'float with leading form feed' => ['float', "\f1.5"];
+        yield 'float with trailing form feed' => ['float', "1.5\f"];
         yield 'bool from word' => ['bool', 'maybe'];
     }
 
@@ -246,6 +250,18 @@ final class ControllerArgumentResolverTest extends TestCase
         $this->expectExceptionMessage('Invalid value for parameter: item');
 
         $this->resolver->resolve($specs, ['item' => 'abc'], $this->request());
+    }
+
+    #[Test]
+    public function rejectsAnEntityIdentifierWithATrailingNewline(): void
+    {
+        $specs = [$this->spec('item', 'input', Item::class)];
+        $request = $this->request()->withQueryParams(['item' => "12\n"]);
+
+        $this->expectException(ArgumentResolutionException::class);
+        $this->expectExceptionMessage('Invalid value for parameter: item');
+
+        $this->resolver->resolve($specs, [], $request);
     }
 
     #[Test]

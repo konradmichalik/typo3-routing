@@ -110,6 +110,8 @@ final readonly class ApiKeyAuthenticator implements RouteAuthenticatorInterface
 }
 ```
 
+Authenticators run before the request body is validated. One that reads the body, for example to verify a signature over the payload, receives it unchecked and has to handle a malformed one itself.
+
 ## Caching authenticated routes
 
 Authenticated routes are **never served from the shared response cache** (the cache key does not vary by identity, so a cached entry would leak one client's response to another). The dispatcher forces `no-store` for any route with an `#[Authenticate]` attribute — combining it with `#[Cache]` raises a build-time **warning** and the cache is ignored.
@@ -131,6 +133,7 @@ public function update(ServerRequestInterface $request): ResponseInterface { /* 
 
 - Only enforced for `POST`/`PUT`/`PATCH`/`DELETE`; safe methods are not CSRF-relevant. Putting it on a **GET-only** route is a build-time error.
 - It is **redundant for Bearer-protected** routes (harmless, but unnecessary).
+- [`routing:lint`](../operating/commands.md#routinglint) reports a `FrontendUserAuthenticator` or `BackendUserAuthenticator` route that accepts a state-changing method without it as `missing-request-token`.
 
 ### Issuing the token
 

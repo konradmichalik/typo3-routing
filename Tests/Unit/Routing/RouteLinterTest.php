@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
+use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, BearerTokenAuthenticator, FrontendUserAuthenticator};
 use KonradMichalik\Typo3Routing\Routing\{RouteLinter, RouteRegistry};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -299,12 +300,92 @@ final class RouteLinterTest extends TestCase
         self::assertSame([], (new RouteLinter())->lint($registry, ''));
     }
 
+    #[Test]
+    public function flagsASessionAuthenticatedPostRouteWithoutRequestToken(): void
+    {
+        $registry = $this->registry(
+            ['update' => ['path' => '/api/account/update', 'methods' => ['POST'], 'controller' => 'ctrl::update', 'env' => null, 'requirements' => []]],
+            authenticators: ['update' => [['service' => FrontendUserAuthenticator::class, 'options' => []]]],
+        );
+
+        $findings = (new RouteLinter())->lint($registry);
+
+        self::assertCount(1, $findings);
+        self::assertSame('missing-request-token', $findings[0]['check']);
+        self::assertSame('warning', $findings[0]['severity']);
+        self::assertSame('update', $findings[0]['route']);
+        self::assertSame('ctrl::update', $findings[0]['controller']);
+        self::assertStringContainsString('#[RequireRequestToken]', $findings[0]['message']);
+    }
+
+    #[Test]
+    public function flagsABackendSessionRouteAcceptingAnyMethodWithoutRequestToken(): void
+    {
+        $registry = $this->registry(
+            ['any' => ['path' => '/api/admin/any', 'methods' => [], 'controller' => 'ctrl::any', 'env' => null, 'requirements' => []]],
+            authenticators: ['any' => [
+                ['service' => BearerTokenAuthenticator::class, 'options' => []],
+                ['service' => BackendUserAuthenticator::class, 'options' => []],
+            ]],
+        );
+
+        $findings = (new RouteLinter())->lint($registry);
+
+        self::assertCount(1, $findings);
+        self::assertSame('missing-request-token', $findings[0]['check']);
+        self::assertStringContainsString('list its methods explicitly', $findings[0]['message']);
+    }
+
+    #[Test]
+    public function doesNotFlagASessionAuthenticatedWriteRouteWithRequestToken(): void
+    {
+        $registry = $this->registry(
+            ['update' => ['path' => '/api/account/update', 'methods' => ['POST'], 'controller' => 'ctrl::update', 'env' => null, 'requirements' => []]],
+            authenticators: ['update' => [['service' => FrontendUserAuthenticator::class, 'options' => []]]],
+            requestTokenScopes: ['update' => 'routing/update'],
+        );
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
+    #[Test]
+    public function doesNotFlagABearerOnlyWriteRoute(): void
+    {
+        $registry = $this->registry(
+            ['report' => ['path' => '/api/partner/report', 'methods' => ['POST'], 'controller' => 'ctrl::report', 'env' => null, 'requirements' => []]],
+            authenticators: ['report' => [['service' => BearerTokenAuthenticator::class, 'options' => []]]],
+        );
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
+    #[Test]
+    public function doesNotFlagAGetOnlySessionRoute(): void
+    {
+        $registry = $this->registry(
+            ['profile' => ['path' => '/api/account/profile', 'methods' => ['GET', 'HEAD'], 'controller' => 'ctrl::profile', 'env' => null, 'requirements' => []]],
+            authenticators: ['profile' => [['service' => FrontendUserAuthenticator::class, 'options' => []]]],
+        );
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
+    #[Test]
+    public function doesNotFlagAPublicWriteRoute(): void
+    {
+        $registry = $this->registry(['submit' => ['path' => '/api/contact', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => []]]);
+
+        self::assertSame([], (new RouteLinter())->lint($registry));
+    }
+
     /**
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int}> $routes
      * @param array<string, list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}>>                        $arguments
+     * @param array<string, list<array{service: string, options: array<string, mixed>}>>                                                                           $authenticators
+     * @param array<string, string>                                                                                                                                $requestTokenScopes
      */
-    private function registry(array $routes, array $arguments = []): RouteRegistry
+    private function registry(array $routes, array $arguments = [], array $authenticators = [], array $requestTokenScopes = []): RouteRegistry
     {
-        return new RouteRegistry($routes, new ServiceLocator([]), arguments: $arguments);
+        return new RouteRegistry($routes, new ServiceLocator([]), arguments: $arguments, authenticators: $authenticators, requestTokenScopes: $requestTokenScopes);
     }
 }

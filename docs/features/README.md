@@ -25,7 +25,7 @@ public function export(ServerRequestInterface $request): ResponseInterface { /* 
 
 ## Where they take effect
 
-They are not independent knobs applied in arbitrary order. The dispatcher runs them at fixed points, and two of those positions carry a security decision:
+They are not independent knobs applied in arbitrary order. The dispatcher runs them at fixed points, and three of those positions carry a security decision:
 
 | Order | Feature | Rejects with |
 |-------|---------|--------------|
@@ -33,9 +33,11 @@ They are not independent knobs applied in arbitrary order. The dispatcher runs t
 | 2 | Rate limit | `429` + `Retry-After` |
 | 3 | Authentication | `401` |
 | 4 | Request token (CSRF) | `403` |
-| 5 | Response cache, then the controller | — |
+| 5 | Request body shape, then query/body requirements | `400` / `415` |
+| 6 | Response cache, then the controller | — |
 
 - **Rate limiting before authentication**, so a coarse per-IP limit absorbs token brute-force attempts before any authentication logic runs.
+- **Authentication before body and input validation**, so an unauthenticated client gets `401` instead of a `400` that names the parameter contract of a protected route, and its JSON body is never decoded. A `400`/`415` still consumes a rate-limit token and carries the `X-RateLimit-*` headers.
 - **The response cache last**, so a cacheable response cannot be used to bypass the rate limit.
 
 The full pipeline, including matching and the environment filter, is in [How it works](../background/how-it-works.md#runtime).

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Cache;
 
 use KonradMichalik\Typo3Routing\Http\RequestBody;
+use KonradMichalik\Typo3Routing\Routing\{ArgumentResolutionException, ControllerArgumentResolver};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
@@ -24,7 +25,7 @@ use function array_column;
 use function array_diff_key;
 use function array_filter;
 use function array_flip;
-use function array_key_exists;
+use function array_values;
 use function in_array;
 use function is_array;
 
@@ -43,6 +44,7 @@ final class ResponseCacheManager
 
     public function __construct(
         private readonly CacheManager $cacheManager,
+        private readonly ControllerArgumentResolver $argumentResolver,
     ) {}
 
     public function get(string $key): ?ResponseInterface
@@ -129,15 +131,22 @@ final class ResponseCacheManager
     }
 
     /**
-     * Keyed on what the route consumes, read the way ControllerArgumentResolver reads it, so a client cannot
-     * create entries at will. Host and site are part of it, so two sites never share an entry.
+     * Keyed on what the route consumes, in the form the controller receives it (`?page=1` and `?page=01` on
+     * `int $page` share an entry), so a client cannot create entries at will. Host and site are part of it,
+     * so two sites never share an entry. Null when a consumed value is invalid: it would answer 400, so the
+     * request neither reads nor writes the cache.
      *
-     * @param array<string, mixed>                      $match        the matcher result
-     * @param list<string>                              $ignoreParams
-     * @param list<array{name: string, source: string}> $arguments    the route's argument specs, see RouteRegistry::getArguments()
+     * @param array<string, mixed>                                                                                           $match        the matcher result
+     * @param list<string>                                                                                                   $ignoreParams
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments    the route's argument specs, see RouteRegistry::getArguments()
      */
-    public function buildKey(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): string
+    public function buildKey(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): ?string
     {
+        $inputs = $this->consumedInputs($match, $request, $ignoreParams, $arguments);
+        if (null === $inputs) {
+            return null;
+        }
+
         $language = $request->getAttribute('language');
         $languageId = $language instanceof SiteLanguage ? $language->getLanguageId() : 0;
         $site = $request->getAttribute('site');
@@ -148,7 +157,7 @@ final class ResponseCacheManager
             $request->getUri()->getHost(),
             $site instanceof SiteInterface ? $site->getIdentifier() : '',
             // serialize(), not json_encode(): it never throws on invalid UTF-8 or INF and keeps every value distinct.
-            serialize(self::consumedInputs($match, $request, $ignoreParams, $arguments)),
+            serialize($inputs),
             (string) $languageId,
         ]));
     }
@@ -164,35 +173,36 @@ final class ResponseCacheManager
 
     /**
      * A controller taking the request may read the raw path and any parameter itself, so for such a route
-     * those count; otherwise only the values its arguments bind, from the same place the resolver takes them.
+     * those count, raw; otherwise the values its arguments bind, coerced by the resolver itself (entities
+     * as identifiers, never loaded). Null when the resolver would reject one of them. A declared argument is
+     * never in `ignoreParams` (checked at build time), so that list only narrows the raw branch.
      *
-     * @param array<string, mixed>                      $match
-     * @param list<string>                              $ignoreParams
-     * @param list<array{name: string, source: string}> $arguments
+     * @param array<string, mixed>                                                                                           $match
+     * @param list<string>                                                                                                   $ignoreParams
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}> $arguments
      *
-     * @return array<string, mixed>
+     * @return array<mixed>|null
      */
-    private static function consumedInputs(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): array
+    private function consumedInputs(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): ?array
     {
-        $ignored = array_flip($ignoreParams);
-        $query = array_diff_key($request->getQueryParams(), $ignored);
-        $body = array_diff_key(RequestBody::toArray($request), $ignored);
-
         if (in_array('request', array_column($arguments, 'source'), true)) {
-            return self::sorted(['path' => $request->getUri()->getPath(), 'query' => self::sorted($query), 'body' => self::sorted($body)]);
+            $ignored = array_flip($ignoreParams);
+
+            return self::sorted([
+                'path' => $request->getUri()->getPath(),
+                'query' => self::sorted(array_diff_key($request->getQueryParams(), $ignored)),
+                'body' => self::sorted(array_diff_key(RequestBody::toArray($request), $ignored)),
+            ]);
         }
 
-        $inputs = array_merge($query, $body);
-        $sources = ['path' => $match, 'host' => $match, 'query' => $query, 'body' => $body, 'input' => $inputs, 'variadic' => $inputs];
-        $consumed = [];
-        foreach ($arguments as $argument) {
-            $values = $sources[$argument['source']] ?? [];
-            if (array_key_exists($argument['name'], $values)) {
-                $consumed[$argument['source'].':'.$argument['name']] = $values[$argument['name']];
-            }
-        }
+        // An upload comes from the request body, not from a value the key could carry.
+        $keyed = array_values(array_filter($arguments, static fn (array $argument): bool => 'upload' !== $argument['source']));
 
-        return self::sorted($consumed);
+        try {
+            return $this->argumentResolver->resolve($keyed, $match, $request, false);
+        } catch (ArgumentResolutionException) {
+            return null;
+        }
     }
 
     /**

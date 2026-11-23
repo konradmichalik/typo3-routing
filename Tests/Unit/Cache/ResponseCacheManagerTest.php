@@ -16,10 +16,13 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 use KonradMichalik\Ttt\Http\{RequestBuilder, Requests};
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\Priority;
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
 use TYPO3\CMS\Core\Site\Entity\Site;
+use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
  * ResponseCacheManagerTest.
@@ -128,7 +131,7 @@ final class ResponseCacheManagerTest extends TestCase
     #[Test]
     public function buildKeyIsStableAndHonoursIgnoredParameters(): void
     {
-        $arguments = [self::argument('page', 'input'), self::argument('search', 'input')];
+        $arguments = [self::argument('page', 'input'), self::argument('request', 'request')];
         $base = $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '1', 'search' => 'foo']), ['search'], $arguments);
         $otherSearch = $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '1', 'search' => 'bar']), ['search'], $arguments);
         $otherPage = $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '2', 'search' => 'foo']), ['search'], $arguments);
@@ -172,6 +175,152 @@ final class ResponseCacheManagerTest extends TestCase
         $two = $this->subject->buildKey(self::match(), $this->requestWithQuery(['q' => '2']), [], $arguments);
 
         self::assertSame($varies, $one !== $two);
+    }
+
+    /**
+     * @return iterable<string, array{string, array<string, mixed>, array<string, mixed>}>
+     */
+    public static function equivalentInputs(): iterable
+    {
+        yield 'int with leading zero' => ['int', ['v' => '1'], ['v' => '01']];
+        yield 'int with many leading zeros' => ['int', ['v' => '1'], ['v' => '0001']];
+        yield 'bool 1 and true' => ['bool', ['v' => '1'], ['v' => 'true']];
+        yield 'bool false spellings' => ['bool', ['v' => 'no'], ['v' => '0']];
+        yield 'bool empty is false' => ['bool', ['v' => ''], ['v' => 'off']];
+        yield 'float with trailing zero' => ['float', ['v' => '1.5'], ['v' => '1.50']];
+        yield 'array passthrough' => ['array', ['v' => ['a' => 1]], ['v' => ['a' => 1]]];
+        yield 'int backed enum' => [Priority::class, ['v' => '1'], ['v' => '1']];
+    }
+
+    /**
+     * @param array<string, mixed> $first
+     * @param array<string, mixed> $second
+     */
+    #[Test]
+    #[DataProvider('equivalentInputs')]
+    public function buildKeySharesOneEntryForValuesTheControllerReceivesIdentically(string $type, array $first, array $second): void
+    {
+        $arguments = [self::argument('v', 'query', $type, false)];
+
+        self::assertSame(
+            $this->subject->buildKey(self::match(), $this->requestWithQuery($first), [], $arguments),
+            $this->subject->buildKey(self::match(), $this->requestWithQuery($second), [], $arguments),
+        );
+    }
+
+    #[Test]
+    public function buildKeyStillSeparatesValuesThatCoerceApart(): void
+    {
+        $arguments = [self::argument('page', 'query', 'int', false)];
+
+        self::assertNotSame(
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '1']), [], $arguments),
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '2']), [], $arguments),
+        );
+    }
+
+    #[Test]
+    public function buildKeyKeysAMissingAndAnEmptyValueOnTheDefault(): void
+    {
+        $arguments = [self::argument('page', 'query', 'int', false, true, 1)];
+        $explicit = $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '1']), [], $arguments);
+
+        self::assertSame($explicit, $this->subject->buildKey(self::match(), $this->requestWithQuery([]), [], $arguments));
+        self::assertSame($explicit, $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '']), [], $arguments));
+        self::assertNotSame($explicit, $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '2']), [], $arguments));
+    }
+
+    #[Test]
+    public function buildKeyKeysAPathPlaceholderInItsCoercedForm(): void
+    {
+        $arguments = [self::argument('id', 'path', 'int', false)];
+
+        self::assertSame(
+            $this->subject->buildKey(self::match(['id' => '5']), $this->requestWithQuery([]), [], $arguments),
+            $this->subject->buildKey(self::match(['id' => '05']), $this->requestWithQuery([]), [], $arguments),
+        );
+    }
+
+    #[Test]
+    public function buildKeyCoercesAVariadicElementWise(): void
+    {
+        $arguments = [self::argument('ids', 'variadic', 'int', false)];
+
+        self::assertSame(
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['ids' => ['1', '2']]), [], $arguments),
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['ids' => ['01', '002']]), [], $arguments),
+        );
+        self::assertNotSame(
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['ids' => ['1', '2']]), [], $arguments),
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['ids' => ['1']]), [], $arguments),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string|null, bool, array<string, mixed>}>
+     */
+    public static function rejectedInputs(): iterable
+    {
+        yield 'malformed int' => ['int', false, ['v' => 'abc']];
+        yield 'malformed bool' => ['bool', false, ['v' => 'maybe']];
+        yield 'unknown enum case' => [Priority::class, false, ['v' => '99']];
+        yield 'malformed entity identifier' => [Item::class, false, ['v' => 'abc']];
+        yield 'missing required value' => ['int', false, []];
+        yield 'array for a scalar' => ['int', false, ['v' => ['1']]];
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     */
+    #[Test]
+    #[DataProvider('rejectedInputs')]
+    public function buildKeyReturnsNullWhenAConsumedValueWouldBeRejected(?string $type, bool $nullable, array $query): void
+    {
+        $arguments = [self::argument('v', 'query', $type, $nullable)];
+
+        self::assertNull($this->subject->buildKey(self::match(), $this->requestWithQuery($query), [], $arguments));
+    }
+
+    #[Test]
+    public function buildKeyReturnsNullWhenOneOfSeveralValuesIsRejected(): void
+    {
+        $arguments = [self::argument('a', 'query', 'int', false), self::argument('b', 'query', 'int', false)];
+
+        self::assertNull($this->subject->buildKey(self::match(), $this->requestWithQuery(['a' => '1', 'b' => 'x']), [], $arguments));
+    }
+
+    #[Test]
+    public function buildKeyNeverLoadsAnEntityAndKeysItOnItsIdentifier(): void
+    {
+        $persistenceManager = $this->createMock(PersistenceManagerInterface::class);
+        $persistenceManager->expects(self::never())->method('getObjectByIdentifier');
+        $subject = $this->createResponseCacheManager($persistenceManager);
+        $arguments = [self::argument('item', 'query', Item::class, false)];
+
+        $one = $subject->buildKey(self::match(), $this->requestWithQuery(['item' => '5']), [], $arguments);
+
+        self::assertSame($one, $subject->buildKey(self::match(), $this->requestWithQuery(['item' => '05']), [], $arguments));
+        self::assertNotSame($one, $subject->buildKey(self::match(), $this->requestWithQuery(['item' => '6']), [], $arguments));
+    }
+
+    #[Test]
+    public function buildKeyKeepsRawInputWhenTheControllerTakesTheRequest(): void
+    {
+        $arguments = [self::argument('request', 'request'), self::argument('page', 'query', 'int', false)];
+
+        self::assertNotSame(
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '1']), [], $arguments),
+            $this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => '01']), [], $arguments),
+        );
+        self::assertNotNull($this->subject->buildKey(self::match(), $this->requestWithQuery(['page' => 'abc']), [], $arguments));
+    }
+
+    #[Test]
+    public function buildKeyLeavesAnUploadArgumentOutOfTheKey(): void
+    {
+        $arguments = [self::argument('file', 'upload', null, false)];
+
+        self::assertNotNull($this->subject->buildKey(self::match(), $this->requestWithQuery([]), [], $arguments));
     }
 
     #[Test]
@@ -254,6 +403,7 @@ final class ResponseCacheManagerTest extends TestCase
         $infinite = $this->subject->buildKey(self::match(), Requests::get('https://example.com/api/x')->withParsedBody(['id' => \INF])->build(), [], $arguments);
 
         self::assertNotSame($invalidUtf8, $otherBytes);
+        self::assertIsString($infinite);
         self::assertStringStartsWith('route_', $infinite);
     }
 
@@ -339,15 +489,15 @@ final class ResponseCacheManagerTest extends TestCase
     }
 
     /**
-     * @return array{name: string, source: string}
+     * @return array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed}
      */
-    private static function argument(string $name, string $source): array
+    private static function argument(string $name, string $source, ?string $type = null, bool $nullable = true, bool $hasDefault = false, mixed $default = null): array
     {
-        return ['name' => $name, 'source' => $source];
+        return ['name' => $name, 'type' => $type, 'source' => $source, 'nullable' => $nullable, 'hasDefault' => $hasDefault, 'default' => $default];
     }
 
     /**
-     * @param array<string, string> $query
+     * @param array<string, mixed> $query
      */
     private function requestWithQuery(array $query): ServerRequest
     {

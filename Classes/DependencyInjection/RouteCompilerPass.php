@@ -23,8 +23,10 @@ use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, Servi
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
 
+use function array_column;
 use function array_intersect;
 use function array_map;
+use function array_merge;
 use function array_unique;
 use function array_values;
 use function count;
@@ -127,6 +129,8 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $registry->setArgument('$returns', $collected->returns);
         $registry->setArgument('$jsonErrorRoutes', $collected->jsonErrorRoutes);
         $registry->setArgument('$cacheInvalidations', $collected->cacheInvalidations);
+        // Lets the DataHandler flusher skip every table no #[Cache] route uses as a tag.
+        $registry->setArgument('$cacheTags', array_values(array_unique(array_merge([], ...array_column($collected->cacheConfigs, 'tags')))));
         // Routes contributing nothing are dropped rather than baked as empty arrays.
         $registry->setArgument('$paramDescriptions', array_filter($collected->paramDescriptions));
         $registry->setArgument('$optionalInputs', array_filter($collected->optionalInputs));

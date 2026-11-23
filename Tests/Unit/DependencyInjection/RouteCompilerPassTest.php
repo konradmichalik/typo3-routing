@@ -791,6 +791,19 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
+    public function bakesTheUniqueCacheTagsIntoTheRegistry(): void
+    {
+        $container = $this->buildContainer([
+            'fixture_controller' => FixtureController::class,
+            'products' => InheritedProductController::class,
+            'news' => InheritedNewsController::class,
+        ]);
+        (new RouteCompilerPass())->process($container);
+
+        self::assertSame(['tx_fixture', 'tx_inherited'], $container->getDefinition(RouteRegistry::class)->getArgument('$cacheTags'));
+    }
+
+    #[Test]
     public function capturesCacheConfigForAnnotatedMethods(): void
     {
         $container = $this->buildContainer(['fixture_controller' => FixtureController::class]);

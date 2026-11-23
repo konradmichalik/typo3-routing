@@ -36,6 +36,7 @@ use function is_string;
 use function is_subclass_of;
 use function sprintf;
 use function strtolower;
+use function trim;
 
 /**
  * ControllerArgumentResolver.
@@ -238,7 +239,8 @@ final readonly class ControllerArgumentResolver
 
     private function toFloat(mixed $value, string $name): float
     {
-        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value))) {
+        // is_numeric() accepts surrounding whitespace, a trailing newline included.
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value) && trim($value) === $value)) {
             return (float) $value;
         }
 

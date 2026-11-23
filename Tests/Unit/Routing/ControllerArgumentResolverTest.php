@@ -172,6 +172,7 @@ final class ControllerArgumentResolverTest extends TestCase
         yield 'int from float' => ['int', '1.5'];
         yield 'int with trailing newline' => ['int', "12\n"];
         yield 'float from word' => ['float', 'abc'];
+        yield 'float with trailing newline' => ['float', "1.5\n"];
         yield 'bool from word' => ['bool', 'maybe'];
     }
 

@@ -138,10 +138,11 @@ final readonly class OpenApiGenerator
         $bodyRequired = [];
 
         $descriptions = $this->registry->getParamDescriptions($name);
+        $utf8 = $this->registry->routeNeedsUtf8($name);
 
         foreach ($arguments as $argument) {
             $pattern = $route['requirements'][$argument['name']] ?? null;
-            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, ArgumentConstraints::KEYS));
+            $schema = $this->schemas->schemaForType($argument['type'], '' === $pattern ? null : $pattern, array_intersect_key($argument, ArgumentConstraints::KEYS), $utf8);
             $description = $descriptions[$argument['name']] ?? null;
 
             match ($this->target($argument['source'], $hasBody, $acceptsUpload)) {

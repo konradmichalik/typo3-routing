@@ -62,12 +62,14 @@ final readonly class JsonSchemaMapper
      *                                                                                               schema that ends up `{"type": "string"}`, and used to narrow a
      *                                                                                               backed enum's `enum` list to the cases the route actually accepts
      * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints the argument's value constraints, added as `minimum`, `maximum`, `minLength` and `maxLength`
+     * @param bool                                                                      $utf8        whether the route matches in UTF-8 mode (`RouteRegistry::routeNeedsUtf8()`), so
+     *                                                                                               the enum narrowing applies `$pattern` with the same `u` modifier
      *
      * @return array<string, mixed>
      */
-    public function schemaForType(?string $type, ?string $pattern = null, array $constraints = []): array
+    public function schemaForType(?string $type, ?string $pattern = null, array $constraints = [], bool $utf8 = false): array
     {
-        return [...$this->typeSchema($type, $pattern), ...$this->constraintKeywords($constraints)];
+        return [...$this->typeSchema($type, $pattern, $utf8), ...$this->constraintKeywords($constraints)];
     }
 
     /**
@@ -100,10 +102,10 @@ final readonly class JsonSchemaMapper
     /**
      * @return array<string, mixed>
      */
-    private function typeSchema(?string $type, ?string $pattern): array
+    private function typeSchema(?string $type, ?string $pattern, bool $utf8): array
     {
         if (null !== $type && is_a($type, UnitEnum::class, true)) {
-            return $this->enumSchema($type, $pattern);
+            return $this->enumSchema($type, $pattern, $utf8);
         }
 
         if (null !== $type && is_a($type, DomainObjectInterface::class, true)) {
@@ -355,7 +357,7 @@ final readonly class JsonSchemaMapper
      *
      * @return array<string, mixed>
      */
-    private function enumSchema(string $enum, ?string $pattern): array
+    private function enumSchema(string $enum, ?string $pattern, bool $utf8): array
     {
         $reflection = new ReflectionEnum($enum);
         $backingType = $reflection->getBackingType()?->getName();
@@ -371,28 +373,28 @@ final readonly class JsonSchemaMapper
 
         return [
             'type' => 'int' === $backingType ? 'integer' : 'string',
-            'enum' => $this->casesMatchingRequirement($values, $pattern),
+            'enum' => $this->casesMatchingRequirement($values, $pattern, $utf8),
         ];
     }
 
     /**
      * Drops the cases a non-empty route requirement rejects, so the `enum` list states what the route
      * accepts rather than what the PHP type allows. Matching mirrors how the requirement is enforced
-     * for real, via the same {@see RequirementPattern} regex ControllerInvoker and RouteMatcher use. The
-     * mapper has no route, so it always matches in byte mode, never in a UTF-8 route's `u` mode.
+     * for real, via the same {@see RequirementPattern} regex ControllerInvoker and RouteMatcher use,
+     * including the `u` modifier of a UTF-8 route.
      *
      * @param list<int|string> $values
      *
      * @return list<int|string>
      */
-    private function casesMatchingRequirement(array $values, ?string $pattern): array
+    private function casesMatchingRequirement(array $values, ?string $pattern, bool $utf8): array
     {
         // '' is "presence only" rather than a regex (see #[Route]), so it narrows nothing.
         if (null === $pattern || '' === $pattern) {
             return $values;
         }
 
-        $regex = RequirementPattern::regex($pattern);
+        $regex = RequirementPattern::regex($pattern, $utf8);
         if (false === @preg_match($regex, '')) {
             // An unusable requirement cannot be evaluated; report the enum unnarrowed rather than
             // claim no case is acceptable. Such a route never matches anyway — Symfony compiles the

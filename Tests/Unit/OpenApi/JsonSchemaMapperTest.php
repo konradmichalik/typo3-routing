@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\OpenApi;
 use KonradMichalik\Typo3Routing\OpenApi\JsonSchemaMapper;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{AllOptionalDto, ChildDto, CourseDto, CourseWithInstructorDto, CycleADto, CycleHolderDto, EmptyDto, LooseFieldsDto, NodeDto, NullableFieldsDto, SelfTypedNodeDto};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status, Suit};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Spelling, Status, Suit};
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\UploadedFileInterface;
@@ -298,6 +298,30 @@ final class JsonSchemaMapperTest extends TestCase
         self::assertSame(
             ['type' => 'string', 'enum' => []],
             (new JsonSchemaMapper())->schemaForType(Suit::class, 'Hearts'),
+        );
+    }
+
+    /**
+     * A UTF-8 route matches its requirement with `u`, so `\p{L}` accepts the multibyte `ë`.
+     */
+    #[Test]
+    public function narrowsInUtf8ModeWhenTheRouteNeedsIt(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => ['zoe', 'zoë']],
+            (new JsonSchemaMapper())->schemaForType(Spelling::class, '\p{L}+', [], true),
+        );
+    }
+
+    /**
+     * Without `u` the trailing byte of `ë` is no letter, exactly as a byte-mode route would see it.
+     */
+    #[Test]
+    public function narrowsInByteModeByDefault(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => ['zoe']],
+            (new JsonSchemaMapper())->schemaForType(Spelling::class, '\p{L}+'),
         );
     }
 

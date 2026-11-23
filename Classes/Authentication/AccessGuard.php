@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Authentication;
 
-use KonradMichalik\Typo3Routing\Attribute\RequireRequestToken;
 use KonradMichalik\Typo3Routing\Http\JsonErrorResponse;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -21,7 +20,6 @@ use TYPO3\CMS\Core\Context\{Context, SecurityAspect};
 use TYPO3\CMS\Core\Security\RequestToken;
 
 use function assert;
-use function in_array;
 
 /**
  * AccessGuard.
@@ -93,13 +91,12 @@ final readonly class AccessGuard
 
     private function passesRequestToken(string $routeName, ServerRequestInterface $request): bool
     {
-        $scope = $this->registry->getRequestTokenScope($routeName);
-
         // Not opted in, or a non-state-changing method that is not CSRF-relevant → nothing to verify.
-        // Upper-cased because the Symfony matcher matches methods case-insensitively.
-        if (null === $scope || !in_array(strtoupper($request->getMethod()), RequireRequestToken::PROTECTED_METHODS, true)) {
+        if (!$this->registry->requiresRequestToken($routeName, $request->getMethod())) {
             return true;
         }
+
+        $scope = $this->registry->getRequestTokenScope($routeName);
 
         // The core RequestTokenMiddleware has already decoded the received token into the SecurityAspect:
         // null = none sent, false = present but not verifiable against the nonce, otherwise the token object.

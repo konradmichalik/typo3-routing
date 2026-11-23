@@ -13,13 +13,11 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 
-use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Cache\CacheBypassGuard;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\FakeUser;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use TYPO3\CMS\Core\Context\{Context, UserAspect};
-use TYPO3\CMS\Core\Http\ServerRequest;
 
 /**
  * CacheBypassGuardTest.
@@ -30,54 +28,21 @@ use TYPO3\CMS\Core\Http\ServerRequest;
 final class CacheBypassGuardTest extends TestCase
 {
     #[Test]
-    public function anAnonymousRequestWithoutCacheControlSkipsNeitherReadNorWrite(): void
+    public function anAnonymousRequestIsNotBypassed(): void
     {
-        $guard = new CacheBypassGuard(new Context());
-        $request = $this->request();
-
-        self::assertFalse($guard->skipsRead($request));
-        self::assertFalse($guard->skipsWrite($request));
+        self::assertFalse((new CacheBypassGuard(new Context()))->isBypassed());
     }
 
     #[Test]
-    public function anAnonymousRequestWithNoStoreSkipsBothReadAndWrite(): void
+    public function aLoggedInBackendUserIsBypassed(): void
     {
-        $guard = new CacheBypassGuard(new Context());
-        $request = $this->request('no-store');
-
-        self::assertTrue($guard->skipsRead($request));
-        self::assertTrue($guard->skipsWrite($request));
+        self::assertTrue((new CacheBypassGuard($this->backendUserContext(true)))->isBypassed());
     }
 
     #[Test]
-    public function aLoggedInBackendUserSkipsBothReadAndWriteRegardlessOfCacheControl(): void
+    public function aLoggedOutBackendUserIsNotBypassed(): void
     {
-        $guard = new CacheBypassGuard($this->backendUserContext(true));
-        $request = $this->request();
-
-        self::assertTrue($guard->skipsRead($request));
-        self::assertTrue($guard->skipsWrite($request));
-    }
-
-    #[Test]
-    public function aLoggedOutBackendUserDoesNotSkipEitherOnItsOwn(): void
-    {
-        $guard = new CacheBypassGuard($this->backendUserContext(false));
-        $request = $this->request();
-
-        self::assertFalse($guard->skipsRead($request));
-        self::assertFalse($guard->skipsWrite($request));
-    }
-
-    private function request(?string $cacheControl = null): ServerRequest
-    {
-        $builder = Requests::get('https://example.com/api/cached');
-
-        if (null !== $cacheControl) {
-            $builder->withHeader('Cache-Control', $cacheControl);
-        }
-
-        return $builder->build();
+        self::assertFalse((new CacheBypassGuard($this->backendUserContext(false)))->isBypassed());
     }
 
     private function backendUserContext(bool $loggedIn): Context

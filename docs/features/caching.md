@@ -35,7 +35,9 @@ public function list(int $page = 1): ResponseInterface
 
 > [!WARNING]
 > This safeguard only triggers on `#[Authenticate]`. A **public** `#[Cache]` route whose controller inspects the frontend-user context itself (e.g. via the `frontend.user` aspect) shares one cache entry across all visitors — the first user's personalized response would be served to everyone. Don't combine `#[Cache]` with identity-dependent output; protect such routes with `#[Authenticate]` (which disables the cache) instead.
-- The cache is bypassed entirely — neither read nor written — for a **logged-in backend user** (so editors always see live content while previewing) and for a request sending `Cache-Control: no-store`. A plain `Cache-Control: no-cache` only skips **reading** the stored entry; the fresh response still refreshes the cache for later requests.
+- The cache is bypassed entirely, neither read nor written, only for a **logged-in backend user**, so editors always see live content while previewing.
+- **Clients cannot bypass the cache.** A request header such as `Cache-Control: no-cache` or `no-store` is ignored: the stored entry is served, and on a miss the fresh response is stored as usual. Otherwise any client could force a controller run on every request with a single header.
+- To force a fresh response as an operator, flush the entry instead: through its tags (a DataHandler change of the tagged record, or a write route with [`#[InvalidatesCache]`](#invalidating-from-a-write-route)), or by clearing the page cache as described above.
 
 - [Invalidating from a write route](#invalidating-from-a-write-route)
 - [ETag / conditional GET](#etag--conditional-get)
@@ -87,7 +89,7 @@ Matching follows RFC 9110 (weak comparison, understands `*` and comma-separated 
 
 ## Cache status header
 
-Every response from a `#[Cache]`-enabled `GET` route carries an `X-TYPO3-API-Cache` header — `HIT` when served from the stored entry, `MISS` when computed fresh (including whenever the cache was bypassed, see above). Routes without `#[Cache]`, or non-`GET` requests, never receive the header — its mere presence tells a client whether caching applies at all.
+Every response from a `#[Cache]`-enabled `GET` route carries an `X-TYPO3-API-Cache` header — `HIT` when served from the stored entry, `MISS` when computed fresh (including every request of a logged-in backend user, see above). Routes without `#[Cache]`, or non-`GET` requests, never receive the header — its mere presence tells a client whether caching applies at all.
 
 > [!NOTE]
 > The header is not echoed on a `304 Not Modified` response — only `ETag` is (RFC 9110 §15.4.5).

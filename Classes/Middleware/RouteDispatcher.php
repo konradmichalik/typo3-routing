@@ -479,7 +479,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function readCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request): ?ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || $this->services->cacheBypass()->skipsRead($request)) {
+        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || $this->services->cacheBypass()->isBypassed()) {
             return null;
         }
 
@@ -495,7 +495,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function writeCache(?array $cacheConfig, string $routeName, ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || 200 !== $response->getStatusCode() || $this->services->cacheBypass()->skipsWrite($request)) {
+        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || 200 !== $response->getStatusCode() || $this->services->cacheBypass()->isBypassed()) {
             return $response;
         }
 

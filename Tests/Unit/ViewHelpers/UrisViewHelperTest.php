@@ -48,7 +48,7 @@ final class UrisViewHelperTest extends TestCase
             ->build();
 
         $viewHelper = new UrisViewHelper();
-        $viewHelper->setArguments(['routes' => ['count' => 'example_count', 'list' => 'example_list']]);
+        $viewHelper->setArguments(['routes' => ['count' => 'example_count', 'list' => 'example_list'], 'absolute' => false]);
 
         self::assertJsonStringEqualsJsonString(
             '{"count":"/api/count","list":"/api/list"}',

@@ -763,8 +763,15 @@ final class RouteCompilerPassTest extends TestCase
             PassAuthenticator::class => PassAuthenticator::class,
         ]);
 
-        // PHP does not carry method attributes onto an override, and nothing reports the loss.
-        self::assertSame([], $this->discover($container));
+        $warnings = $this->captureWarnings($container);
+
+        // PHP does not carry method attributes onto an override, the compiler pass only warns about the loss.
+        self::assertSame([], $container->getDefinition(RouteRegistry::class)->getArgument('$routes'));
+        self::assertCount(2, $warnings);
+        self::assertStringContainsString('"overriding::detail()" overrides', $warnings[0]);
+        self::assertStringContainsString('the following inherited route(s) no longer exist: detail', $warnings[0]);
+        self::assertStringContainsString('"overriding" implements', $warnings[1]);
+        self::assertStringContainsString('declares no #[Route]', $warnings[1]);
     }
 
     #[Test]
@@ -775,7 +782,7 @@ final class RouteCompilerPassTest extends TestCase
             'rerouting' => ReroutingOverrideController::class,
             PassAuthenticator::class => PassAuthenticator::class,
         ]);
-        (new RouteCompilerPass())->process($container);
+        $warnings = $this->captureWarnings($container);
 
         $definition = $container->getDefinition(RouteRegistry::class);
         /** @var array<string, list<array{service: string, options: array<string, mixed>}>> $authenticators */
@@ -788,6 +795,9 @@ final class RouteCompilerPassTest extends TestCase
         // Overridden with a repeated #[Route]: the route exists, the protection does not.
         self::assertSame('/api/rerouting/{uid}', $routes['rerouting_detail']['path']);
         self::assertArrayNotHasKey('rerouting_detail', $authenticators);
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('"rerouting::detail()" overrides', $warnings[0]);
+        self::assertStringContainsString('drops #[Authenticate]', $warnings[0]);
     }
 
     #[Test]

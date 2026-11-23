@@ -48,7 +48,7 @@ final class UriViewHelperTest extends TestCase
             ->build();
 
         $viewHelper = new UriViewHelper();
-        $viewHelper->setArguments(['route' => 'example_count', 'parameters' => []]);
+        $viewHelper->setArguments(['route' => 'example_count', 'parameters' => [], 'absolute' => false]);
 
         self::assertSame('/sub/api/count', $viewHelper->render());
     }
@@ -84,7 +84,7 @@ final class UriViewHelperTest extends TestCase
         unset($GLOBALS['TYPO3_REQUEST']);
 
         $viewHelper = new UriViewHelper();
-        $viewHelper->setArguments(['route' => 'example_count', 'parameters' => []]);
+        $viewHelper->setArguments(['route' => 'example_count', 'parameters' => [], 'absolute' => false]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionCode(1750000001);

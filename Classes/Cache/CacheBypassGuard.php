@@ -31,7 +31,6 @@ final readonly class CacheBypassGuard
     /**
      * A logged-in backend user previewing draft/unpublished content neither reads nor writes the cache: the
      * key does not vary by preview state, so a stored entry would leak between editors and public visitors.
-     * Nothing a client sends, "Cache-Control" included, bypasses the cache, so no client can force a controller run.
      */
     public function isBypassed(): bool
     {

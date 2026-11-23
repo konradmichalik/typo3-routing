@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 
-use KonradMichalik\Typo3Routing\Cache\{CacheInvalidator, ResponseCacheManager};
+use KonradMichalik\Typo3Routing\Cache\{CacheInvalidator, CacheTagPlaceholders, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\CreatesResponseCacheManager;
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
@@ -38,12 +38,14 @@ final class CacheInvalidatorTest extends TestCase
     protected function setUp(): void
     {
         $this->cache = $this->createResponseCacheManager();
-        $registry = new RouteRegistry([], new ServiceLocator([]), cacheInvalidations: ['news_create' => ['news', 'teaser']]);
+        $registry = new RouteRegistry([], new ServiceLocator([]), cacheInvalidations: ['news_create' => ['news', 'teaser'], 'news_update' => ['news_{id}']]);
         $this->subject = new CacheInvalidator($registry, $this->cache);
 
         $this->cache->store('news', new Response('php://temp', 200), 3600, ['news']);
         $this->cache->store('teaser', new Response('php://temp', 200), 3600, ['teaser']);
         $this->cache->store('other', new Response('php://temp', 200), 3600, ['other']);
+        $this->cache->store('news_5', new Response('php://temp', 200), 3600, ['news_5']);
+        $this->cache->store('news_6', new Response('php://temp', 200), 3600, ['news_6']);
     }
 
     /**
@@ -60,7 +62,7 @@ final class CacheInvalidatorTest extends TestCase
     #[DataProvider('flushingStatuses')]
     public function flushesEveryDeclaredTagAfterASuccessOrRedirectResponse(int $status): void
     {
-        $this->subject->afterResponse('news_create', $this->responseWithStatus($status));
+        $this->subject->afterResponse(['_route' => 'news_create'], $this->responseWithStatus($status));
 
         self::assertNull($this->cache->get('news'));
         self::assertNull($this->cache->get('teaser'));
@@ -81,7 +83,7 @@ final class CacheInvalidatorTest extends TestCase
     #[DataProvider('nonFlushingStatuses')]
     public function flushesNothingAfterAnInformationalOrErrorResponse(int $status): void
     {
-        $this->subject->afterResponse('news_create', $this->responseWithStatus($status));
+        $this->subject->afterResponse(['_route' => 'news_create'], $this->responseWithStatus($status));
 
         self::assertNotNull($this->cache->get('news'));
         self::assertNotNull($this->cache->get('teaser'));
@@ -90,10 +92,32 @@ final class CacheInvalidatorTest extends TestCase
     #[Test]
     public function flushesNothingForARouteWithoutDeclaredTags(): void
     {
-        $this->subject->afterResponse('other_route', new Response('php://temp', 200));
+        $this->subject->afterResponse(['_route' => 'other_route'], new Response('php://temp', 200));
 
         self::assertNotNull($this->cache->get('news'));
         self::assertNotNull($this->cache->get('other'));
+    }
+
+    #[Test]
+    public function flushesOnlyTheRecordTheWriteRouteMatched(): void
+    {
+        $this->subject->afterResponse(['_route' => 'news_update', 'id' => '5'], new Response('php://temp', 200));
+
+        self::assertNull($this->cache->get('news_5'));
+        self::assertNotNull($this->cache->get('news_6'));
+        self::assertNotNull($this->cache->get('news'));
+    }
+
+    #[Test]
+    public function flushesTheHashedTagAnUnsafeValueWasStoredUnder(): void
+    {
+        $stored = CacheTagPlaceholders::resolve(['news_{slug}'], ['slug' => 'a.b']);
+        $this->cache->store('news_slug', new Response('php://temp', 200), 3600, $stored);
+
+        $this->subject->afterResponse(['_route' => 'news_update', 'id' => 'a.b'], new Response('php://temp', 200));
+
+        self::assertNull($this->cache->get('news_slug'));
+        self::assertNotNull($this->cache->get('news_5'));
     }
 
     // TYPO3's Response rejects unregistered codes such as 199 and 399, which the boundaries need.

@@ -194,6 +194,20 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['invalidated' => true]);
     }
 
+    #[Route(path: '/api/example/record/{id}', methods: ['GET'], name: 'example_record')]
+    #[Cache(lifetime: 3600, tags: ['tx_routingtest_domain_model_item_{id}'])]
+    public function record(string $id): JsonResponse
+    {
+        return new JsonResponse(['id' => $id, 'token' => bin2hex(random_bytes(8))]);
+    }
+
+    #[Route(path: '/api/example/record/{id}', methods: ['POST'], name: 'example_record_update')]
+    #[InvalidatesCache(tags: ['tx_routingtest_domain_model_item_{id}'])]
+    public function updateRecord(string $id): JsonResponse
+    {
+        return new JsonResponse(['updated' => $id]);
+    }
+
     #[Route(path: '/api/example/invalidate-rejected', methods: ['POST'], name: 'example_invalidate_rejected')]
     #[InvalidatesCache(tags: ['pages'])]
     public function invalidateRejected(): never

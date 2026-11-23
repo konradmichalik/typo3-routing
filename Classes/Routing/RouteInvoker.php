@@ -137,7 +137,7 @@ final readonly class RouteInvoker
         // 5. Dispatch. Rate limiting and the response cache stay out: both are HTTP-transport
         //    mechanisms, not part of the route's correctness contract. Invalidation is not, see above.
         $response = $this->invoker->invoke($match, $synthetic);
-        $this->cacheInvalidator?->afterResponse($routeName, $response);
+        $this->cacheInvalidator?->afterResponse($match, $response);
 
         return $response;
     }

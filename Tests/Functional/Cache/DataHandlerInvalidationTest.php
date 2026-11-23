@@ -14,10 +14,15 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Functional\Cache;
 
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
+use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
 use PHPUnit\Framework\Attributes\Test;
+use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
+use Psr\Http\Server\RequestHandlerInterface;
+use TYPO3\CMS\Core\Context\{Context, UserAspect};
 use TYPO3\CMS\Core\DataHandling\DataHandler;
-use TYPO3\CMS\Core\Http\Response;
+use TYPO3\CMS\Core\Http\{Response, ServerRequest};
 use TYPO3\CMS\Core\Localization\LanguageServiceFactory;
+use TYPO3\CMS\Core\Site\Entity\Site;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\TestingFramework\Core\Functional\FunctionalTestCase;
 
@@ -99,6 +104,56 @@ final class DataHandlerInvalidationTest extends FunctionalTestCase
         $dataHandler->clear_cacheCmd('pages');
 
         self::assertNull($this->responseCache->get('route_table'));
+    }
+
+    #[Test]
+    public function updatingARecordFlushesOnlyTheDetailRouteEntryTaggedWithItsUid(): void
+    {
+        $this->dispatch('/api/example/record/5');
+        $this->dispatch('/api/example/record/6');
+
+        $this->runDataHandler([self::TABLE => [5 => ['title' => 'Changed']]], []);
+
+        self::assertSame('MISS', $this->dispatch('/api/example/record/5')->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $this->dispatch('/api/example/record/6')->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function updatingARecordFlushesTheDetailRouteEntryRequestedWithLeadingZeros(): void
+    {
+        $this->dispatch('/api/example/record/05');
+
+        $this->runDataHandler([self::TABLE => [5 => ['title' => 'Changed']]], []);
+
+        self::assertSame('MISS', $this->dispatch('/api/example/record/05')->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    private function dispatch(string $path): ResponseInterface
+    {
+        $site = new Site('main', 1, [
+            'base' => 'https://example.com/',
+            'languages' => [['languageId' => 0, 'title' => 'English', 'locale' => 'en_US.UTF-8', 'base' => 'https://example.com/']],
+        ]);
+        $request = (new ServerRequest('https://example.com'.$path, 'GET'))
+            ->withAttribute('site', $site)
+            ->withAttribute('language', $site->getDefaultLanguage());
+        $pageHandler = new class implements RequestHandlerInterface {
+            public function handle(ServerRequestInterface $request): ResponseInterface
+            {
+                return new Response('php://temp', 404);
+            }
+        };
+
+        // A logged-in backend user bypasses the response cache, so the request runs as a visitor.
+        $context = $this->get(Context::class);
+        $editor = $context->getAspect('backend.user');
+        $context->setAspect('backend.user', new UserAspect());
+
+        try {
+            return $this->get(RouteDispatcher::class)->process($request, $pageHandler);
+        } finally {
+            $context->setAspect('backend.user', $editor);
+        }
     }
 
     private function store(string $key, string $tag): void

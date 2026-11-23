@@ -14,16 +14,17 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\DependencyInjection;
 
 use KonradMichalik\Typo3Routing\Attribute\InvalidatesCache;
+use KonradMichalik\Typo3Routing\Cache\CacheTagPlaceholders;
 use LogicException;
 use ReflectionMethod;
-use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 
 use function array_column;
-use function array_diff;
+use function array_filter;
 use function array_intersect;
+use function array_map;
 use function array_merge;
 use function implode;
-use function preg_match;
+use function in_array;
 use function sprintf;
 use function trigger_error;
 
@@ -42,8 +43,9 @@ final readonly class InvalidatesCacheResolver
      * Stores the method's #[InvalidatesCache] tags on $collected, if it declares the attribute.
      *
      * @param list<string> $methods the route's HTTP methods, empty meaning any
+     * @param string       $path    the route's full path, the only source tag placeholders resolve from
      */
-    public function apply(ReflectionMethod $method, array $methods, string $serviceId, string $name, CollectedRoutes $collected): void
+    public function apply(ReflectionMethod $method, array $methods, string $path, string $serviceId, string $name, CollectedRoutes $collected): void
     {
         $attributes = $method->getAttributes(InvalidatesCache::class);
         if ([] === $attributes) {
@@ -57,9 +59,14 @@ final readonly class InvalidatesCacheResolver
 
         foreach ($tags as $tag) {
             // The cache frontend rejects such a tag only at flush time, after the controller already wrote.
-            if (1 !== preg_match(FrontendInterface::PATTERN_TAG, $tag)) {
-                throw new LogicException(sprintf('#[InvalidatesCache] on "%s::%s()" (route "%s") declares the invalid cache tag "%s": tags may only contain letters, digits, "_", "%%", "-" and "&", at most 250 characters.', $serviceId, $method->getName(), $name, $tag), 1750000052);
+            if (!CacheTagPlaceholders::isValid($tag)) {
+                throw new LogicException(sprintf('#[InvalidatesCache] on "%s::%s()" (route "%s") declares the invalid cache tag "%s": tags may only contain letters, digits, "_", "%%", "-" and "&", at most 250 characters, a placeholder counting as 64.', $serviceId, $method->getName(), $name, $tag), 1750000052);
             }
+        }
+
+        $unbound = CacheTagPlaceholders::unbound($tags, $path);
+        if ([] !== $unbound) {
+            throw new LogicException(sprintf('#[InvalidatesCache] on "%s::%s()" (route "%s") uses the cache tag placeholder(s) "{%s}", but its path "%s" declares no such parameter. Tag placeholders resolve from path parameters only, never from query or body values.', $serviceId, $method->getName(), $name, implode('}", "{', $unbound), $path), 1750000070);
         }
 
         $collected->cacheInvalidations[$name] = $tags;
@@ -72,10 +79,11 @@ final readonly class InvalidatesCacheResolver
      */
     public function warnAboutUndeclaredTags(CollectedRoutes $collected): void
     {
-        $cachedTags = array_merge([], ...array_column($collected->cacheConfigs, 'tags'));
+        // Compared with placeholders replaced alike, so "news_{uid}" counts as declared by "news_{id}".
+        $cachedTags = array_map(CacheTagPlaceholders::withStandIns(...), array_merge([], ...array_column($collected->cacheConfigs, 'tags')));
 
         foreach ($collected->cacheInvalidations as $name => $tags) {
-            $undeclared = array_diff($tags, $cachedTags);
+            $undeclared = array_filter($tags, static fn (string $tag): bool => !in_array(CacheTagPlaceholders::withStandIns($tag), $cachedTags, true));
             if ([] === $undeclared) {
                 continue;
             }

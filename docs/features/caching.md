@@ -20,7 +20,7 @@ public function list(int $page = 1): ResponseInterface
 | Parameter      | Type           | Default | Description                                                                       |
 |----------------|----------------|---------|-----------------------------------------------------------------------------------|
 | `lifetime`     | `int`          | `86400` | Time to live in seconds (fallback when no tag is invalidated).                    |
-| `tags`         | `list<string>` | `[]`    | Static cache tags. A tag `{table}` is flushed automatically when a record of that table changes through the DataHandler, a fixed tag `{table}_{uid}` (e.g. `tx_news_domain_model_news_5`) when that one record does. A tag cannot take a value from a path parameter, so a detail route has no per-record tag. A tag the TYPO3 cache rejects (anything but letters, digits, `_`, `%`, `-` and `&`, or longer than 250 characters) fails the build. |
+| `tags`         | `list<string>` | `[]`    | Cache tags. A tag `{table}` is flushed automatically when a record of that table changes through the DataHandler, a tag `{table}_{uid}` (e.g. `tx_news_domain_model_news_5`) when that one record does. A tag may take the value of a path parameter through a placeholder (`tx_news_domain_model_news_{id}`), see [Record tags from path parameters](#record-tags-from-path-parameters). A tag the TYPO3 cache rejects (anything but letters, digits, `_`, `%`, `-` and `&`, or longer than 250 characters, a placeholder counting as 64) fails the build. |
 | `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key. Mainly for routes whose controller takes the request, which otherwise vary on every query parameter (e.g. `utm_source`). |
 
 - Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, site, language and the values the controller's arguments consume (path placeholders, query, body, read the same way the arguments are resolved, minus `ignoreParams`). Host, site and language variants are cached separately and two sites never share a cache entry. Path variants the matcher accepts for one route (trailing slash, case, repeated leading slashes) share one entry.
@@ -40,9 +40,33 @@ public function list(int $page = 1): ResponseInterface
 - **Clients cannot bypass the cache.** A request header such as `Cache-Control: no-cache` or `no-store` is ignored: the stored entry is served, and on a miss the fresh response is stored as usual. Otherwise any client could force a controller run on every request with a single header.
 - To force a fresh response as an operator, flush the entry instead: through its tags (a DataHandler change of the tagged record, or a write route with [`#[InvalidatesCache]`](#invalidating-from-a-write-route)), or by clearing the page cache as described above.
 
+- [Record tags from path parameters](#record-tags-from-path-parameters)
 - [Invalidating from a write route](#invalidating-from-a-write-route)
 - [ETag / conditional GET](#etag--conditional-get)
 - [Cache status header](#cache-status-header)
+
+## Record tags from path parameters
+
+A tag may contain `{name}` placeholders bound to the route's path parameters. Each placeholder is replaced with the matched value when the response is stored, so a detail route gets one tag per record:
+
+```php
+// GET /api/news/5 → stored under the tag "tx_news_domain_model_news_5"
+#[Route(path: '/api/news/{id}', name: 'news_detail', methods: ['GET'])]
+#[Cache(lifetime: 3600, tags: ['tx_news_domain_model_news_{id}'])]
+public function detail(int $id): ResponseInterface
+{
+    // …
+}
+```
+
+A DataHandler change of news record 5 makes the core flush `tx_news_domain_model_news_5`, so only the entry for `/api/news/5` is dropped and every other detail entry stays cached. The core also flushes `{table}` on a change of any record of that table, so a table tag on the detail route would empty all detail entries again. Leave it off only when records are not translated: a change to a translation (uid 12, `l10n_parent` 5) makes the core flush `tx_news_domain_model_news_12`, not `tx_news_domain_model_news_5`, so the entry for `/api/news/5` would stay stale. Keep the table tag when records are translated or otherwise flushed under a different uid than the one in the path.
+
+- Placeholders resolve from path parameters only, including a class-level `#[Route]` prefix. A placeholder that is not a path parameter of the route fails the build, also when the controller reads it from the query or body: a client could otherwise create tags at will. Host placeholders do not count either.
+- A method with several `#[Route]` attributes needs the placeholder in the path of every one of them, otherwise the build fails for the route that lacks it.
+- An integer-like value loses its leading zeros, the way an `int` argument receives it and the core builds `{table}_{uid}`: `/api/news/05` and `/api/news/5` share the tag `tx_news_domain_model_news_5`. A string slug like `007` therefore shares its tag with `7`, which can only cause an extra flush, never a missed one.
+- A value with a character outside `A-Z`, `a-z`, `0-9`, `_` and `-`, an empty value, or one longer than 64 characters becomes `h` followed by the first 16 hex characters of its SHA-256 hash, instead of a silently altered value. Storing and flushing apply the same rule, so the same value always yields the same tag. A literal value that already has that shape (`h` and 16 lowercase hex characters) is hashed as well, so it never collides with another value's hash form.
+- The build checks the static parts of the tag: `tx_news_{id}` passes, `tx.news_{id}` fails. Each placeholder counts as 64 characters toward the 250-character limit.
+- `routing:debug <name>` lists the tags as declared, with their placeholders.
 
 ## Invalidating from a write route
 
@@ -62,8 +86,9 @@ public function create(string $title): JsonResponse
 
 | Parameter | Type           | Description |
 |-----------|----------------|-------------|
-| `tags`    | `list<string>` | `#[Cache]` tags to flush. An empty list, or a tag the TYPO3 cache rejects (anything but letters, digits, `_`, `%`, `-` and `&`, or longer than 250 characters), fails the build. A tag that no `#[Cache]` declares raises a build-time warning, because it can never match a cached response. |
+| `tags`    | `list<string>` | `#[Cache]` tags to flush. Placeholders work as in [Record tags from path parameters](#record-tags-from-path-parameters) and resolve from the write route's own path. An empty list, a placeholder that is not a path parameter of the route, or a tag the TYPO3 cache rejects (anything but letters, digits, `_`, `%`, `-` and `&`, or longer than 250 characters, a placeholder counting as 64), fails the build. A tag that no `#[Cache]` declares raises a build-time warning, because it can never match a cached response; placeholder names do not matter for that check, so `news_{uid}` counts as declared by `news_{id}`. |
 
+- A write route on `/api/news/{id}` with `#[InvalidatesCache(tags: ['tx_news_domain_model_news_{id}'])]` flushes only the entry of the record it wrote, the same one the detail route above stored.
 - The tags are flushed **after** the controller returned a `2xx` or `3xx` response, so a write answering with a POST-redirect-GET `303` invalidates too. An error response (`4xx`, `5xx`, including an `HttpProblemException` turned into one) flushes nothing, since a rejected write changed nothing.
 - An `ImmediateResponseException` thrown from the controller propagates past the flush, so nothing is flushed in that case either. Return the response instead if the write should invalidate.
 - It is a separate attribute rather than an option of `#[Cache]`, so it combines freely with `#[Authenticate]` (which disables `#[Cache]` on the same route).

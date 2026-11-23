@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use Closure;
 use KonradMichalik\Typo3Routing\DependencyInjection\{CollectedRoutes, InvalidatesCacheResolver};
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EmptyInvalidatesCacheController, InvalidTagInvalidatesCacheController, InvalidatesCacheController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EmptyInvalidatesCacheController, InvalidTagInvalidatesCacheController, InvalidatesCacheController, PlaceholderTagController};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -39,7 +39,7 @@ final class InvalidatesCacheResolverTest extends TestCase
     {
         $collected = new CollectedRoutes();
 
-        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidatesCacheController::class, 'create'), ['POST'], 'svc', 'news_create', $collected);
+        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidatesCacheController::class, 'create'), ['POST'], '/news', 'svc', 'news_create', $collected);
 
         self::assertSame(['news_create' => ['tx_news_domain_model_news', 'news_list']], $collected->cacheInvalidations);
     }
@@ -49,7 +49,7 @@ final class InvalidatesCacheResolverTest extends TestCase
     {
         $collected = new CollectedRoutes();
 
-        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidatesCacheController::class, 'list'), ['GET'], 'svc', 'news_list', $collected);
+        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidatesCacheController::class, 'list'), ['GET'], '/news', 'svc', 'news_list', $collected);
 
         self::assertSame([], $collected->cacheInvalidations);
     }
@@ -61,7 +61,7 @@ final class InvalidatesCacheResolverTest extends TestCase
         $this->expectExceptionCode(1750000051);
         $this->expectExceptionMessageMatches('/#\[InvalidatesCache\] on "svc::create\(\)" \(route "news_create"\) declares no tags/');
 
-        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(EmptyInvalidatesCacheController::class, 'create'), ['POST'], 'svc', 'news_create', new CollectedRoutes());
+        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(EmptyInvalidatesCacheController::class, 'create'), ['POST'], '/news', 'svc', 'news_create', new CollectedRoutes());
     }
 
     #[Test]
@@ -69,9 +69,43 @@ final class InvalidatesCacheResolverTest extends TestCase
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000052);
-        $this->expectExceptionMessageMatches('/#\[InvalidatesCache\] on "svc::create\(\)" \(route "news_create"\) declares the invalid cache tag "news\.item"/');
+        $this->expectExceptionMessageMatches('/#\[InvalidatesCache\] on "svc::update\(\)" \(route "news_update"\) declares the invalid cache tag "news\.item_\{id\}"/');
 
-        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidTagInvalidatesCacheController::class, 'create'), ['POST'], 'svc', 'news_create', new CollectedRoutes());
+        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidTagInvalidatesCacheController::class, 'update'), ['PUT'], '/news/{id}', 'svc', 'news_update', new CollectedRoutes());
+    }
+
+    #[Test]
+    public function acceptsAPlaceholderBoundToAPathParameter(): void
+    {
+        $collected = new CollectedRoutes();
+
+        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(PlaceholderTagController::class, 'update'), ['PUT'], '/news/{id}', 'svc', 'news_update', $collected);
+
+        self::assertSame(['news_update' => ['news_{id}']], $collected->cacheInvalidations);
+    }
+
+    #[Test]
+    public function rejectsAPlaceholderThatIsNoPathParameter(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000070);
+        $this->expectExceptionMessage('#[InvalidatesCache] on "svc::update()" (route "news_update") uses the cache tag placeholder(s) "{id}", but its path "/news/{uid}" declares no such parameter');
+
+        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(PlaceholderTagController::class, 'update'), ['PUT'], '/news/{uid}', 'svc', 'news_update', new CollectedRoutes());
+    }
+
+    #[Test]
+    public function matchesPlaceholderTagsByShapeWhenLookingForUndeclaredTags(): void
+    {
+        $collected = new CollectedRoutes();
+        $collected->cacheConfigs['news_detail'] = ['lifetime' => 60, 'tags' => ['news_{id}'], 'ignoreParams' => []];
+        $collected->cacheInvalidations['news_update'] = ['news_{uid}'];
+        $collected->cacheInvalidations['news_typo'] = ['nwes_{uid}'];
+
+        $warnings = $this->captureUndeclaredTagWarnings($collected);
+
+        self::assertCount(1, $warnings);
+        self::assertStringContainsString('Route "news_typo" invalidates the response cache tag(s) "nwes_{uid}"', $warnings[0]);
     }
 
     #[Test]
@@ -134,7 +168,7 @@ final class InvalidatesCacheResolverTest extends TestCase
      */
     private function captureWarnings(array $methods): array
     {
-        return $this->warningsOf(static fn () => (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidatesCacheController::class, 'create'), $methods, 'svc', 'news_create', new CollectedRoutes()));
+        return $this->warningsOf(static fn () => (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidatesCacheController::class, 'create'), $methods, '/news', 'svc', 'news_create', new CollectedRoutes()));
     }
 
     /**

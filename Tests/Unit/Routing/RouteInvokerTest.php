@@ -65,6 +65,19 @@ final class RouteInvokerTest extends TestCase
     }
 
     #[Test]
+    public function aSuccessfulInvocationResolvesInvalidationTagPlaceholdersFromItsPathValues(): void
+    {
+        $this->responseCache->store('item_5', new Response('php://temp', 200), 3600, ['item_5']);
+        $this->responseCache->store('item_6', new Response('php://temp', 200), 3600, ['item_6']);
+
+        $response = $this->invoker()->invoke('item', ['id' => 5], $this->request());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertNull($this->responseCache->get('item_5'));
+        self::assertNotNull($this->responseCache->get('item_6'));
+    }
+
+    #[Test]
     public function anInstanceBuiltWithoutAnInvalidatorInvokesWithoutFlushing(): void
     {
         $this->responseCache->store('entry', new Response('php://temp', 200), 3600, ['pages']);
@@ -649,7 +662,7 @@ final class RouteInvokerTest extends TestCase
             HeaderAuthenticator::class => static fn (): HeaderAuthenticator => new HeaderAuthenticator(),
         ]);
 
-        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, cacheInvalidations: ['submit' => ['pages']]);
+        return new RouteRegistry($routes, $locator, $cacheConfigs, $rateLimits, $arguments, $authenticators, $requestTokenScopes, $authenticatorLocator, cacheInvalidations: ['submit' => ['pages'], 'item' => ['item_{id}']]);
     }
 
     private function site(): Site

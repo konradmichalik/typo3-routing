@@ -24,10 +24,10 @@ use TYPO3\CMS\Core\Http\JsonResponse;
  */
 final class InvalidTagCacheController implements RouteControllerInterface
 {
-    #[Route(path: '/news', name: 'news_list')]
-    #[Cache(lifetime: 60, tags: ['news_list', 'news.item'])]
-    public function list(): JsonResponse
+    #[Route(path: '/news/{id}', name: 'news_detail')]
+    #[Cache(lifetime: 60, tags: ['news_list', 'news.item_{id}'])]
+    public function detail(int $id): JsonResponse
     {
-        return new JsonResponse([]);
+        return new JsonResponse(['id' => $id]);
     }
 }

@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AnyMethodRequestTokenController, AuthenticatedController, BrokenAuthenticatorController, CacheIgnoresConstrainedParamController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ClassLevelAuthenticateController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InlinePlaceholderController, InlinePlaceholderLegacyPathController, InvalidAuthenticatorController, InvalidClassLevelAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, InvalidTagCacheController, InvalidatesCacheController, JsonErrorRouteController, MethodLevelExclusiveController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedInvalidatesCacheController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RouteDefaultBreaksConstraintController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AnyMethodRequestTokenController, AuthenticatedController, BrokenAuthenticatorController, CacheIgnoresConstrainedParamController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ClassLevelAuthenticateController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InlinePlaceholderController, InlinePlaceholderLegacyPathController, InvalidAuthenticatorController, InvalidClassLevelAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, InvalidTagCacheController, InvalidatesCacheController, JsonErrorRouteController, MethodLevelExclusiveController, MultiRoutePlaceholderCacheController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedInvalidatesCacheController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlaceholderTagController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RouteDefaultBreaksConstraintController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -334,9 +334,32 @@ final class RouteCompilerPassTest extends TestCase
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000068);
-        $this->expectExceptionMessage('"news.item"');
+        $this->expectExceptionMessage('#[Cache] on "invalid::detail()" declares the invalid cache tag "news.item_{id}"');
 
         $this->discover($this->buildContainer(['invalid' => InvalidTagCacheController::class]));
+    }
+
+    #[Test]
+    public function keepsCacheTagPlaceholdersBoundToAPathParameterForTheRequestToResolve(): void
+    {
+        $container = $this->buildContainer(['news' => PlaceholderTagController::class]);
+        (new RouteCompilerPass())->process($container);
+
+        /** @var array<string, array{lifetime: int, tags: list<string>, ignoreParams: list<string>}> $cacheConfigs */
+        $cacheConfigs = $container->getDefinition(RouteRegistry::class)->getArgument('$cacheConfigs');
+
+        self::assertSame(['news', 'news_{id}'], $cacheConfigs['news_detail']['tags']);
+        self::assertSame(['news_update' => ['news_{id}']], $container->getDefinition(RouteRegistry::class)->getArgument('$cacheInvalidations'));
+    }
+
+    #[Test]
+    public function rejectsACacheTagPlaceholderMissingFromOneOfTheMethodsRoutes(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionCode(1750000069);
+        $this->expectExceptionMessage('#[Cache] on "multi::detail()" (route "news_latest") uses the cache tag placeholder(s) "{id}", but its path "/news/latest" declares no such parameter');
+
+        $this->discover($this->buildContainer(['multi' => MultiRoutePlaceholderCacheController::class]));
     }
 
     #[Test]

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use KonradMichalik\Typo3Routing\Attribute\RequireRequestToken;
 use KonradMichalik\Typo3Routing\Authentication\{BackendUserAuthenticator, FrontendUserAuthenticator};
 
 use function array_column;
@@ -79,7 +80,7 @@ final readonly class RouteLinter
                 'check' => 'missing-request-token',
                 'route' => $name,
                 'controller' => $route['controller'],
-                'message' => 'Route authenticates through a cookie session and accepts a state-changing method, but has no #[RequireRequestToken]; only the SameSite cookie attribute stands between it and a cross-site form POST. A route accepting any method has to list its methods explicitly before #[RequireRequestToken] is allowed.',
+                'message' => 'Route authenticates through a cookie session and accepts a state-changing method, but has no #[RequireRequestToken]; only the SameSite cookie attribute stands between it and a cross-site form POST. Add #[RequireRequestToken].',
             ];
         }
 
@@ -94,7 +95,7 @@ final readonly class RouteLinter
         $services = array_column($registry->getAuthenticators($name), 'service');
 
         return null === $registry->getRequestTokenScope($name)
-            && $this->methodsOverlap($methods, ['POST', 'PUT', 'PATCH', 'DELETE'])
+            && $this->methodsOverlap($methods, RequireRequestToken::PROTECTED_METHODS)
             && [] !== array_intersect($services, [FrontendUserAuthenticator::class, BackendUserAuthenticator::class]);
     }
 

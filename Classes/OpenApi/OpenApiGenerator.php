@@ -184,7 +184,7 @@ final readonly class OpenApiGenerator
         }
 
         $hasInput = [] !== $parameters || [] !== $bodyProperties || self::hasConstrainedHostArgument($arguments);
-        $operation['responses'] = $this->responses($name, $route, $hasInput, $this->takesUpload($arguments, $acceptsUpload), $usedSchemas);
+        $operation['responses'] = $this->responses($name, $route, $method, $hasInput, $this->takesUpload($arguments, $acceptsUpload), $usedSchemas);
 
         return $operation;
     }
@@ -399,13 +399,13 @@ final readonly class OpenApiGenerator
      *
      * @return array<int, array<string, mixed>>
      */
-    private function responses(string $name, array $route, bool $hasInput, bool $hasUpload, array &$usedSchemas): array
+    private function responses(string $name, array $route, string $method, bool $hasInput, bool $hasUpload, array &$usedSchemas): array
     {
         return $this->responsesBuilder->build(
             $this->registry->getReturns($name),
             $hasInput,
             [] !== $this->registry->getAuthenticators($name),
-            null !== $this->registry->getRequestTokenScope($name),
+            $this->registry->requiresRequestToken($name, $method),
             [] !== $route['methods'],
             null !== $this->registry->getRateLimit($name),
             $hasUpload,

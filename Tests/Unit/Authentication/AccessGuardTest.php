@@ -130,6 +130,18 @@ final class AccessGuardTest extends TestCase
         self::assertNull($guard->enforce(['_route' => 'token'], $this->request('DELETE')));
     }
 
+    #[Test]
+    public function deniesALowercaseStateChangingMethodWithoutARequestToken(): void
+    {
+        // The Symfony matcher upper-cases the method, so "patch" matches a PATCH route and must not skip the check.
+        $guard = $this->guard($this->contextWithToken(null));
+
+        $response = $guard->enforce(['_route' => 'token'], $this->request('patch'));
+
+        self::assertNotNull($response);
+        self::assertSame(403, $response->getStatusCode());
+    }
+
     private function guard(?Context $context = null): AccessGuard
     {
         $pass = ['service' => PassAuthenticator::class, 'options' => []];

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use KonradMichalik\Typo3Routing\Attribute\RequireRequestToken;
 use LogicException;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Routing\Matcher\{CompiledUrlMatcher, UrlMatcher, UrlMatcherInterface};
@@ -423,6 +424,18 @@ final class RouteRegistry
     public function getRequestTokenScope(string $routeName): ?string
     {
         return $this->requestTokenScopes[$routeName] ?? null;
+    }
+
+    /**
+     * Whether a request with this method needs a request token. Upper-cased because the Symfony
+     * matcher matches methods case-insensitively.
+     *
+     * @internal shared by AccessGuard and the OpenAPI export, not part of the metadata surface
+     */
+    public function requiresRequestToken(string $routeName, string $method): bool
+    {
+        return null !== $this->getRequestTokenScope($routeName)
+            && in_array(strtoupper($method), RequireRequestToken::PROTECTED_METHODS, true);
     }
 
     /**

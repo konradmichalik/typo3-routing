@@ -20,7 +20,6 @@ use TYPO3\CMS\Core\Context\{Context, SecurityAspect};
 use TYPO3\CMS\Core\Security\RequestToken;
 
 use function assert;
-use function in_array;
 
 /**
  * AccessGuard.
@@ -92,12 +91,12 @@ final readonly class AccessGuard
 
     private function passesRequestToken(string $routeName, ServerRequestInterface $request): bool
     {
-        $scope = $this->registry->getRequestTokenScope($routeName);
-
         // Not opted in, or a non-state-changing method that is not CSRF-relevant → nothing to verify.
-        if (null === $scope || !in_array($request->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        if (!$this->registry->requiresRequestToken($routeName, $request->getMethod())) {
             return true;
         }
+
+        $scope = $this->registry->getRequestTokenScope($routeName);
 
         // The core RequestTokenMiddleware has already decoded the received token into the SecurityAspect:
         // null = none sent, false = present but not verifiable against the nonce, otherwise the token object.

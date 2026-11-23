@@ -368,6 +368,17 @@ final class RouteRegistryTest extends TestCase
     }
 
     #[Test]
+    public function requiresARequestTokenOnlyForOptedInRoutesAndProtectedMethods(): void
+    {
+        $registry = new RouteRegistry([], new ServiceLocator([]), requestTokenScopes: ['token' => 'routing/token']);
+
+        self::assertTrue($registry->requiresRequestToken('token', 'POST'));
+        self::assertTrue($registry->requiresRequestToken('token', 'patch'));
+        self::assertFalse($registry->requiresRequestToken('token', 'GET'));
+        self::assertFalse($registry->requiresRequestToken('public', 'POST'));
+    }
+
+    #[Test]
     public function derivesNoClassExclusivePrefixesWithoutAnyOptedInRoute(): void
     {
         self::assertSame([], $this->createRegistry()->getClassExclusivePrefixes());

@@ -25,6 +25,8 @@ use Attribute;
 #[Attribute(Attribute::TARGET_METHOD)]
 final readonly class RequireRequestToken
 {
+    public const PROTECTED_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
     /**
      * @param string|null $scope token scope; defaults to "routing/<routeName>" when null
      */

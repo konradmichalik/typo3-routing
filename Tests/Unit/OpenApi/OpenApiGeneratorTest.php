@@ -66,6 +66,19 @@ final class OpenApiGeneratorTest extends TestCase
     }
 
     #[Test]
+    public function documentsTheRequestTokenForbiddenOnlyOnProtectedMethods(): void
+    {
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
+        $routes = ['x' => ['path' => '/api/x', 'methods' => ['GET', 'POST'], 'controller' => 'ctrl::x', 'env' => null, 'requirements' => []]];
+        $registry = new RouteRegistry($routes, new ServiceLocator([]), requestTokenScopes: ['x' => 'routing/x']);
+
+        $paths = $this->generator($registry)->generate('My API', '2.0.0', '/api/')['paths']['/api/x'];
+
+        self::assertArrayNotHasKey(403, $paths['get']['responses']);
+        self::assertArrayHasKey(403, $paths['post']['responses']);
+    }
+
+    #[Test]
     public function omitsTheDeprecatedFlagForARouteWithoutTheAttribute(): void
     {
         $document = $this->generate();

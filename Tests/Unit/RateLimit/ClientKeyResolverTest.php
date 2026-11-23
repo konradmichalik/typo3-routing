@@ -66,6 +66,44 @@ final class ClientKeyResolverTest extends TestCase
     }
 
     #[Test]
+    public function keysIpv6ClientsByTheirSlash64Prefix(): void
+    {
+        $first = Requests::get('https://example.com/api/x')->withRemoteAddress('2001:db8:85a3:1:a:b:c:d')->build();
+        $second = Requests::get('https://example.com/api/x')->withRemoteAddress('2001:0DB8:85A3:0001:ffff:0:0:1')->build();
+
+        self::assertSame('ip:2001:db8:85a3:1::/64', $this->resolver()->resolve(self::IP_CONFIG, $first));
+        self::assertSame('ip:2001:db8:85a3:1::/64', $this->resolver()->resolve(self::IP_CONFIG, $second));
+    }
+
+    #[Test]
+    public function keysIpv6ClientsFromDifferentSlash64PrefixesSeparately(): void
+    {
+        $first = Requests::get('https://example.com/api/x')->withRemoteAddress('2001:db8:85a3:1::1')->build();
+        $second = Requests::get('https://example.com/api/x')->withRemoteAddress('2001:db8:85a3:2::1')->build();
+
+        self::assertNotSame(
+            $this->resolver()->resolve(self::IP_CONFIG, $first),
+            $this->resolver()->resolve(self::IP_CONFIG, $second),
+        );
+    }
+
+    #[Test]
+    public function keysIpv4MappedIpv6ClientsByTheirIpv4Address(): void
+    {
+        $request = Requests::get('https://example.com/api/x')->withRemoteAddress('::ffff:203.0.113.5')->build();
+
+        self::assertSame('ip:203.0.113.5', $this->resolver()->resolve(self::IP_CONFIG, $request));
+    }
+
+    #[Test]
+    public function keysByTheRawValueWhenTheAddressIsInvalid(): void
+    {
+        $request = Requests::get('https://example.com/api/x')->withRemoteAddress('not-an-ip')->build();
+
+        self::assertSame('ip:not-an-ip', $this->resolver()->resolve(self::IP_CONFIG, $request));
+    }
+
+    #[Test]
     public function keysByUserWhenAFrontendUserIsLoggedIn(): void
     {
         $request = Requests::get('https://example.com/api/x')->build();

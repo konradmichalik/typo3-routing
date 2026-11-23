@@ -709,6 +709,14 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function rejectsALowercaseStateChangingRequestWithoutARequestToken(): void
+    {
+        $response = $this->process($this->request('post', 'https://example.com/api/example/token'));
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    #[Test]
     public function dispatchesAStateChangingRequestWithAMatchingRequestToken(): void
     {
         // Simulate what the core RequestTokenMiddleware does: provide the decoded token in the SecurityAspect.

@@ -95,7 +95,8 @@ final readonly class AccessGuard
         $scope = $this->registry->getRequestTokenScope($routeName);
 
         // Not opted in, or a non-state-changing method that is not CSRF-relevant → nothing to verify.
-        if (null === $scope || !in_array($request->getMethod(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        // Upper-cased because the Symfony matcher matches methods case-insensitively.
+        if (null === $scope || !in_array(strtoupper($request->getMethod()), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             return true;
         }
 

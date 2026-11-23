@@ -131,7 +131,8 @@ public function update(ServerRequestInterface $request): ResponseInterface { /* 
 |-----------|---------------|------------------------|------------------------------------------------------|
 | `scope`   | `string\|null`| `routing/<routeName>`  | Token scope; derived from the route name when omitted. |
 
-- Only enforced for `POST`/`PUT`/`PATCH`/`DELETE` (compared case-insensitively, like route matching); safe methods are not CSRF-relevant. On a route accepting any method (`methods: []`), the token is required for exactly those methods. Putting it on a route that lists none of them (e.g. **GET-only**) is a build-time error.
+- Only enforced for `POST`/`PUT`/`PATCH`/`DELETE` (compared case-insensitively, like route matching); safe methods are not CSRF-relevant. On a route accepting any method (`methods: []`), the token is required for exactly those methods; any other method, such as `PURGE`, passes without one, so the controller must not change state on it. Putting it on a route that lists none of them (e.g. **GET-only**) is a build-time error.
+- TYPO3 reads the token from the `__RequestToken` body field only for upper-case `POST`, `PUT` and `PATCH`. A `DELETE` or a lower-case method (`fetch()` leaves `patch` as written) has to send it in the `X-TYPO3-RequestToken` header, otherwise it is rejected.
 - It is **redundant for Bearer-protected** routes (harmless, but unnecessary).
 - [`routing:lint`](../operating/commands.md#routinglint) reports a `FrontendUserAuthenticator` or `BackendUserAuthenticator` route that accepts a state-changing method without it as `missing-request-token`.
 

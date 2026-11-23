@@ -16,7 +16,6 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\Cache;
 use KonradMichalik\Typo3Routing\Cache\CacheTagPlaceholders;
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
-use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 
 use function hash;
 use function str_repeat;
@@ -66,6 +65,36 @@ final class CacheTagPlaceholdersTest extends TestCase
         self::assertSame(['news_h'.substr(hash('sha256', $hashed), 0, 16)], $tags);
     }
 
+    /**
+     * @return iterable<string, array{mixed, string}>
+     */
+    public static function integerLikeValues(): iterable
+    {
+        yield 'leading zero' => ['05', 'news_5'];
+        yield 'several leading zeros' => ['005', 'news_5'];
+        yield 'plain' => ['5', 'news_5'];
+        yield 'integer' => [5, 'news_5'];
+        yield 'negative zero' => ['-0', 'news_0'];
+        yield 'negative with leading zero' => ['-07', 'news_-7'];
+    }
+
+    #[Test]
+    #[DataProvider('integerLikeValues')]
+    public function normalizesAnIntegerLikeValueTheWayTheControllerReceivesIt(mixed $value, string $tag): void
+    {
+        self::assertSame([$tag], CacheTagPlaceholders::resolve(['news_{id}'], ['id' => $value]));
+    }
+
+    #[Test]
+    public function hashesALiteralValueShapedLikeAHashFormSoItCannotCollideWithIt(): void
+    {
+        [$hashed] = CacheTagPlaceholders::resolve(['{id}'], ['id' => 'a.b']);
+
+        self::assertMatchesRegularExpression('/^h[0-9a-f]{16}$/', $hashed);
+        self::assertNotSame([$hashed], CacheTagPlaceholders::resolve(['{id}'], ['id' => $hashed]));
+        self::assertSame(['h'.substr(hash('sha256', $hashed), 0, 16)], CacheTagPlaceholders::resolve(['{id}'], ['id' => $hashed]));
+    }
+
     #[Test]
     public function keepsAValueOfExactly64SafeCharacters(): void
     {
@@ -108,8 +137,8 @@ final class CacheTagPlaceholdersTest extends TestCase
 
     #[Test]
     #[DataProvider('tagsToValidate')]
-    public function standInsValidateOnlyTheStaticPartsAgainstTheTagPattern(string $tag, bool $valid): void
+    public function validatesOnlyTheStaticPartsAgainstTheTagPattern(string $tag, bool $valid): void
     {
-        self::assertSame($valid, 1 === preg_match(FrontendInterface::PATTERN_TAG, CacheTagPlaceholders::withStandIns($tag)));
+        self::assertSame($valid, CacheTagPlaceholders::isValid($tag));
     }
 }

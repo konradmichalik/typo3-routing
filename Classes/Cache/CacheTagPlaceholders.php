@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Cache;
 
+use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
+
 use function array_diff;
 use function array_map;
 use function array_merge;
@@ -49,6 +51,10 @@ final readonly class CacheTagPlaceholders
 
     private const SAFE_VALUE = '/^[A-Za-z0-9_-]{1,'.self::MAX_VALUE_LENGTH.'}$/';
 
+    private const INTEGER_VALUE = '/^-?\d+$/';
+
+    private const HASH_FORM = '/^h[0-9a-f]{16}$/';
+
     /**
      * @return list<string>
      */
@@ -84,6 +90,14 @@ final readonly class CacheTagPlaceholders
     }
 
     /**
+     * Whether the cache frontend accepts the tag with every placeholder at its longest value.
+     */
+    public static function isValid(string $tag): bool
+    {
+        return 1 === preg_match(FrontendInterface::PATTERN_TAG, self::withStandIns($tag));
+    }
+
+    /**
      * @param list<string>         $tags
      * @param array<string, mixed> $match the matcher result
      *
@@ -102,13 +116,21 @@ final readonly class CacheTagPlaceholders
     }
 
     /**
-     * A value outside the safe characters is hashed rather than stripped, so two different values
-     * never collapse into the same tag.
+     * A value outside the safe characters is hashed rather than stripped, and a literal value shaped
+     * like a hash form is hashed too, so a literal never equals another value's hash form.
      */
     private static function value(mixed $value): string
     {
         $string = is_scalar($value) ? (string) $value : '';
+        // The controller and the core DataHandler see "05" as 5: an extra flush for a slug like "007" beats a missed one.
+        if (1 === preg_match(self::INTEGER_VALUE, $string)) {
+            $string = (string) (int) $string;
+        }
 
-        return 1 === preg_match(self::SAFE_VALUE, $string) ? $string : 'h'.substr(hash('sha256', $string), 0, 16);
+        if (1 === preg_match(self::SAFE_VALUE, $string) && 1 !== preg_match(self::HASH_FORM, $string)) {
+            return $string;
+        }
+
+        return 'h'.substr(hash('sha256', $string), 0, 16);
     }
 }

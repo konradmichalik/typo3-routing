@@ -118,6 +118,16 @@ final class DataHandlerInvalidationTest extends FunctionalTestCase
         self::assertSame('HIT', $this->dispatch('/api/example/record/6')->getHeaderLine('X-TYPO3-API-Cache'));
     }
 
+    #[Test]
+    public function updatingARecordFlushesTheDetailRouteEntryRequestedWithLeadingZeros(): void
+    {
+        $this->dispatch('/api/example/record/05');
+
+        $this->runDataHandler([self::TABLE => [5 => ['title' => 'Changed']]], []);
+
+        self::assertSame('MISS', $this->dispatch('/api/example/record/05')->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
     private function dispatch(string $path): ResponseInterface
     {
         $site = new Site('main', 1, [

@@ -20,7 +20,7 @@ use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\Collision\CourseDto as CollidingCourseDto;
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\{CourseDto, NullableFieldsDto};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Status};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Spelling, Status};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -252,6 +252,28 @@ final class OpenApiGeneratorTest extends TestCase
         $params = $this->schemasByName($this->features()['paths']['/api/types']['get']['parameters']);
 
         self::assertSame(['type' => 'string', 'enum' => ['active']], $params['state']);
+    }
+
+    /**
+     * `\p{L}` makes the route UTF-8, so the router accepts `zoë`; the exported `enum` has to keep it.
+     */
+    #[Test]
+    public function narrowsEnumParameterSchemaInUtf8ModeOnAUtf8Route(): void
+    {
+        $params = $this->schemasByName($this->features()['paths']['/api/spelling-utf8']['get']['parameters']);
+
+        self::assertSame(['type' => 'string', 'enum' => ['zoe', 'zoë']], $params['name']);
+    }
+
+    /**
+     * `zo..` is plain ASCII, so the route stays in byte mode, where the two bytes of `ë` fill both dots.
+     */
+    #[Test]
+    public function narrowsEnumParameterSchemaInByteModeOnAByteModeRoute(): void
+    {
+        $params = $this->schemasByName($this->features()['paths']['/api/spelling-bytes']['get']['parameters']);
+
+        self::assertSame(['type' => 'string', 'enum' => ['zoë']], $params['name']);
     }
 
     /**
@@ -547,6 +569,8 @@ final class OpenApiGeneratorTest extends TestCase
             'payload' => ['path' => '/api/payload', 'methods' => ['POST'], 'controller' => 'ctrl::payload', 'env' => null, 'requirements' => []],
             'upload' => ['path' => '/api/upload', 'methods' => ['POST'], 'controller' => 'ctrl::upload', 'env' => null, 'requirements' => []],
             'attachments' => ['path' => '/api/attachments', 'methods' => ['GET', 'POST', 'PUT'], 'controller' => 'ctrl::attachments', 'env' => null, 'requirements' => []],
+            'spellingUtf8' => ['path' => '/api/spelling-utf8', 'methods' => ['GET'], 'controller' => 'ctrl::spellingUtf8', 'env' => null, 'requirements' => ['name' => '\\p{L}+']],
+            'spellingBytes' => ['path' => '/api/spelling-bytes', 'methods' => ['GET'], 'controller' => 'ctrl::spellingBytes', 'env' => null, 'requirements' => ['name' => 'zo..']],
         ];
 
         $arguments = [
@@ -591,6 +615,12 @@ final class OpenApiGeneratorTest extends TestCase
             'attachments' => [
                 ['name' => 'file', 'type' => UploadedFileInterface::class, 'source' => 'upload', 'nullable' => true, 'hasDefault' => true, 'default' => null],
                 ['name' => 'q', 'type' => 'string', 'source' => 'input', 'nullable' => true, 'hasDefault' => true, 'default' => null],
+            ],
+            'spellingUtf8' => [
+                ['name' => 'name', 'type' => Spelling::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
+            ],
+            'spellingBytes' => [
+                ['name' => 'name', 'type' => Spelling::class, 'source' => 'query', 'nullable' => true, 'hasDefault' => false, 'default' => null],
             ],
         ];
 

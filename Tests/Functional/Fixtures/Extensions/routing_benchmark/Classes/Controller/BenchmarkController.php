@@ -78,10 +78,8 @@ final class BenchmarkController implements RouteControllerInterface
         return new JsonResponse(['ok' => true]);
     }
 
-    // v1.2.0: cost of SiteLanguageScope::isVisibleForSite()/isVisibleForLanguage() — two in_array()
-    // checks against request attributes already present on every frontend request, paid on a route
-    // that opted in and is requested in scope (the "opted in, matches" case; out-of-scope is a 404
-    // and not a dispatch-cost question).
+    // v1.2.0: cost of the site/language visibility check (SiteLanguageScope::isMatchVisible() inside
+    // RouteMatcher::match()), paid on a route that opted in and is requested in scope.
     #[Route(path: '/api/bench/routing/scoped', name: 'bench_routing_scoped', sites: ['main'], languages: [0])]
     public function scoped(): JsonResponse
     {

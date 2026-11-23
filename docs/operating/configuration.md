@@ -100,7 +100,7 @@ final class ApiNotFound
 
 ## Environment-bound routes
 
-A route with `env: 'Development'` only exists while the top-level application context matches (case-insensitive). Outside that context the route behaves as if it does not exist — no ExpressionLanguage, just a match-time check against `Environment::getContext()`. Its path answers exactly like an unmatched one (`404` inside an [exclusive prefix](#exclusive-path-prefixes), page rendering otherwise), for every method: it never causes a `405`, and a visible route on the same path advertises only its own methods, in `Allow` as in a CORS preflight.
+A route with `env: 'Development'` only exists while the top-level application context matches (case-insensitive). Outside that context the route behaves as if it does not exist: no ExpressionLanguage, just a match-time check against `Environment::getContext()`. Its path answers exactly like an unmatched one (`404` inside an [exclusive prefix](#exclusive-path-prefixes), page rendering otherwise), for every method: it never causes a `405`, and a visible route on the same path advertises only its own methods, in `Allow` as in a CORS preflight.
 
 ```php
 #[Route(path: '/api/debug/dump', name: 'debug_dump', env: 'Development')]

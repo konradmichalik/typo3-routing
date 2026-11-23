@@ -94,7 +94,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $handler->handle($request);
         }
 
-        // CORS preflight is answered up front — before auth — so the browser gets its 204 without
+        // CORS preflight is answered up front, before auth, so the browser gets its 204 without
         // credentials ever being required. A path that matches no visible route falls through to the
         // gauntlet, which then answers it like any other missing path.
         $preflight = $this->preflight($request, $path);
@@ -160,10 +160,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function handleApiRequest(ServerRequestInterface $request, string $path, ?array &$corsConfig, ?string &$routeName): ?ResponseInterface
     {
-        // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try). Routes
-        //    invisible in this context (env, sites, languages) are left out by the matcher itself, so they
-        //    answer like a missing path, 405 and its Allow header included. Before either redirect below,
-        //    so a redirect never reveals an invisible route either.
+        // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try). The
+        //    matcher already left invisible routes out, so no redirect below can reveal one.
         $match = $this->matchRoute($request, $path);
         if (null === $match || $match instanceof ResponseInterface) {
             return $match;

@@ -194,8 +194,7 @@ final class RouteRegistry
      * re-compile every route's regex on each request. The fallback covers registries constructed
      * without compiled routes (tests, manual wiring).
      *
-     * With `$keep`, only the routes it accepts take part. That matcher is never the compiled one, so
-     * RouteMatcher asks for it only once the compiled one gave an answer that may involve a hidden route.
+     * With `$keep`, a plain UrlMatcher over the accepted routes only, never the compiled one (slower).
      *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
      *

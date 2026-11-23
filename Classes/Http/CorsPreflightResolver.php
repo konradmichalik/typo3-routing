@@ -19,7 +19,6 @@ use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotF
 use Symfony\Component\Routing\RequestContext;
 
 use function array_values;
-use function sprintf;
 
 /**
  * CorsPreflightResolver.
@@ -70,7 +69,7 @@ final readonly class CorsPreflightResolver
         if (!$this->isVisible($match, $request)) {
             // Not null: the caller would go on to answer OPTIONS on the route's path with a 405 and its
             // Allow header, where a missing path gets a 404. The caller must treat it as a missing path.
-            throw new ResourceNotFoundException(sprintf('No route found for "%s".', $path));
+            throw new ResourceNotFoundException();
         }
 
         $routeName = (string) ($match['_route'] ?? '');

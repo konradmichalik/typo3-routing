@@ -59,8 +59,7 @@ final readonly class ClientKeyResolver
 
     /**
      * An IPv6 client usually controls a whole /64, so keying by the full address would hand it a fresh
-     * bucket per request. IPv6 keys by its canonical /64 prefix, IPv4-mapped IPv6 by the IPv4 address.
-     * IPv4 and unparseable values are returned unchanged.
+     * bucket per request. IPv4-mapped IPv6 keys as the IPv4 address so both notations share one bucket.
      */
     private function normalizeIp(string $ip): string
     {

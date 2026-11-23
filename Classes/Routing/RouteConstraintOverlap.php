@@ -15,7 +15,6 @@ namespace KonradMichalik\Typo3Routing\Routing;
 
 use function array_intersect;
 use function array_map;
-use function preg_match;
 use function preg_match_all;
 use function str_contains;
 use function strtolower;
@@ -104,7 +103,7 @@ final readonly class RouteConstraintOverlap
     private function patternsCanBothMatchAValue(string $a, string $b): bool
     {
         foreach (['42', 'abc', 'a1b2'] as $sample) {
-            if (1 === preg_match('{^(?:'.$a.')$}sD', $sample) && 1 === preg_match('{^(?:'.$b.')$}sD', $sample)) {
+            if (RequirementPattern::matches($a, $sample) && RequirementPattern::matches($b, $sample)) {
                 return true;
             }
         }

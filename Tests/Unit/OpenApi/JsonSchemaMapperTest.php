@@ -236,6 +236,15 @@ final class JsonSchemaMapperTest extends TestCase
     }
 
     #[Test]
+    public function narrowsWithARequirementContainingAHash(): void
+    {
+        self::assertSame(
+            ['type' => 'string', 'enum' => ['active']],
+            (new JsonSchemaMapper())->schemaForType(Status::class, '#?active'),
+        );
+    }
+
+    #[Test]
     public function narrowsABackedIntEnumAgainstTheStringFormOfItsValues(): void
     {
         self::assertSame(

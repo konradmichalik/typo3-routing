@@ -214,6 +214,37 @@ final class ControllerInvokerTest extends TestCase
     }
 
     #[Test]
+    public function rejectsAnInputWithATrailingNewline(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_requirements' => ['slug' => '[a-z]+']],
+            $this->request(['slug' => "abc\n"]),
+        );
+
+        self::assertSame('Invalid value for parameter: slug', $error);
+    }
+
+    #[Test]
+    public function validatesARequirementContainingAHash(): void
+    {
+        $match = ['_requirements' => ['color' => '#[0-9a-f]{6}']];
+
+        self::assertNull($this->invoker()->firstInputRequirementError($match, $this->request(['color' => '#00ff00'])));
+        self::assertSame('Invalid value for parameter: color', $this->invoker()->firstInputRequirementError($match, $this->request(['color' => 'green'])));
+    }
+
+    #[Test]
+    public function checksAUnicodeRequirementInUtf8Mode(): void
+    {
+        $error = $this->invoker()->firstInputRequirementError(
+            ['_route' => 'unicode', '_requirements' => ['name' => '\p{L}+']],
+            $this->request(['name' => 'Zoë']),
+        );
+
+        self::assertNull($error);
+    }
+
+    #[Test]
     public function skipsARequirementAlreadyEnforcedOnThePath(): void
     {
         $error = $this->invoker()->firstInputRequirementError(
@@ -564,6 +595,7 @@ final class ControllerInvokerTest extends TestCase
             'inlineTenant' => ['path' => '/api/inline-tenant', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => [], 'host' => '{tenant<[a-z]+>}.example.com'],
             'importantTenant' => ['path' => '/api/important-tenant', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['tenant' => '[a-z]+'], 'host' => '{!tenant}.example.com'],
             'listing' => ['path' => '/api/list', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['sort' => 'asc|desc'], 'defaults' => ['sort' => 'asc']],
+            'unicode' => ['path' => '/api/unicode', 'methods' => [], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['name' => '\p{L}+']],
         ];
 
         return new RouteRegistry($routes, $locator, arguments: $arguments, optionalInputs: ['optional' => ['page']], jsonErrorRoutes: ['jsonError' => true, 'shortCircuit' => true]);

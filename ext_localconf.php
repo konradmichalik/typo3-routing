@@ -16,4 +16,3 @@ defined('TYPO3') || exit;
 KonradMichalik\Typo3Routing\Configuration::registerFluidNamespace();
 KonradMichalik\Typo3Routing\Configuration::registerResponseCache();
 KonradMichalik\Typo3Routing\Configuration::registerRateLimitCache();
-KonradMichalik\Typo3Routing\Configuration::registerCacheInvalidation();

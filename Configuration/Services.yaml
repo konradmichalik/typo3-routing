@@ -18,10 +18,6 @@ services:
             $routes: []
             $cacheConfigs: []
 
-    # Public so the DataHandler cache-tag flusher (resolved via GeneralUtility::makeInstance) is DI-wired.
-    KonradMichalik\Typo3Routing\Cache\CacheTagFlusher:
-        public: true
-
     # Middleware services must be public so the TYPO3 middleware dispatcher can fetch them.
     KonradMichalik\Typo3Routing\Middleware\RouteDispatcher:
         public: true

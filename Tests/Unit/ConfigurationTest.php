@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit;
 
 use KonradMichalik\Ttt\Attribute\WithTypo3ConfVars;
-use KonradMichalik\Typo3Routing\Cache\{CacheTagFlusher, ResponseCacheManager};
+use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\Configuration;
 use KonradMichalik\Typo3Routing\RateLimit\CacheStorage;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -48,7 +48,7 @@ final class ConfigurationTest extends TestCase
         /** @var array{frontend: string, groups: list<string>} $config */
         $config = $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER];
         self::assertSame(VariableFrontend::class, $config['frontend']);
-        self::assertSame(['all'], $config['groups']);
+        self::assertSame(['pages', 'all'], $config['groups']);
     }
 
     #[Test]
@@ -61,15 +61,5 @@ final class ConfigurationTest extends TestCase
         self::assertSame(VariableFrontend::class, $config['frontend']);
         // Not part of the "all" group: clearing all caches must not reset live rate-limit buckets.
         self::assertArrayNotHasKey('groups', $config);
-    }
-
-    #[Test]
-    public function registersTheCacheInvalidationHooks(): void
-    {
-        Configuration::registerCacheInvalidation();
-
-        $hooks = $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php'];
-        self::assertSame(CacheTagFlusher::class, $hooks['processDatamapClass'][ResponseCacheManager::CACHE_IDENTIFIER]);
-        self::assertSame(CacheTagFlusher::class, $hooks['processCmdmapClass'][ResponseCacheManager::CACHE_IDENTIFIER]);
     }
 }

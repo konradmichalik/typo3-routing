@@ -359,6 +359,24 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function returnsBadRequestWhenATypedIntegerCarriesATrailingNewline(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/range?from=12%0A'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Invalid value for parameter: from"}', (string) $response->getBody());
+    }
+
+    #[Test]
+    public function returnsBadRequestWhenAQueryRequirementIsMetOnlyBeforeATrailingNewline(): void
+    {
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/search?q=12%0A'));
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Bad Request","status":400,"detail":"Invalid value for parameter: q"}', (string) $response->getBody());
+    }
+
+    #[Test]
     public function returnsBadRequestNamingTheWireParameterWhenAParamRangeIsViolated(): void
     {
         $response = $this->process($this->request('GET', 'https://example.com/api/example/paged?limit=101'));

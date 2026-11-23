@@ -175,7 +175,7 @@ final readonly class ControllerInvoker
 
                 return sprintf('Missing required parameter: %s', $key);
             }
-            if (is_string($pattern) && $this->anyInputViolatesPattern($pattern, $values)) {
+            if (is_string($pattern) && $this->anyInputViolatesPattern($pattern, $values, $this->registry->routeNeedsUtf8($routeName))) {
                 return sprintf('Invalid value for parameter: %s', $key);
             }
         }
@@ -270,15 +270,16 @@ final readonly class ControllerInvoker
     }
 
     /**
-     * A non-empty pattern is violated when a value is not a string or does not fully match the regex.
+     * A non-empty pattern is violated when a value is not a string or does not fully match the regex,
+     * checked in the same Unicode mode the route's path placeholders are matched in.
      *
      * @param list<mixed> $values
      */
-    private function anyInputViolatesPattern(string $pattern, array $values): bool
+    private function anyInputViolatesPattern(string $pattern, array $values, bool $utf8): bool
     {
         return '' !== $pattern && [] !== array_filter(
             $values,
-            static fn (mixed $value): bool => !is_string($value) || 1 !== preg_match('#^(?:'.$pattern.')$#', $value),
+            static fn (mixed $value): bool => !is_string($value) || !RequirementPattern::matches($pattern, $value, $utf8),
         );
     }
 

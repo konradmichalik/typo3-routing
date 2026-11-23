@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\OpenApi;
 
+use KonradMichalik\Typo3Routing\Routing\RequirementPattern;
 use Psr\Http\Message\UploadedFileInterface;
 use ReflectionClass;
 use ReflectionEnum;
@@ -377,7 +378,7 @@ final readonly class JsonSchemaMapper
     /**
      * Drops the cases a non-empty route requirement rejects, so the `enum` list states what the route
      * accepts rather than what the PHP type allows. Matching mirrors how the requirement is enforced
-     * for real — anchored and grouped, exactly as ControllerInvoker and Symfony's matcher apply it.
+     * for real, via the same {@see RequirementPattern} regex ControllerInvoker and RouteMatcher use.
      *
      * @param list<int|string> $values
      *
@@ -390,7 +391,7 @@ final readonly class JsonSchemaMapper
             return $values;
         }
 
-        $regex = '#^(?:'.$pattern.')$#';
+        $regex = RequirementPattern::regex($pattern);
         if (false === @preg_match($regex, '')) {
             // An unusable requirement cannot be evaluated; report the enum unnarrowed rather than
             // claim no case is acceptable. Such a route never matches anyway — Symfony compiles the

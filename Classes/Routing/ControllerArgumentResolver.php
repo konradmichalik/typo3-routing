@@ -34,7 +34,6 @@ use function is_int;
 use function is_numeric;
 use function is_string;
 use function is_subclass_of;
-use function preg_match;
 use function sprintf;
 use function strtolower;
 
@@ -213,7 +212,7 @@ final readonly class ControllerArgumentResolver
      */
     private function toEntity(mixed $value, string $class, string $name): object
     {
-        if (!is_int($value) && !(is_string($value) && 1 === preg_match('/^-?\d+$/', $value))) {
+        if (!is_int($value) && !(is_string($value) && RequirementPattern::matches('-?\d+', $value))) {
             throw ArgumentResolutionException::invalidValue($name, 1950619448);
         }
 
@@ -230,7 +229,7 @@ final readonly class ControllerArgumentResolver
         if (is_int($value)) {
             return $value;
         }
-        if (is_string($value) && 1 === preg_match('/^-?\d+$/', $value)) {
+        if (is_string($value) && RequirementPattern::matches('-?\d+', $value)) {
             return (int) $value;
         }
 

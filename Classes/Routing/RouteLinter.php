@@ -18,7 +18,6 @@ use function array_intersect;
 use function array_map;
 use function count;
 use function implode;
-use function preg_match;
 use function sprintf;
 use function str_starts_with;
 use function strtoupper;
@@ -255,7 +254,7 @@ final readonly class RouteLinter
     private function requirementRejectsNonDigits(string $requirement): bool
     {
         foreach (['abc', 'a1b2', '-1', '1.5'] as $nonDigitSample) {
-            if (1 === preg_match('{^(?:'.$requirement.')$}sD', $nonDigitSample)) {
+            if (RequirementPattern::matches($requirement, $nonDigitSample)) {
                 return false;
             }
         }

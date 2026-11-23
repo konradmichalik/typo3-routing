@@ -21,7 +21,6 @@ use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 
 use function in_array;
 use function is_string;
-use function preg_match;
 
 /**
  * RouteMatcher.
@@ -217,7 +216,7 @@ final readonly class RouteMatcher
         /** @var array<string, string> $requirements */
         $requirements = $match['_requirements'] ?? [];
         $routeName = (string) ($match['_route'] ?? '');
-        $modifiers = $this->registry->routeNeedsUtf8($routeName) ? 'sDu' : 'sD';
+        $utf8 = $this->registry->routeNeedsUtf8($routeName);
 
         foreach ($requirements as $name => $requirement) {
             $value = $match[$name] ?? null;
@@ -228,7 +227,7 @@ final readonly class RouteMatcher
                 continue;
             }
 
-            if (1 !== preg_match('{^(?:'.$requirement.')$}'.$modifiers, $value)) {
+            if (!RequirementPattern::matches($requirement, $value, $utf8)) {
                 throw new RequirementMismatchException($routeName, $name, $value, $requirement);
             }
         }

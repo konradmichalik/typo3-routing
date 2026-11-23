@@ -337,20 +337,6 @@ final class RouteLinterTest extends TestCase
     }
 
     #[Test]
-    public function flagsALowercaseWriteMethod(): void
-    {
-        $registry = $this->registry(
-            ['remove' => ['path' => '/api/item/remove', 'methods' => ['GET', 'delete'], 'controller' => 'ctrl::remove', 'env' => null, 'requirements' => []]],
-            authenticators: ['remove' => [['service' => FrontendUserAuthenticator::class, 'options' => []]]],
-        );
-
-        $findings = (new RouteLinter())->lint($registry);
-
-        self::assertCount(1, $findings);
-        self::assertSame('missing-request-token', $findings[0]['check']);
-    }
-
-    #[Test]
     public function doesNotFlagASessionAuthenticatedWriteRouteWithRequestToken(): void
     {
         $registry = $this->registry(

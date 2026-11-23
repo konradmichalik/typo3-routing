@@ -221,9 +221,9 @@ final readonly class RouteMatcher
         foreach ($requirements as $name => $requirement) {
             $value = $match[$name] ?? null;
 
-            // A requirement of '' means "presence only" and constrains nothing; anything that is not a
-            // matched string (absent, or a non-string default) was never subject to the path regex.
-            if ('' === $requirement || !is_string($value)) {
+            // Anything that is not a matched string (absent, or a non-string default) was never subject to
+            // the path regex. An empty requirement cannot occur: Symfony's Route rejects it.
+            if (!is_string($value)) {
                 continue;
             }
 

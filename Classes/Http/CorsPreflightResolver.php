@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Http;
 
-use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry, SiteLanguageScope};
+use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
 use Symfony\Component\Routing\RequestContext;
@@ -33,14 +33,12 @@ final readonly class CorsPreflightResolver
         private RouteRegistry $registry,
         private RouteMatcher $matcher,
         private CorsHandler $cors,
-        private SiteLanguageScope $siteLanguageScope,
     ) {}
 
     /**
      * Returns null when CORS is off (globally and for the matched route), the request is not a
-     * preflight, or the path matches nothing (so the caller continues the gauntlet).
-     *
-     * @throws ResourceNotFoundException the path matches a route that is invisible in the current context
+     * preflight, or the path matches nothing (so the caller continues the gauntlet). Routes invisible in
+     * the current context take no part, exactly as for the real request (see RouteMatcher::match()).
      */
     public function resolve(ServerRequestInterface $request, string $path, RequestContext $context): ?ResponseInterface
     {
@@ -56,19 +54,13 @@ final readonly class CorsPreflightResolver
             // resolves exactly the route the real request will hit, and with it its own #[Cors] override.
             $context->setMethod($intendedMethod);
             // Trailing-slash tolerant, like the real request the browser is about to send.
-            $match = $this->matcher->match($path, $context);
+            $match = $this->matcher->match($path, $context, $request);
         } catch (MethodNotAllowedException $exception) {
             // No route accepts the intended method at all — same fate the real request would meet, so
             // only the global policy applies (there is no specific route to resolve an override from).
             return $this->cors->isEnabled() ? $this->cors->preflightResponse(array_values($exception->getAllowedMethods()), $request) : null;
         } catch (ResourceNotFoundException) {
             return null;
-        }
-
-        if (!$this->siteLanguageScope->isMatchVisible($match, $request)) {
-            // Not null: the caller would go on to answer OPTIONS on the route's path with a 405 and its
-            // Allow header, where a missing path gets a 404. The caller must treat it as a missing path.
-            throw new ResourceNotFoundException();
         }
 
         $routeName = (string) ($match['_route'] ?? '');

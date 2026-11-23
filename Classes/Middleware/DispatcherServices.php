@@ -17,7 +17,7 @@ use KonradMichalik\Typo3Routing\Authentication\AccessGuard;
 use KonradMichalik\Typo3Routing\Cache\{CacheBypassGuard, CacheInvalidator, ResponseCacheManager};
 use KonradMichalik\Typo3Routing\Http\{CorsHandler, CorsPreflightResolver, DeprecationHeaders, RouteUrlGenerator};
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck};
-use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, RouteMatcher, SiteLanguageScope};
+use KonradMichalik\Typo3Routing\Routing\{ControllerInvoker, RouteMatcher};
 use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 
@@ -110,11 +110,6 @@ final readonly class DispatcherServices
     public function urlGenerator(): RouteUrlGenerator
     {
         return $this->service(RouteUrlGenerator::class);
-    }
-
-    public function siteLanguageScope(): SiteLanguageScope
-    {
-        return $this->service(SiteLanguageScope::class);
     }
 
     public function deprecation(): DeprecationHeaders

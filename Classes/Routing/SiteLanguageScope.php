@@ -33,7 +33,8 @@ use function strtolower;
  * SiteLanguageScope.
  *
  * The one place that decides whether a route is visible in the current context: its application context
- * (`env`), its sites and its languages.
+ * (`env`), its sites and its languages. An invisible route must be indistinguishable from a missing one,
+ * so the matcher drops it before anything else sees it (see RouteMatcher::match()).
  *
  * @internal
  *

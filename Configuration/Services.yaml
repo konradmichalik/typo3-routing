@@ -39,7 +39,6 @@ services:
                 KonradMichalik\Typo3Routing\Cache\CacheInvalidator: '@KonradMichalik\Typo3Routing\Cache\CacheInvalidator'
                 KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver: '@KonradMichalik\Typo3Routing\RateLimit\ClientKeyResolver'
                 KonradMichalik\Typo3Routing\Http\RouteUrlGenerator: '@KonradMichalik\Typo3Routing\Http\RouteUrlGenerator'
-                KonradMichalik\Typo3Routing\Routing\SiteLanguageScope: '@KonradMichalik\Typo3Routing\Routing\SiteLanguageScope'
                 KonradMichalik\Typo3Routing\Http\DeprecationHeaders: '@KonradMichalik\Typo3Routing\Http\DeprecationHeaders'
                 Psr\EventDispatcher\EventDispatcherInterface: '@Psr\EventDispatcher\EventDispatcherInterface'
 

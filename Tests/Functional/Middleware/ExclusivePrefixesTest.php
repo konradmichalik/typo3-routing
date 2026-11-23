@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Functional\Middleware;
 
 use KonradMichalik\Ttt\Http\RequestBuilder;
 use KonradMichalik\Typo3Routing\Middleware\RouteDispatcher;
-use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\{Test, TestWith};
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\{Response, ServerRequest};
@@ -56,6 +56,22 @@ final class ExclusivePrefixesTest extends FunctionalTestCase
         $response = $this->process($this->request('GET', 'https://example.com/api/example/missing'));
 
         self::assertSame(404, $response->getStatusCode());
+        self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
+    }
+
+    /**
+     * The suite runs in "Testing", so the Development-bound route is hidden: it gets the claimed
+     * prefix's 404 like an unknown path, for its own method and for any other alike, never a 405.
+     */
+    #[Test]
+    #[TestWith(['GET'])]
+    #[TestWith(['POST'])]
+    public function answersAHiddenRouteInsideTheClaimedPrefixLikeAnUnknownPath(string $method): void
+    {
+        $response = $this->process($this->request($method, 'https://example.com/api/example/dev'));
+
+        self::assertSame(404, $response->getStatusCode());
+        self::assertFalse($response->hasHeader('Allow'));
         self::assertJsonStringEqualsJsonString('{"type":"about:blank","title":"Not Found","status":404}', (string) $response->getBody());
     }
 

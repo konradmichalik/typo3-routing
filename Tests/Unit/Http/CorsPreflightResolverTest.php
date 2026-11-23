@@ -20,7 +20,6 @@ use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry, SiteLangua
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
-use Symfony\Component\Routing\Exception\ResourceNotFoundException;
 use Symfony\Component\Routing\RequestContext;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
 use TYPO3\CMS\Core\Http\ServerRequest;
@@ -118,12 +117,11 @@ final class CorsPreflightResolverTest extends TestCase
 
     #[Test]
     #[WithEnvironment(context: 'Production')]
-    public function rejectsAnEnvBoundRouteOutsideItsContextAsNotFound(): void
+    public function returnsNullForAnEnvBoundRouteOutsideItsContextLikeForAMissingPath(): void
     {
         $resolver = $this->resolver(['allowedOrigins' => 'https://app.example.com']);
 
-        $this->expectException(ResourceNotFoundException::class);
-        $resolver->resolve($this->request('OPTIONS', 'GET'), '/api/dev', new RequestContext());
+        self::assertNull($resolver->resolve($this->request('OPTIONS', 'GET'), '/api/dev', new RequestContext()));
     }
 
     #[Test]
@@ -136,21 +134,19 @@ final class CorsPreflightResolverTest extends TestCase
     }
 
     #[Test]
-    public function rejectsARouteBoundToAnotherSiteAsNotFound(): void
+    public function returnsNullForARouteBoundToAnotherSiteLikeForAMissingPath(): void
     {
         $resolver = $this->resolver(['allowedOrigins' => 'https://app.example.com']);
 
-        $this->expectException(ResourceNotFoundException::class);
-        $resolver->resolve($this->request('OPTIONS', 'GET'), '/api/site-scoped', new RequestContext());
+        self::assertNull($resolver->resolve($this->request('OPTIONS', 'GET'), '/api/site-scoped', new RequestContext()));
     }
 
     #[Test]
-    public function rejectsARouteBoundToAnotherLanguageAsNotFound(): void
+    public function returnsNullForARouteBoundToAnotherLanguageLikeForAMissingPath(): void
     {
         $resolver = $this->resolver(['allowedOrigins' => 'https://app.example.com']);
 
-        $this->expectException(ResourceNotFoundException::class);
-        $resolver->resolve($this->request('OPTIONS', 'GET'), '/api/language-scoped', new RequestContext());
+        self::assertNull($resolver->resolve($this->request('OPTIONS', 'GET'), '/api/language-scoped', new RequestContext()));
     }
 
     /**
@@ -179,9 +175,8 @@ final class CorsPreflightResolverTest extends TestCase
 
         return new CorsPreflightResolver(
             $registry,
-            new RouteMatcher($registry, $extensionConfiguration),
+            new RouteMatcher($registry, $extensionConfiguration, new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class))),
             new CorsHandler($extensionConfiguration),
-            new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class)),
         );
     }
 

@@ -13,7 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
-use KonradMichalik\Typo3Routing\Routing\{RequirementMismatchException, RouteMatcher, RouteRegistry};
+use KonradMichalik\Ttt\Http\Requests;
+use KonradMichalik\Typo3Routing\Routing\{RequirementMismatchException, RouteMatcher, RouteRegistry, SiteLanguageScope};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -21,6 +22,9 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
 use Symfony\Component\Routing\RequestContext;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Http\ServerRequest;
+use TYPO3\CMS\Core\Log\LogManager;
+use TYPO3\CMS\Core\Site\SiteFinder;
 
 /**
  * RouteMatcherTest.
@@ -118,7 +122,7 @@ final class RouteMatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willThrowException(new RuntimeException('not configured', 1750000030));
 
-        $matcher = new RouteMatcher($this->registry(), $extensionConfiguration);
+        $matcher = new RouteMatcher($this->registry(), $extensionConfiguration, $this->scope());
 
         self::assertSame('count', $matcher->match('/api/count/', $this->context())['_route']);
     }
@@ -201,7 +205,7 @@ final class RouteMatcherTest extends TestCase
 
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
         $routes = ['count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
-        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration, $this->scope());
 
         $this->expectException(ResourceNotFoundException::class);
 
@@ -242,7 +246,7 @@ final class RouteMatcherTest extends TestCase
 
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, defaults: array<string, mixed>, caseInsensitive: bool}> $routes */
         $routes = ['pages' => ['path' => '/api/pages/{page}', 'methods' => ['GET'], 'controller' => 'ctrl::pages', 'env' => null, 'requirements' => ['page' => '\d+'], 'defaults' => ['page' => 1], 'caseInsensitive' => true]];
-        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration, $this->scope());
 
         $match = $matcher->match('/API/Pages', $this->context());
 
@@ -297,7 +301,7 @@ final class RouteMatcherTest extends TestCase
 
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
         $routes = ['count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
-        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration, $this->scope());
 
         $this->expectException(ResourceNotFoundException::class);
 
@@ -409,11 +413,86 @@ final class RouteMatcherTest extends TestCase
 
         /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>}> $routes */
         $routes = ['count' => ['path' => '/api/count', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []]];
-        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration, $this->scope());
 
         $this->expectException(ResourceNotFoundException::class);
 
         $matcher->match('/api/secure', $this->context());
+    }
+
+    /**
+     * The unit suite runs in the "Testing" context, so every Development-bound route below is invisible.
+     */
+    #[Test]
+    public function aWrongMethodOnAnInvisibleRouteIsNotFoundRatherThanMethodNotAllowed(): void
+    {
+        $this->expectException(ResourceNotFoundException::class);
+
+        $this->visibilityMatcher()->match('/api/dev', $this->context('POST'), $this->request());
+    }
+
+    #[Test]
+    public function aVisibleRouteSharingThePathOnlyAdvertisesItsOwnMethods(): void
+    {
+        try {
+            $this->visibilityMatcher()->match('/api/shared', $this->context('DELETE'), $this->request());
+        } catch (MethodNotAllowedException $exception) {
+            self::assertSame(['GET'], $exception->getAllowedMethods());
+
+            return;
+        }
+
+        self::fail('Expected a MethodNotAllowedException carrying only the visible route\'s methods.');
+    }
+
+    #[Test]
+    public function theMethodOfAnInvisibleRouteSharingThePathIsNotAllowed(): void
+    {
+        try {
+            $this->visibilityMatcher()->match('/api/shared', $this->context('POST'), $this->request());
+        } catch (MethodNotAllowedException $exception) {
+            self::assertSame(['GET'], $exception->getAllowedMethods());
+
+            return;
+        }
+
+        self::fail('Expected a MethodNotAllowedException instead of the invisible route.');
+    }
+
+    #[Test]
+    public function anInvisibleRouteNoLongerShadowsAVisibleOneOnTheSamePathAndMethod(): void
+    {
+        $match = $this->visibilityMatcher()->match('/api/shadowed', $this->context(), $this->request());
+
+        self::assertSame('shadowed', $match['_route']);
+    }
+
+    #[Test]
+    public function aRequirementMismatchOfAnInvisibleRouteDoesNotHideALaterTier(): void
+    {
+        $match = $this->visibilityMatcher()->match('/api/hidden/ABC', $this->context(), $this->request());
+
+        self::assertSame('legacyVisible', $match['_route']);
+    }
+
+    #[Test]
+    public function aWrongMethodStaysMethodNotAllowedWhenNoRouteIsInvisible(): void
+    {
+        $this->expectException(MethodNotAllowedException::class);
+
+        $this->matcher()->match('/api/submit', $this->context('GET'), $this->request());
+    }
+
+    /**
+     * Without a request there is nothing to judge visibility against, which is what routing:match relies
+     * on to explain why a route it found would be hidden.
+     */
+    #[Test]
+    public function withoutARequestInvisibleRoutesStillMatch(): void
+    {
+        $match = $this->visibilityMatcher()->match('/api/dev', $this->context());
+
+        self::assertSame('dev', $match['_route']);
     }
 
     private function matcher(string $trailingSlash = '1'): RouteMatcher
@@ -421,7 +500,36 @@ final class RouteMatcherTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn($trailingSlash);
 
-        return new RouteMatcher($this->registry(), $extensionConfiguration);
+        return new RouteMatcher($this->registry(), $extensionConfiguration, $this->scope());
+    }
+
+    private function visibilityMatcher(): RouteMatcher
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn('1');
+
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, caseInsensitive?: bool, legacyPaths?: list<string>}> $routes */
+        $routes = [
+            'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
+            'sharedRead' => ['path' => '/api/shared', 'methods' => ['GET'], 'controller' => 'ctrl::read', 'env' => null, 'requirements' => []],
+            'sharedWrite' => ['path' => '/api/shared', 'methods' => ['POST'], 'controller' => 'ctrl::write', 'env' => 'Development', 'requirements' => []],
+            'shadowing' => ['path' => '/api/shadowed', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => [], 'priority' => 10],
+            'shadowed' => ['path' => '/api/shadowed', 'methods' => ['GET'], 'controller' => 'ctrl::read', 'env' => null, 'requirements' => []],
+            'looseHidden' => ['path' => '/api/Hidden/{code}', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => ['code' => '[a-z]+'], 'caseInsensitive' => true],
+            'legacyVisible' => ['path' => '/api/visible', 'methods' => ['GET'], 'controller' => 'ctrl::read', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/api/hidden/ABC']],
+        ];
+
+        return new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration, $this->scope());
+    }
+
+    private function scope(): SiteLanguageScope
+    {
+        return new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
+    }
+
+    private function request(): ServerRequest
+    {
+        return Requests::get('https://example.com/')->build();
     }
 
     private function context(string $method = 'GET', string $scheme = 'http'): RequestContext

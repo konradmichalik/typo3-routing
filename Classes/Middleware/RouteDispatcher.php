@@ -94,16 +94,10 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $handler->handle($request);
         }
 
-        // CORS preflight is answered up front — before env/auth — so the browser gets its 204 without
-        // credentials ever being required. A path that matches no route falls through to the gauntlet,
-        // and one that matches only a route invisible in this context is answered like a missing path.
-        try {
-            $preflight = $this->preflight($request, $path);
-        } catch (ResourceNotFoundException) {
-            $notFound = $this->unmatched($request, $path);
-
-            return null === $notFound ? $handler->handle($request) : $this->finish($notFound, $request, null, null);
-        }
+        // CORS preflight is answered up front — before auth — so the browser gets its 204 without
+        // credentials ever being required. A path that matches no visible route falls through to the
+        // gauntlet, which then answers it like any other missing path.
+        $preflight = $this->preflight($request, $path);
         if ($preflight instanceof ResponseInterface) {
             return $preflight;
         }
@@ -138,7 +132,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
     /**
      * The dispatcher's own "nothing here" 404, after every matcher tier ran. Listeners may replace it, see
-     * UnmatchedRouteResponseEvent. A hidden route takes this path too, so it looks like a missing one.
+     * UnmatchedRouteResponseEvent.
      */
     private function notFound(ServerRequestInterface $request, string $path): ResponseInterface
     {
@@ -166,7 +160,10 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function handleApiRequest(ServerRequestInterface $request, string $path, ?array &$corsConfig, ?string &$routeName): ?ResponseInterface
     {
-        // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try).
+        // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try). Routes
+        //    invisible in this context (env, sites, languages) are left out by the matcher itself, so they
+        //    answer like a missing path, 405 and its Allow header included. Before either redirect below,
+        //    so a redirect never reveals an invisible route either.
         $match = $this->matchRoute($request, $path);
         if (null === $match || $match instanceof ResponseInterface) {
             return $match;
@@ -174,15 +171,6 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
         $routeName = (string) ($match['_route'] ?? '');
         $corsConfig = $this->registry->getCorsConfig($routeName);
-
-        // 3. Visibility (env, sites, languages): a route invisible in the current context does not exist.
-        //    Checked before either redirect below: a redirect must never reveal such a route.
-        if (!$this->services->siteLanguageScope()->isMatchVisible($match, $request)) {
-            // Its own deprecation and CORS headers would reveal the route, so forget it for the 404.
-            $corsConfig = $routeName = null;
-
-            return $this->notFound($request, $path);
-        }
 
         // 3a. Legacy path (opt-in): a request that reached this route through one of its old paths
         //     either redirects (default) or is served directly (`legacyAlias: true`). Checked before the
@@ -348,7 +336,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface|null
     {
         try {
-            return $this->services->matcher()->match($path, $this->requestContext($request));
+            return $this->services->matcher()->match($path, $this->requestContext($request), $request);
         } catch (ResourceNotFoundException) {
             return $this->unmatched($request, $path);
         } catch (MethodNotAllowedException $exception) {

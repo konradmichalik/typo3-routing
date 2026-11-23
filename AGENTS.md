@@ -16,7 +16,7 @@ TYPO3 extension `typo3_routing` (`konradmichalik/typo3-routing`). It registers f
 - `Classes/Attribute/`: `#[Route]` (repeatable), `#[Authenticate]`, `#[Cache]`, `#[InvalidatesCache]`, `#[Cors]`, `#[RateLimit]`, `#[Param]`, `#[Returns]`, `#[RequireRequestToken]`, `#[DeprecatedRoute]`
 - `Classes/DependencyInjection/RouteCompilerPass`: reflects `#[Route]` attributes of `RouteControllerInterface` services at container compile time into a plain array injected into `RouteRegistry`. Duplicate route names fail the build
 - `Classes/Routing/`: `RouteRegistry`, `RouteMatcher` (trailing-slash retry, opt-in case-insensitive matching, scheme redirects), `PathPrefixGate`, `RouteControllerInterface`
-- `Classes/Middleware/RouteDispatcher`: frontend middleware. Order: path gate, match, env filter, rate limit, response cache, dispatch. Registered in `Configuration/RequestMiddlewares.php` after `typo3/cms-frontend/site` and before `typo3/cms-frontend/page-resolver`
+- `Classes/Middleware/RouteDispatcher`: frontend middleware. Order: path gate, match (routes invisible by `env`, `sites` or `languages` are left out by `RouteMatcher`, checked in `SiteLanguageScope`), rate limit, response cache, dispatch. Registered in `Configuration/RequestMiddlewares.php` after `typo3/cms-frontend/site` and before `typo3/cms-frontend/page-resolver`
 - `Classes/Http/`: base-path resolving, URL generation, CORS, error responses, conditional GET
 - `Classes/Event/`: `UnmatchedRouteResponseEvent`, PSR-14, lets a listener replace the dispatcher's own 404
 - `Classes/Authentication/`, `Classes/Cache/`, `Classes/RateLimit/`, `Classes/OpenApi/`, `Classes/Command/`, `Classes/ViewHelpers/`, `Classes/Controller/`

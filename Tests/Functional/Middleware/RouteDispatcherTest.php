@@ -561,6 +561,61 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function anUndeclaredQueryParameterSharesTheCacheEntry(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=2&x=1'));
+        $undeclared = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=2&x=2'));
+        $otherPage = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=3&x=1'));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $undeclared->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('MISS', $otherPage->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function aRouteTakingTheRequestVariesOnTheFullQuery(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached-request?x=1'));
+        $other = $this->process($this->request('GET', 'https://example.com/api/example/cached-request?x=2'));
+        $repeat = $this->process($this->request('GET', 'https://example.com/api/example/cached-request?x=1'));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('MISS', $other->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $repeat->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function pathVariantsOfOneUrl(): iterable
+    {
+        yield 'trailing slash' => ['https://example.com/api/example/cached', 'https://example.com/api/example/cached/'];
+        yield 'leading slashes' => ['https://example.com/api/example/cached', 'https://example.com//api/example/cached'];
+        yield 'case' => ['https://example.com/api/example/cached-page', 'https://example.com/API/Example/Cached-Page'];
+    }
+
+    #[Test]
+    #[DataProvider('pathVariantsOfOneUrl')]
+    public function pathVariantsOfOneUrlShareTheCacheEntry(string $url, string $variant): void
+    {
+        $first = $this->process($this->request('GET', $url));
+        $second = $this->process($this->request('GET', $variant));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('HIT', $second->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function twoSitesOnOneHostWithDifferentBasePathsDoNotShareTheCacheEntry(): void
+    {
+        $en = $this->process($this->request('GET', 'https://example.com/en/api/example/cached', 'https://example.com/en/', 'en'));
+        $de = $this->process($this->request('GET', 'https://example.com/de/api/example/cached', 'https://example.com/de/', 'de'));
+
+        self::assertSame('MISS', $en->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('MISS', $de->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
     public function headResponseHasAnEmptyBodyRegardlessOfCacheState(): void
     {
         $miss = $this->process($this->request('HEAD', 'https://example.com/api/example/cached'));
@@ -1029,9 +1084,9 @@ final class RouteDispatcherTest extends FunctionalTestCase
         return $dispatcher->process($request, $this->handler($fallThrough ?? new Response('php://temp', 200)));
     }
 
-    private function request(string $method, string $url, string $base = 'https://example.com/'): ServerRequest
+    private function request(string $method, string $url, string $base = 'https://example.com/', string $siteIdentifier = 'main'): ServerRequest
     {
-        $site = new Site('main', 1, [
+        $site = new Site($siteIdentifier, 1, [
             'base' => $base,
             'languages' => [
                 [

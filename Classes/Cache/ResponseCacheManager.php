@@ -17,9 +17,18 @@ use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Http\Response;
-use TYPO3\CMS\Core\Site\Entity\SiteLanguage;
+use TYPO3\CMS\Core\Site\Entity\{SiteInterface, SiteLanguage};
 
+use function array_column;
+use function array_diff_key;
+use function array_filter;
+use function array_flip;
+use function array_intersect_key;
+use function in_array;
 use function is_array;
+use function str_starts_with;
+
+use const ARRAY_FILTER_USE_KEY;
 
 /**
  * ResponseCacheManager.
@@ -31,6 +40,14 @@ use function is_array;
 final class ResponseCacheManager
 {
     public const CACHE_IDENTIFIER = 'typo3_routing';
+
+    /**
+     * Argument sources whose value the resolver reads from the query string ("input" and a variadic
+     * read query and body merged).
+     *
+     * @var list<string>
+     */
+    private const QUERY_SOURCES = ['query', 'input', 'variadic'];
 
     private ?FrontendInterface $cache = null;
 
@@ -122,28 +139,30 @@ final class ResponseCacheManager
     }
 
     /**
-     * The host is part of the key: in a multi-site install the same route can serve several sites
-     * whose controller output differs per site, and those must never share a cache entry.
+     * The key is built from what the route consumes, not from what the client sent, so a client cannot
+     * create entries at will. The host and the site are part of it: in a multi-site install the same
+     * route can serve several sites (on several hosts, or on one host under different base paths) whose
+     * controller output differs per site, and those must never share a cache entry. The raw path is
+     * not: route name and matched placeholder values identify the resource, so every path variant the
+     * matcher tolerates (trailing slash, case, repeated leading slashes) shares one entry.
      *
-     * @param list<string> $ignoreParams
+     * @param array<string, mixed>                      $match        the matcher result
+     * @param list<string>                              $ignoreParams
+     * @param list<array{name: string, source: string}> $arguments    the route's argument specs, see RouteRegistry::getArguments()
      */
-    public function buildKey(string $routeName, ServerRequestInterface $request, array $ignoreParams): string
+    public function buildKey(array $match, ServerRequestInterface $request, array $ignoreParams, array $arguments): string
     {
-        $query = $request->getQueryParams();
-        foreach ($ignoreParams as $param) {
-            unset($query[$param]);
-        }
-        ksort($query);
-
         $language = $request->getAttribute('language');
         $languageId = $language instanceof SiteLanguage ? $language->getLanguageId() : 0;
+        $site = $request->getAttribute('site');
 
         return 'route_'.hash('sha256', implode('|', [
-            $routeName,
+            (string) ($match['_route'] ?? ''),
             $this->cacheableMethod($request),
             $request->getUri()->getHost(),
-            $request->getUri()->getPath(),
-            http_build_query($query),
+            $site instanceof SiteInterface ? $site->getIdentifier() : '',
+            http_build_query(self::placeholderValues($match)),
+            http_build_query(self::consumedQuery($request->getQueryParams(), $ignoreParams, $arguments)),
             (string) $languageId,
         ]));
     }
@@ -155,6 +174,43 @@ final class ResponseCacheManager
     public function cacheableMethod(ServerRequestInterface $request): string
     {
         return 'HEAD' === $request->getMethod() ? 'GET' : $request->getMethod();
+    }
+
+    /**
+     * @param array<string, mixed> $match
+     *
+     * @return array<string, mixed>
+     */
+    private static function placeholderValues(array $match): array
+    {
+        $values = array_filter($match, static fn (string $key): bool => !str_starts_with($key, '_'), ARRAY_FILTER_USE_KEY);
+        ksort($values);
+
+        return $values;
+    }
+
+    /**
+     * The query parameters the route reads through its arguments, minus `ignoreParams`. A controller
+     * taking the request may read any parameter itself, so for such a route the whole query counts.
+     *
+     * @param array<string, mixed>                      $query
+     * @param list<string>                              $ignoreParams
+     * @param list<array{name: string, source: string}> $arguments
+     *
+     * @return array<string, mixed>
+     */
+    private static function consumedQuery(array $query, array $ignoreParams, array $arguments): array
+    {
+        $sources = array_column($arguments, 'source');
+        if (!in_array('request', $sources, true)) {
+            $consumed = array_filter($arguments, static fn (array $argument): bool => in_array($argument['source'], self::QUERY_SOURCES, true));
+            $query = array_intersect_key($query, array_flip(array_column($consumed, 'name')));
+        }
+
+        $query = array_diff_key($query, array_flip($ignoreParams));
+        ksort($query);
+
+        return $query;
     }
 
     private function cache(): FrontendInterface

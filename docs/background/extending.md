@@ -24,7 +24,7 @@ public function __construct(
 ) {}
 ```
 
-`RouteRegistry` serves two purposes — reading route metadata, and providing plumbing the dispatcher/URL generator need internally. Only the metadata-reading methods below are `@api`; `getRouteCollection()`, `getMatcher()`, `getControllerLocator()`, `getAuthenticatorLocator()`, `isCacheTag()`, and the static `buildCollection()` are marked `@internal` on the method itself, even though the class as a whole is `@api`.
+`RouteRegistry` serves two purposes: reading route metadata, and providing plumbing the dispatcher/URL generator need internally. Only the metadata-reading methods below are `@api`; `getRouteCollection()`, `getMatcher()`, `getControllerLocator()`, `getAuthenticatorLocator()`, `isCacheTag()`, and the static `buildCollection()` are marked `@internal` on the method itself, even though the class as a whole is `@api`.
 
 | Method | Returns |
 |---|---|

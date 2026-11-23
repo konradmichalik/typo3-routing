@@ -78,14 +78,14 @@ final class ConfigurationTest extends TestCase
     }
 
     #[Test]
-    public function registersTheRateLimitCacheOutsideTheAllGroup(): void
+    public function registersTheRateLimitCacheWithoutExplicitGroups(): void
     {
         Configuration::registerRateLimitCache();
 
         /** @var array{frontend: string} $config */
         $config = $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][CacheStorage::CACHE_IDENTIFIER];
         self::assertSame(VariableFrontend::class, $config['frontend']);
-        // Not part of the "all" group: clearing all caches must not reset live rate-limit buckets.
+        // No "groups" key: TYPO3 then assigns only "all", so clearing the page caches keeps live buckets.
         self::assertArrayNotHasKey('groups', $config);
     }
 }

@@ -46,8 +46,8 @@ final class Configuration
     }
 
     /**
-     * Register the rate-limit bucket store. Deliberately kept out of every cache group so a
-     * "Flush all caches" cannot reset live rate-limit counters; buckets expire on their own TTL.
+     * Register the rate-limit bucket store. Without a "groups" key it lands in TYPO3's default group "all"
+     * only, so clearing the page caches keeps live counters; "Flush all caches" empties it.
      */
     public static function registerRateLimitCache(): void
     {

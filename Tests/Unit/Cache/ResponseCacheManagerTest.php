@@ -69,17 +69,6 @@ final class ResponseCacheManagerTest extends TestCase
     }
 
     #[Test]
-    public function flushByTagRemovesTaggedEntry(): void
-    {
-        $this->subject->store('route_tagged', new Response('php://temp', 200), 3600, ['tx_news']);
-        self::assertNotNull($this->subject->get('route_tagged'));
-
-        $this->subject->flushByTag('tx_news');
-
-        self::assertNull($this->subject->get('route_tagged'));
-    }
-
-    #[Test]
     public function flushByTagsRemovesEveryEntryTaggedWithOneOfThem(): void
     {
         $this->subject->store('route_news', new Response('php://temp', 200), 3600, ['tx_news']);

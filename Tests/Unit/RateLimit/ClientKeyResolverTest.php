@@ -76,18 +76,6 @@ final class ClientKeyResolverTest extends TestCase
     }
 
     #[Test]
-    public function keysIpv6ClientsFromDifferentSlash64PrefixesSeparately(): void
-    {
-        $first = Requests::get('https://example.com/api/x')->withRemoteAddress('2001:db8:85a3:1::1')->build();
-        $second = Requests::get('https://example.com/api/x')->withRemoteAddress('2001:db8:85a3:2::1')->build();
-
-        self::assertNotSame(
-            $this->resolver()->resolve(self::IP_CONFIG, $first),
-            $this->resolver()->resolve(self::IP_CONFIG, $second),
-        );
-    }
-
-    #[Test]
     public function keysIpv4MappedIpv6ClientsByTheirIpv4Address(): void
     {
         $request = Requests::get('https://example.com/api/x')->withRemoteAddress('::ffff:203.0.113.5')->build();

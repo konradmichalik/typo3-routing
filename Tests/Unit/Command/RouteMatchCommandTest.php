@@ -14,12 +14,14 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Command;
 
 use KonradMichalik\Typo3Routing\Command\RouteMatchCommand;
-use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry};
+use KonradMichalik\Typo3Routing\Routing\{RouteMatcher, RouteRegistry, SiteLanguageScope};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use TYPO3\CMS\Core\Configuration\ExtensionConfiguration;
+use TYPO3\CMS\Core\Log\LogManager;
+use TYPO3\CMS\Core\Site\SiteFinder;
 
 /**
  * RouteMatchCommandTest.
@@ -246,7 +248,7 @@ final class RouteMatchCommandTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $extensionConfiguration->method('get')->willReturn('1');
 
-        return new CommandTester(new RouteMatchCommand(new RouteMatcher($this->registry(), $extensionConfiguration)));
+        return new CommandTester(new RouteMatchCommand(new RouteMatcher($this->registry(), $extensionConfiguration, new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class)))));
     }
 
     private function registry(): RouteRegistry

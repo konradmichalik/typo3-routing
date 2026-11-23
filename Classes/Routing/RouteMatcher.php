@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use Closure;
+use Psr\Http\Message\ServerRequestInterface;
 use Symfony\Component\Routing\Exception\{MethodNotAllowedException, ResourceNotFoundException};
 use Symfony\Component\Routing\Matcher\UrlMatcherInterface;
 use Symfony\Component\Routing\RequestContext;
@@ -36,6 +38,7 @@ final readonly class RouteMatcher
     public function __construct(
         private RouteRegistry $registry,
         ExtensionConfiguration $extensionConfiguration,
+        private SiteLanguageScope $scope,
     ) {
         $this->tolerateTrailingSlash = self::readToggle($extensionConfiguration);
     }
@@ -53,19 +56,50 @@ final readonly class RouteMatcher
      * finally against the scheme-redirect matcher (#[Route(schemes: [...])]), which is why a scheme
      * mismatch surfaces as a match carrying `_schemeRedirect` rather than as a miss.
      *
+     * With a request, a route invisible for it (see SiteLanguageScope) does not exist: it neither matches
+     * nor lends its methods to a MethodNotAllowedException, so it answers exactly like a missing path.
+     * Without one, as for routing:match, every route takes part.
+     *
      * @return array<string, mixed> the matched route attributes
      *
      * @throws ResourceNotFoundException no route matches any tolerated variant of the path
      * @throws MethodNotAllowedException the path matches, the request method does not
      */
-    public function match(string $path, RequestContext $context): array
+    public function match(string $path, RequestContext $context, ?ServerRequestInterface $request = null): array
+    {
+        if (null === $request) {
+            return $this->matchTiers($path, $context, null);
+        }
+
+        // Hiding routes cannot change a visible match or a plain miss, so only a hidden match, a 405 or a
+        // requirement mismatch repeats the tiers without the hidden routes.
+        try {
+            $match = $this->matchTiers($path, $context, null);
+            if ($this->scope->isMatchVisible($match, $request)) {
+                return $match;
+            }
+        } catch (MethodNotAllowedException|RequirementMismatchException) {
+        }
+
+        return $this->matchTiers($path, $context, fn (array $defaults): bool => $this->scope->isMatchVisible($defaults, $request));
+    }
+
+    /**
+     * @param (Closure(array<string, mixed>): bool)|null $keep only the routes it accepts take part, see RouteRegistry::getMatcher()
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ResourceNotFoundException
+     * @throws MethodNotAllowedException
+     */
+    private function matchTiers(string $path, RequestContext $context, ?Closure $keep): array
     {
         try {
-            return $this->matchTolerantly($this->registry->getMatcher($context), $path, alreadyVariant: false);
+            return $this->matchTolerantly($this->registry->getMatcher($context, $keep), $path, alreadyVariant: false);
         } catch (ResourceNotFoundException $exception) {
-            return $this->matchCaseInsensitively($path, $context)
-                ?? $this->matchLegacyPath($path, $context)
-                ?? $this->matchWrongScheme($path, $context)
+            return $this->matchCaseInsensitively($path, $context, $keep)
+                ?? $this->matchLegacyPath($path, $context, $keep)
+                ?? $this->matchWrongScheme($path, $context, $keep)
                 ?? throw $exception;
         }
     }
@@ -76,11 +110,13 @@ final readonly class RouteMatcher
      * mismatch is not "no match": both propagate immediately, exactly as they would from the top-level
      * primary attempt.
      *
+     * @param (Closure(array<string, mixed>): bool)|null $keep
+     *
      * @return array<string, mixed>|null
      */
-    private function matchCaseInsensitively(string $path, RequestContext $context): ?array
+    private function matchCaseInsensitively(string $path, RequestContext $context, ?Closure $keep): ?array
     {
-        $matcher = $this->registry->getCaseInsensitiveMatcher($context);
+        $matcher = $this->registry->getCaseInsensitiveMatcher($context, $keep);
         if (null === $matcher) {
             return null;
         }
@@ -102,11 +138,13 @@ final readonly class RouteMatcher
      * Null means: no route declared a legacy path, or none of them matched. A MethodNotAllowedException
      * propagates immediately, matching every other tier.
      *
+     * @param (Closure(array<string, mixed>): bool)|null $keep
+     *
      * @return array<string, mixed>|null
      */
-    private function matchLegacyPath(string $path, RequestContext $context): ?array
+    private function matchLegacyPath(string $path, RequestContext $context, ?Closure $keep): ?array
     {
-        $matcher = $this->registry->getLegacyMatcher($context);
+        $matcher = $this->registry->getLegacyMatcher($context, $keep);
         if (null === $matcher) {
             return null;
         }
@@ -131,11 +169,13 @@ final readonly class RouteMatcher
      * only remaining explanation. A MethodNotAllowedException propagates as everywhere else — the
      * method is wrong on the correct scheme too, so redirecting first would only postpone the 405.
      *
+     * @param (Closure(array<string, mixed>): bool)|null $keep
+     *
      * @return array<string, mixed>|null
      */
-    private function matchWrongScheme(string $path, RequestContext $context): ?array
+    private function matchWrongScheme(string $path, RequestContext $context, ?Closure $keep): ?array
     {
-        $matcher = $this->registry->getSchemeRedirectMatcher($context);
+        $matcher = $this->registry->getSchemeRedirectMatcher($context, $keep);
         if (null === $matcher) {
             return null;
         }

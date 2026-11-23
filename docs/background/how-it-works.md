@@ -43,21 +43,19 @@ Two consequences follow directly from where that boundary sits:
 | # | Step | Outcome when it does not pass |
 |---|------|-------------------------------|
 | 1 | [Path gate](../operating/configuration.md#path-gate) — could this path belong to any route at all? | Falls through to page rendering, at the cost of one string comparison |
-| 2 | [CORS preflight](../features/cors.md) — an `OPTIONS` request announcing a cross-origin call | Answered with `204` before credentials are ever required. A route invisible in the current context (steps 4 and 5) is answered like a missing path |
-| 3 | Matching, via the compiled matcher | `404` (or the page router, unless an [exclusive prefix](../operating/configuration.md#exclusive-path-prefixes) claims the path) / `405` with an `Allow` header |
-| 4 | [Environment filter](../operating/configuration.md#environment-bound-routes) — is the route's `env` the current context? | `404`, as if the route did not exist |
-| 5 | [Site/language scope](../routes/host-and-scope.md#site--and-language-bound-routes) — is the route reachable from the request's site/language? | `404`, as if the route did not exist |
-| 6 | [Canonical redirect](../routes/path-tolerance.md#redirecting-instead-of-tolerating) (opt-in) — did the request only match a tolerated path variant? | `308` to the declared path |
-| 7 | [Scheme redirect](../routes/host-and-scope.md#schemes) — did the request match everything but the route's declared `schemes`? | `308` to the same URL under the declared scheme |
-| 8 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
-| 9 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
-| 10 | Request body shape (malformed JSON / unsupported content type) | `400` / `415` |
-| 11 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
-| 12 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/error-responses.md#automatic-json-errors-for-jsonresponse-routes) |
+| 2 | [CORS preflight](../features/cors.md) — an `OPTIONS` request announcing a cross-origin call | Answered with `204` before credentials are ever required. Routes invisible in the current context take no part (see step 3), so a path holding only such routes is answered like a missing path |
+| 3 | Matching, via the compiled matcher, among the routes visible in the current context: [environment](../operating/configuration.md#environment-bound-routes), [site and language](../routes/host-and-scope.md#site--and-language-bound-routes) | `404` (or the page router, unless an [exclusive prefix](../operating/configuration.md#exclusive-path-prefixes) claims the path) / `405` with an `Allow` header. An invisible route answers exactly like a missing one: it neither matches nor adds its methods to a `405` |
+| 4 | [Canonical redirect](../routes/path-tolerance.md#redirecting-instead-of-tolerating) (opt-in) — did the request only match a tolerated path variant? | `308` to the declared path |
+| 5 | [Scheme redirect](../routes/host-and-scope.md#schemes) — did the request match everything but the route's declared `schemes`? | `308` to the same URL under the declared scheme |
+| 6 | [Rate limit](../features/rate-limiting.md) | `429` with `Retry-After` |
+| 7 | [Access control](../features/authentication.md) — authentication, then the CSRF request token | `401` / `403` |
+| 8 | Request body shape (malformed JSON / unsupported content type) | `400` / `415` |
+| 9 | [Query/body requirements](../routes/route-attribute.md#requirements) — path requirements were already enforced by the matcher | `400` |
+| 10 | Dispatch: resolve the [typed arguments](../routes/arguments.md) and invoke the controller, [response cache](../features/caching.md) permitting | `400` for an unresolvable argument, `404` for a missing entity, `500` for any other exception on a route that [opted into automatic JSON errors](../routes/error-responses.md#automatic-json-errors-for-jsonresponse-routes) |
 
 Several ordering decisions in there are deliberate rather than incidental:
 
-- **The env filter and site/language scope run before the canonical redirect**, so a redirect never reveals a route that is otherwise invisible in the current context.
+- **Visibility (env, sites, languages) is part of matching**, not a check after it. The compiled matcher cannot leave routes out, so whenever its answer involves an invisible route (it matched one, or it answers `405`, whose `Allow` list may include one) the matcher tiers run again over the visible routes alone. That repeat uses a plain, uncompiled matcher, but only on those paths: a visible match and a plain miss cost nothing extra. Since every later step only ever sees a visible route, no redirect can reveal an invisible one either.
 - **The scheme redirect runs after the canonical and legacy-path ones**, because both of those regenerate their target through `RouteUrlGenerator`, which already points at the declared scheme. A request that is wrong in two ways at once therefore still costs exactly one redirect.
 - **Rate limiting runs before authentication**, so a coarse per-IP limit absorbs token brute-force attempts before any authentication logic executes.
 - **Access control runs before body and input validation**, so an unauthenticated client gets `401` rather than a `400` naming the parameters of a protected route, and its JSON body is never decoded. Those validation errors still count against the rate limit.

@@ -305,6 +305,18 @@ final class ExampleController implements RouteControllerInterface
         return new JsonResponse(['ok' => true]);
     }
 
+    #[Route(path: '/api/example/shared-env', name: 'example_shared_env_read', methods: ['GET'])]
+    public function sharedEnvRead(): JsonResponse
+    {
+        return new JsonResponse(['read' => true]);
+    }
+
+    #[Route(path: '/api/example/shared-env', name: 'example_shared_env_write', methods: ['POST'], env: 'Development')]
+    public function sharedEnvWrite(): JsonResponse
+    {
+        return new JsonResponse(['written' => true]);
+    }
+
     #[Route(path: '/api/example/item-dto/{id}', name: 'example_item_dto', requirements: ['id' => '\d+'])]
     #[Returns(ItemDto::class)]
     #[Returns(status: 404, description: 'Item not found')]

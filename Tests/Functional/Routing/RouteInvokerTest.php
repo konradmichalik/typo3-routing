@@ -90,7 +90,6 @@ final class RouteInvokerTest extends FunctionalTestCase
         yield 'unresolvable argument' => ['example_range', [], '/api/example/range'];
         yield 'violated query requirement' => ['example_search', ['q' => 'abc'], '/api/example/search?q=abc'];
         yield 'controller problem' => ['example_problem', [], '/api/example/problem'];
-        yield 'env-bound route' => ['example_dev', [], '/api/example/dev'];
     }
 
     /**
@@ -108,19 +107,31 @@ final class RouteInvokerTest extends FunctionalTestCase
     }
 
     /**
-     * The one place where a rejected input cannot answer alike: a violated path requirement matches no
-     * route at all, and with no `exclusivePrefixes` configured such a path is not claimed by this
-     * middleware — the page router takes it. Invoking by name has no such alternative, so the route's
-     * own "no resource for this value" answer stands.
+     * The places where a rejected call cannot answer alike: a violated path requirement or a route
+     * invisible in the current context matches no route at all, and with no `exclusivePrefixes`
+     * configured such a path is not claimed by this middleware — the page router takes it. Invoking by
+     * name has no such alternative, so the route's own "no resource here" answer stands.
+     *
+     * @param array<string, mixed> $input
      */
     #[Test]
-    public function answersNotFoundWhereAnHttpCallLetsAViolatedPathRequirementFallThrough(): void
+    #[DataProvider('fallingThroughRoutes')]
+    public function answersNotFoundWhereAnHttpCallFallsThrough(string $routeName, array $input, string $url): void
     {
-        $overHttp = $this->process($this->request('GET', 'https://example.com/api/example/item/abc'), 418);
-        $invoked = $this->get(RouteInvoker::class)->invoke('example_item', ['id' => 'abc'], $this->request('GET', 'https://example.com/mcp'));
+        $overHttp = $this->process($this->request('GET', 'https://example.com'.$url), 418);
+        $invoked = $this->get(RouteInvoker::class)->invoke($routeName, $input, $this->request('GET', 'https://example.com/mcp'));
 
         self::assertSame(418, $overHttp->getStatusCode(), 'the dispatcher should have fallen through to the page handler');
         self::assertSame(404, $invoked->getStatusCode());
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: array<string, mixed>, 2: string}>
+     */
+    public static function fallingThroughRoutes(): iterable
+    {
+        yield 'violated path requirement' => ['example_item', ['id' => 'abc'], '/api/example/item/abc'];
+        yield 'env-bound route' => ['example_dev', [], '/api/example/dev'];
     }
 
     #[Test]

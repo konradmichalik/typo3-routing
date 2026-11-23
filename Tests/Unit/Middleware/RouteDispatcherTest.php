@@ -26,7 +26,7 @@ use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerI
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController, RecordingUnmatchedRouteDispatcher};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
-use PHPUnit\Framework\Attributes\{CoversClass, Test};
+use PHPUnit\Framework\Attributes\{CoversClass, Test, TestWith};
 use PHPUnit\Framework\TestCase;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
@@ -831,7 +831,7 @@ final class RouteDispatcherTest extends TestCase
         $registry = $this->registry();
         $context = new Context();
         $cors = new CorsHandler($extensionConfiguration);
-        $matcher = new RouteMatcher($registry, $extensionConfiguration);
+        $matcher = new RouteMatcher($registry, $extensionConfiguration, $this->siteLanguageScope());
         $dispatcher = new RouteDispatcher($registry, new SiteBasePathResolver(), $this->dispatcherServices($registry, $matcher, $cors, $context, new AccessGuard($registry, $context)), $extensionConfiguration);
         $response = $dispatcher->process(
             $this->request('GET', 'https://example.com/api/count'),
@@ -1102,15 +1102,21 @@ final class RouteDispatcherTest extends TestCase
         self::assertSame(404, $response->getStatusCode());
     }
 
+    /**
+     * POST is a method the hidden route does not declare, which used to reach the global policy with the
+     * hidden route's own methods instead of the answer for a missing path.
+     */
     #[Test]
     #[WithEnvironment(context: 'Production')]
-    public function preflightForAnEnvHiddenRouteAnswersLikeAnUnknownPath(): void
+    #[TestWith(['GET'])]
+    #[TestWith(['POST'])]
+    public function preflightForAnEnvHiddenRouteAnswersLikeAnUnknownPath(string $intendedMethod): void
     {
         $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
         $preflight = fn (string $path): ResponseInterface => $dispatcher->process(
             $this->request('OPTIONS', 'https://example.com'.$path)
                 ->withHeader('Origin', 'https://app.example.com')
-                ->withHeader('Access-Control-Request-Method', 'GET'),
+                ->withHeader('Access-Control-Request-Method', $intendedMethod),
             $this->handler(new Response('php://temp', 200)),
         );
 
@@ -1120,6 +1126,51 @@ final class RouteDispatcherTest extends TestCase
         self::assertSame($missing->getStatusCode(), $hidden->getStatusCode());
         self::assertSame((string) $missing->getBody(), (string) $hidden->getBody());
         self::assertSame($this->withoutRequestId($missing->getHeaders()), $this->withoutRequestId($hidden->getHeaders()));
+    }
+
+    /**
+     * "sharedEnvWrite" (POST, Development) shares the path with "sharedEnvRead" (GET): neither the
+     * hidden route's method nor one no route declares may advertise anything but GET.
+     */
+    #[Test]
+    #[WithEnvironment(context: 'Production')]
+    #[TestWith(['DELETE'])]
+    #[TestWith(['POST'])]
+    public function preflightForAVisibleRouteSharingThePathWithAHiddenOneOnlyAdvertisesItsOwnMethods(string $intendedMethod): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $request = $this->request('OPTIONS', 'https://example.com/api/shared-env')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', $intendedMethod);
+
+        $response = $dispatcher->process($request, $this->handler(new Response('php://temp', 200)));
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('GET, OPTIONS', $response->getHeaderLine('Access-Control-Allow-Methods'));
+    }
+
+    #[Test]
+    #[WithEnvironment(context: 'Production')]
+    public function aWrongMethodOnAnEnvHiddenRouteAnswersLikeAnUnknownPath(): void
+    {
+        $hidden = $this->dispatch($this->request('POST', 'https://example.com/api/dev'));
+        $missing = $this->dispatch($this->request('POST', 'https://example.com/api/missing'));
+
+        self::assertSame(404, $hidden->getStatusCode());
+        self::assertSame((string) $missing->getBody(), (string) $hidden->getBody());
+        self::assertSame($this->withoutRequestId($missing->getHeaders()), $this->withoutRequestId($hidden->getHeaders()));
+    }
+
+    #[Test]
+    #[WithEnvironment(context: 'Production')]
+    #[TestWith(['DELETE'])]
+    #[TestWith(['POST'])]
+    public function aVisibleRouteSharingThePathWithAHiddenOneOnlyAllowsItsOwnMethods(string $method): void
+    {
+        $response = $this->dispatch($this->request($method, 'https://example.com/api/shared-env'));
+
+        self::assertSame(405, $response->getStatusCode());
+        self::assertSame('GET', $response->getHeaderLine('Allow'));
     }
 
     #[Test]
@@ -1436,7 +1487,7 @@ final class RouteDispatcherTest extends TestCase
         $context ??= new Context();
         $accessGuard = new AccessGuard($registry, $context);
 
-        $matcher = new RouteMatcher($registry, $extensionConfiguration);
+        $matcher = new RouteMatcher($registry, $extensionConfiguration, $this->siteLanguageScope());
 
         return new RouteDispatcher($registry, new SiteBasePathResolver(), $this->dispatcherServices($registry, $matcher, $cors, $context, $accessGuard), $extensionConfiguration);
     }
@@ -1456,12 +1507,11 @@ final class RouteDispatcherTest extends TestCase
             ControllerInvoker::class => fn (): ControllerInvoker => new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)),
             AccessGuard::class => static fn (): AccessGuard => $accessGuard,
             CorsHandler::class => static fn (): CorsHandler => $cors,
-            CorsPreflightResolver::class => fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)), $this->siteLanguageScope()),
+            CorsPreflightResolver::class => static fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors),
             CacheBypassGuard::class => static fn (): CacheBypassGuard => new CacheBypassGuard($context),
             CacheInvalidator::class => fn (): CacheInvalidator => new CacheInvalidator($registry, $this->responseCache),
             ClientKeyResolver::class => static fn (): ClientKeyResolver => new ClientKeyResolver($context),
             RouteUrlGenerator::class => static fn (): RouteUrlGenerator => new RouteUrlGenerator($registry, new SiteBasePathResolver()),
-            SiteLanguageScope::class => $this->siteLanguageScope(...),
             DeprecationHeaders::class => fn (): DeprecationHeaders => $this->deprecationHeaders($registry),
             EventDispatcherInterface::class => fn (): EventDispatcherInterface => $this->events,
         ]));
@@ -1492,6 +1542,8 @@ final class RouteDispatcherTest extends TestCase
             'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
             'typed' => ['path' => '/api/typed/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => []],
             'dev' => ['path' => '/api/dev', 'methods' => ['GET'], 'controller' => 'ctrl::dev', 'env' => 'Development', 'requirements' => []],
+            'sharedEnvRead' => ['path' => '/api/shared-env', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => []],
+            'sharedEnvWrite' => ['path' => '/api/shared-env', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => 'Development', 'requirements' => []],
             'cached' => ['path' => '/api/cached', 'methods' => ['GET'], 'controller' => 'ctrl::cached', 'env' => null, 'requirements' => []],
             'guarded' => ['path' => '/api/guarded', 'methods' => ['GET'], 'controller' => 'ctrl::count', 'env' => null, 'requirements' => ['q' => '\d+']],
             'posted' => ['path' => '/api/posted', 'methods' => ['POST'], 'controller' => 'ctrl::submit', 'env' => null, 'requirements' => ['n' => '\d+']],

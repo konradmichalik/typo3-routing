@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Routing;
 
+use Closure;
 use KonradMichalik\Typo3Routing\Attribute\RequireRequestToken;
 use LogicException;
 use Psr\Container\ContainerInterface;
@@ -193,10 +194,18 @@ final class RouteRegistry
      * re-compile every route's regex on each request. The fallback covers registries constructed
      * without compiled routes (tests, manual wiring).
      *
+     * With `$keep`, a plain UrlMatcher over the accepted routes only, never the compiled one (slower).
+     *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     *
+     * @param (Closure(array<string, mixed>): bool)|null $keep receives a route's defaults
      */
-    public function getMatcher(RequestContext $context): UrlMatcherInterface
+    public function getMatcher(RequestContext $context, ?Closure $keep = null): UrlMatcherInterface
     {
+        if (null !== $keep) {
+            return new UrlMatcher(self::filtered($this->getRouteCollection(), $keep), $context);
+        }
+
         if ([] !== $this->compiledRoutes) {
             return new CompiledUrlMatcher($this->compiledRoutes, $context);
         }
@@ -229,10 +238,12 @@ final class RouteRegistry
      * honour CaseInsensitiveRouteCompiler.
      *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     *
+     * @param (Closure(array<string, mixed>): bool)|null $keep see getMatcher()
      */
-    public function getCaseInsensitiveMatcher(RequestContext $context): ?UrlMatcherInterface
+    public function getCaseInsensitiveMatcher(RequestContext $context, ?Closure $keep = null): ?UrlMatcherInterface
     {
-        return self::matcherUnlessEmpty($this->getCaseInsensitiveCollection(), $context);
+        return self::matcherUnlessEmpty(self::filtered($this->getCaseInsensitiveCollection(), $keep), $context);
     }
 
     /**
@@ -339,10 +350,12 @@ final class RouteRegistry
      * the primary matcher (and, where applicable, the case-insensitive one) has already failed.
      *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     *
+     * @param (Closure(array<string, mixed>): bool)|null $keep see getMatcher()
      */
-    public function getLegacyMatcher(RequestContext $context): ?UrlMatcherInterface
+    public function getLegacyMatcher(RequestContext $context, ?Closure $keep = null): ?UrlMatcherInterface
     {
-        return self::matcherUnlessEmpty($this->getLegacyCollection(), $context);
+        return self::matcherUnlessEmpty(self::filtered($this->getLegacyCollection(), $keep), $context);
     }
 
     /**
@@ -357,10 +370,12 @@ final class RouteRegistry
      * in a protected property of two unrelated classes.
      *
      * @internal dispatch plumbing, not part of the metadata surface — see docs/background/extending.md
+     *
+     * @param (Closure(array<string, mixed>): bool)|null $keep see getMatcher()
      */
-    public function getSchemeRedirectMatcher(RequestContext $context): ?UrlMatcherInterface
+    public function getSchemeRedirectMatcher(RequestContext $context, ?Closure $keep = null): ?UrlMatcherInterface
     {
-        return self::matcherUnlessEmpty($this->getSchemeRedirectCollection(), $context);
+        return self::matcherUnlessEmpty(self::filtered($this->getSchemeRedirectCollection(), $keep), $context);
     }
 
     /**
@@ -686,6 +701,28 @@ final class RouteRegistry
     private function getLegacyCollection(): RouteCollection
     {
         return $this->legacyCollection ??= self::buildCollection(self::legacyRoutes($this->routes));
+    }
+
+    /**
+     * The same Route objects, so whatever they already compiled is reused. Added in the order all()
+     * returns them, which already reflects their priorities.
+     *
+     * @param (Closure(array<string, mixed>): bool)|null $keep
+     */
+    private static function filtered(RouteCollection $collection, ?Closure $keep): RouteCollection
+    {
+        if (null === $keep) {
+            return $collection;
+        }
+
+        $filtered = new RouteCollection();
+        foreach ($collection->all() as $name => $route) {
+            if ($keep($route->getDefaults())) {
+                $filtered->add($name, $route);
+            }
+        }
+
+        return $filtered;
     }
 
     /**

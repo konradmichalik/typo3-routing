@@ -75,7 +75,7 @@ The request the controller finally sees is synthesised from it: the route's firs
 | Response cache (`#[Cache]`, ETag, conditional GET) | **skipped** | a transport-level performance mechanism; an invocation always sees fresh output |
 | Cache invalidation (`#[InvalidatesCache]`) | enforced after a 2xx or 3xx response | the write happened, so the cached responses it touched are stale whichever transport triggered it |
 
-One consequence is worth spelling out: a violated path requirement is the single case where the answer *differs* from an HTTP call by design. Over HTTP that path matches no route, so — unless `exclusivePrefixes` claims it — the middleware declines and the page router takes over. An invocation names the route explicitly and has no page to fall back to, so the route's own "no resource for this value" answer stands as a 404.
+One consequence is worth spelling out: a violated path requirement and a route invisible in the current context (`env`, `sites`, `languages`) are the cases where the answer *differs* from an HTTP call by design. Over HTTP such a path matches no route, so the middleware declines (unless `exclusivePrefixes` claims it) and the page router takes over. An invocation names the route explicitly and has no page to fall back to, so the answer stands as a 404.
 
 Exception handling is the dispatcher's, so error semantics match a real call to the same route: an unresolvable argument is a 400, a missing entity a 404, a controller-thrown [`HttpProblemException`](../../Classes/Http/HttpProblemException.php) keeps its own status, and every other exception stays untouched for TYPO3's error handling. `Tests/Functional/Routing/RouteInvokerTest.php` pins that agreement route by route.
 
@@ -149,7 +149,7 @@ $schema = $this->schemas->objectSchemaForClass(CourseDto::class);
 
 ## Replacing the dispatcher's 404
 
-[`UnmatchedRouteResponseEvent`](../../Classes/Event/UnmatchedRouteResponseEvent.php) (`@api`) is a PSR-14 event dispatched before the dispatcher sends its own `404`: an unmatched path inside an exclusive prefix, or a route hidden by `env`, `sites` or `languages`. `getRequest()` and `getPath()` describe the request, `setResponse()` replaces the default. See [Shaping the 404](../operating/configuration.md#shaping-the-404) for a listener.
+[`UnmatchedRouteResponseEvent`](../../Classes/Event/UnmatchedRouteResponseEvent.php) (`@api`) is a PSR-14 event dispatched before the dispatcher sends its own `404` for an unmatched path inside an exclusive prefix. A route hidden by `env`, `sites` or `languages` counts as unmatched, so it takes the same way. `getRequest()` and `getPath()` describe the request, `setResponse()` replaces the default. See [Shaping the 404](../operating/configuration.md#shaping-the-404) for a listener.
 
 ## Reference consumer: the OpenAPI export
 

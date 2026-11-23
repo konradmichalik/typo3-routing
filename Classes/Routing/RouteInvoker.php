@@ -54,7 +54,7 @@ final readonly class RouteInvoker
     /**
      * Calls a route's controller for a set of input values, without an inbound HTTP request against
      * the route's own path — the sanctioned seam for tooling that exposes routes over another
-     * transport. Replicated are the steps belonging to the route's own contract (env filter, path
+     * transport. Replicated are the steps belonging to the route's own contract (visibility, path
      * requirements, authentication, input requirements); skipped are those belonging to the HTTP
      * transport (CORS, rate limiting, response caching, and the CSRF request token — no browser is
      * involved).
@@ -77,17 +77,9 @@ final readonly class RouteInvoker
         $route = $this->registry->getRoutes()[$routeName]
             ?? throw new InvalidArgumentException(sprintf('No route named "%s" is registered.', $routeName), 1750000026);
 
-        // 1. Env filter: an env-bound route is invisible outside its application context, here as much
-        //    as over HTTP — a consumer must not reach a route a browser could not.
-        if (!$this->invoker->isVisibleInCurrentContext($route['env'])) {
-            return JsonErrorResponse::create(404, 'Not Found');
-        }
-
-        // 1b. Site/language scope, mirroring the dispatcher: the calling request's own site/language
-        //     attributes decide reachability here too — a consumer must not reach a route a browser
-        //     on the "wrong" site or language could not.
-        if (!$this->siteLanguageScope->isVisibleForSite($route['sites'] ?? null, $request)
-            || !$this->siteLanguageScope->isVisibleForLanguage($route['languages'] ?? null, $request)) {
+        // 1. Visibility (env, sites, languages): the calling request's own context decides reachability
+        //    here as much as over HTTP — a consumer must not reach a route a browser could not.
+        if (!$this->siteLanguageScope->isRouteVisible($route, $request)) {
             return JsonErrorResponse::create(404, 'Not Found');
         }
 

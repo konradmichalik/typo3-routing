@@ -124,7 +124,7 @@ final class ParamConstraintGuard
         }
         foreach (['min' => $param->min, 'max' => $param->max] as $key => $bound) {
             if (null !== $bound && !is_finite($bound)) {
-                throw new LogicException(sprintf('#[Param] on "$%s" of "%s": %s (%s) is not a finite number.', $parameterName, $where, $key, $bound), 1750000049);
+                throw new LogicException(sprintf('#[Param] on "$%s" of "%s": %s (%s) is not a finite number.', $parameterName, $where, $key, var_export($bound, true)), 1750000049);
             }
         }
         if (null !== $param->min && null !== $param->max && $param->min > $param->max) {

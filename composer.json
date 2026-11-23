@@ -32,10 +32,11 @@
 	"require-dev": {
 		"eliashaeussler/version-bumper": "^4.1.3",
 		"konradmichalik/ttt": "^0.6.0",
+		"phpunit/phpcov": "^10.0 || ^11.0 || ^12.0 || ^13.0",
 		"phpunit/phpunit": "^11.0 || ^12.0 || ^13.0",
 		"typo3/cms-base-distribution": "^13.4 || ^14.0",
 		"typo3/cms-lowlevel": "^13.4 || ^14.0",
-		"typo3/testing-framework": "^8.2 || ^9.0 || ^10.0"
+		"typo3/testing-framework": "^8.3 || ^9.1 || ^10.0"
 	},
 	"autoload": {
 		"psr-4": {
@@ -76,9 +77,21 @@
 			"@cgl install"
 		],
 		"cgl": "@composer -d Tests/CGL --",
-		"test": "@test:unit",
-		"test:coverage": "phpunit -c phpunit.xml",
-		"test:functional": "phpunit -c phpunit.functional.xml",
+		"coverage:clean": "rm -rf .Build/coverage",
+		"coverage:merge": "phpcov merge --html .Build/coverage/html --clover .Build/coverage/clover.xml --text php://stdout .Build/coverage",
+		"test": [
+			"@test:unit",
+			"@test:functional"
+		],
+		"test:coverage": [
+			"@coverage:clean",
+			"@test:coverage:unit",
+			"@test:coverage:functional",
+			"@coverage:merge"
+		],
+		"test:coverage:functional": "XDEBUG_MODE=coverage phpunit -c phpunit.functional.xml",
+		"test:coverage:unit": "XDEBUG_MODE=coverage phpunit -c phpunit.xml",
+		"test:functional": "phpunit -c phpunit.functional.xml --no-coverage",
 		"test:unit": "phpunit -c phpunit.xml --no-coverage"
 	}
 }

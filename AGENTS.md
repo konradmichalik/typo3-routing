@@ -52,14 +52,15 @@ ddev 14 typo3 routing:debug    # TYPO3 CLI in one instance
 ## Testing
 
 ```bash
-ddev composer test             # unit tests, no coverage
-ddev composer test:coverage    # unit tests with coverage (pcov, no Xdebug needed)
-ddev composer test:functional  # functional tests, need a database
+ddev composer test             # unit and functional tests, no coverage
+ddev composer test:coverage    # both suites with coverage (pcov), merged by phpcov into .Build/coverage/clover.xml
+ddev composer test:unit        # unit tests only
+ddev composer test:functional  # functional tests only, need a database
 ```
 
-Functional tests need database credentials via `typo3Database*` environment variables and run inside DDEV. Unit tests use `konradmichalik/ttt`, registered as PHPUnit extension in `phpunit.xml` only, not in `phpunit.functional.xml`. The unit bootstrap `Tests/Unit/UnitTestsBootstrap.php` initializes the TYPO3 `Environment` once per process.
+Functional tests need database credentials via `typo3Database*` environment variables. `.ddev/config.yaml` sets them to the local DDEV database, the reusable CI workflow provides its own. Unit tests use `konradmichalik/ttt`, registered as PHPUnit extension in `phpunit.xml` only, not in `phpunit.functional.xml`. The unit bootstrap `Tests/Unit/UnitTestsBootstrap.php` initializes the TYPO3 `Environment` once per process.
 
-CI runs PHPUnit through a reusable workflow on PHP 8.2 to 8.6, TYPO3 13.4, 14.0 and 14.3, with highest and lowest dependencies. It also runs CGL, a security workflow and OpenSSF Scorecard.
+CI runs PHPUnit through a reusable workflow on PHP 8.2 to 8.6, TYPO3 13.4 and 14.3, with highest and lowest dependencies, unit and functional tests in every job. It also runs CGL (PHPStan against the locked TYPO3 13.4 and against 14.3), a security workflow and OpenSSF Scorecard.
 
 ## Code style and static analysis
 

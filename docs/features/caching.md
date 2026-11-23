@@ -20,7 +20,7 @@ public function list(int $page = 1): ResponseInterface
 | Parameter      | Type           | Default | Description                                                                       |
 |----------------|----------------|---------|-----------------------------------------------------------------------------------|
 | `lifetime`     | `int`          | `86400` | Time to live in seconds (fallback when no tag is invalidated).                    |
-| `tags`         | `list<string>` | `[]`    | Static cache tags. A tag `{table}` is flushed automatically when a record of that table changes through the DataHandler, a fixed tag `{table}_{uid}` (e.g. `tx_news_domain_model_news_5`) when that one record does. |
+| `tags`         | `list<string>` | `[]`    | Static cache tags. A tag `{table}` is flushed automatically when a record of that table changes through the DataHandler, a fixed tag `{table}_{uid}` (e.g. `tx_news_domain_model_news_5`) when that one record does. A tag cannot take a value from a path parameter, so a detail route has no per-record tag. A tag the TYPO3 cache rejects (anything but letters, digits, `_`, `%`, `-` and `&`, or longer than 250 characters) fails the build. |
 | `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key, such as tracking parameters (`utm_source`).  |
 
 - Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, path, query string (minus `ignoreParams`) and language, so host/query/language variants are cached separately — in a multi-site install two sites never share a cache entry.

@@ -239,8 +239,8 @@ final readonly class ControllerArgumentResolver
 
     private function toFloat(mixed $value, string $name): float
     {
-        // is_numeric() accepts surrounding whitespace, a trailing newline included.
-        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value) && trim($value) === $value)) {
+        // is_numeric() accepts surrounding whitespace including \f, which trim() keeps without a mask.
+        if (is_int($value) || is_float($value) || (is_string($value) && is_numeric($value) && trim($value, " \t\n\r\v\f") === $value)) {
             return (float) $value;
         }
 

@@ -230,6 +230,35 @@ final class ControllerArgumentResolverTest extends TestCase
     }
 
     #[Test]
+    public function resolvesAnEntityToItsIdentifierWithoutLoadingItOnRequest(): void
+    {
+        $this->persistenceManager->expects(self::never())->method('getObjectByIdentifier');
+        $specs = [$this->spec('item', 'path', Item::class), $this->spec('other', 'input', Item::class)];
+        $request = $this->request()->withQueryParams(['other' => 7]);
+
+        self::assertSame([42, 7], $this->resolver->resolve($specs, ['item' => '042'], $request, false));
+    }
+
+    #[Test]
+    public function stillRejectsAMalformedEntityIdentifierWithoutLoadingIt(): void
+    {
+        $this->persistenceManager->expects(self::never())->method('getObjectByIdentifier');
+
+        $this->expectException(ArgumentResolutionException::class);
+
+        $this->resolver->resolve([$this->spec('item', 'path', Item::class)], ['item' => 'abc'], $this->request(), false);
+    }
+
+    #[Test]
+    public function resolvesAVariadicEntityListToIdentifiersWithoutLoadingThem(): void
+    {
+        $this->persistenceManager->expects(self::never())->method('getObjectByIdentifier');
+        $request = $this->request()->withQueryParams(['items' => ['1', '02']]);
+
+        self::assertSame([1, 2], $this->resolver->resolve([$this->spec('items', 'variadic', Item::class)], [], $request, false));
+    }
+
+    #[Test]
     public function throwsEntityNotFoundWhenNoRecordMatchesTheIdentifier(): void
     {
         $this->persistenceManager->method('getObjectByIdentifier')->willReturn(null);

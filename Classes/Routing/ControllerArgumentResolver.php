@@ -24,6 +24,7 @@ use UnitEnum;
 
 use function array_key_exists;
 use function array_map;
+use function array_push;
 use function array_values;
 use function in_array;
 use function is_a;
@@ -57,12 +58,14 @@ final readonly class ControllerArgumentResolver
     ) {}
 
     /**
-     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs the controller method's parameters, in declaration order
-     * @param array<string, mixed>                                                                                                                                                               $match the matcher result (path placeholders live here, meta keys are prefixed with "_")
+     * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs        the controller method's parameters, in declaration order
+     * @param array<string, mixed>                                                                                                                                                               $match        the matcher result (path placeholders live here, meta keys are prefixed with "_")
+     * @param bool                                                                                                                                                                               $loadEntities false resolves an entity argument to its identifier instead of loading it, for callers that
+     *                                                                                                                                                                                                         only need the coerced value (the response cache key) and must stay off the database
      *
      * @return list<mixed> positional arguments to spread into the controller call
      */
-    public function resolve(array $specs, array $match, ServerRequestInterface $request): array
+    public function resolve(array $specs, array $match, ServerRequestInterface $request, bool $loadEntities = true): array
     {
         $query = $request->getQueryParams();
         $body = RequestBody::toArray($request);
@@ -72,9 +75,7 @@ final readonly class ControllerArgumentResolver
         foreach ($specs as $spec) {
             if ('variadic' === $spec['source']) {
                 // A variadic expands a single input array into zero or more positional arguments.
-                foreach ($this->resolveVariadic($inputs, $spec) as $value) {
-                    $arguments[] = $value;
-                }
+                array_push($arguments, ...$this->resolveVariadic($inputs, $spec, $loadEntities));
 
                 continue;
             }
@@ -82,11 +83,11 @@ final readonly class ControllerArgumentResolver
             $arguments[] = match ($spec['source']) {
                 'request' => $request,
                 // A host placeholder travels in the same match array as a path one.
-                'path', 'host' => $this->coerce($match[$spec['name']] ?? null, $spec),
-                'query' => $this->resolveInput($query, $spec),
-                'body' => $this->resolveInput($body, $spec),
+                'path', 'host' => $this->coerce($match[$spec['name']] ?? null, $spec, $loadEntities),
+                'query' => $this->resolveInput($query, $spec, $loadEntities),
+                'body' => $this->resolveInput($body, $spec, $loadEntities),
                 'upload' => $this->resolveUpload($request, $spec),
-                default => $this->resolveInput($inputs, $spec),
+                default => $this->resolveInput($inputs, $spec, $loadEntities),
             };
         }
 
@@ -109,7 +110,7 @@ final readonly class ControllerArgumentResolver
      *
      * @return list<mixed>
      */
-    private function resolveVariadic(array $inputs, array $spec): array
+    private function resolveVariadic(array $inputs, array $spec, bool $loadEntities): array
     {
         if (!array_key_exists($spec['name'], $inputs)) {
             return [];
@@ -118,25 +119,25 @@ final readonly class ControllerArgumentResolver
         $value = $inputs[$spec['name']];
         $items = is_array($value) ? array_values($value) : [$value];
 
-        return array_map(fn (mixed $item): mixed => $this->coerce($item, $spec), $items);
+        return array_map(fn (mixed $item): mixed => $this->coerce($item, $spec, $loadEntities), $items);
     }
 
     /**
      * @param array<string, mixed>                                                                                                                                                         $inputs
      * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      */
-    private function resolveInput(array $inputs, array $spec): mixed
+    private function resolveInput(array $inputs, array $spec, bool $loadEntities): mixed
     {
         // A missing value reaches coerce() as null, which falls back like an empty form field does.
         $value = $inputs[$spec['name']] ?? null;
 
-        return $this->coerce(ArgumentConstraints::isEmptyWithDefault($value, $spec) ? null : $value, $spec);
+        return $this->coerce(ArgumentConstraints::isEmptyWithDefault($value, $spec) ? null : $value, $spec, $loadEntities);
     }
 
     /**
      * @param array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $spec
      */
-    private function coerce(mixed $value, array $spec): mixed
+    private function coerce(mixed $value, array $spec, bool $loadEntities): mixed
     {
         if (null === $value) {
             return $this->fallbackForMissing($spec);
@@ -147,7 +148,7 @@ final readonly class ControllerArgumentResolver
             return $this->toEnum($value, $type, $spec['name']);
         }
         if (null !== $type && is_a($type, DomainObjectInterface::class, true)) {
-            return $this->toEntity($value, $type, $spec['name']);
+            return $this->toEntity($value, $type, $spec['name'], $loadEntities);
         }
 
         $coerced = match ($type) {
@@ -207,14 +208,19 @@ final readonly class ControllerArgumentResolver
     /**
      * Resolves a path/query/body identifier to an Extbase domain object via the persistence manager.
      * A malformed identifier is a 400 (same shape check as `toInt()`); a well-shaped identifier with
-     * no matching record is an `EntityNotFoundException`, mapped to a 404 by the dispatcher.
+     * no matching record is an `EntityNotFoundException`, mapped to a 404 by the dispatcher. Without
+     * `$loadEntities` it stops after the shape check and returns the identifier as an int.
      *
      * @param class-string $class
      */
-    private function toEntity(mixed $value, string $class, string $name): object
+    private function toEntity(mixed $value, string $class, string $name, bool $loadEntities): object|int
     {
         if (!is_int($value) && !(is_string($value) && RequirementPattern::matches('-?\d+', $value))) {
             throw ArgumentResolutionException::invalidValue($name, 1950619448);
+        }
+
+        if (!$loadEntities) {
+            return (int) $value;
         }
 
         $entity = $this->persistenceManager->getObjectByIdentifier($value, $class);

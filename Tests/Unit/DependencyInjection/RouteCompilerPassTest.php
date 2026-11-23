@@ -16,7 +16,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 use KonradMichalik\Typo3Routing\DependencyInjection\RouteCompilerPass;
 use KonradMichalik\Typo3Routing\Routing\RouteRegistry;
 use KonradMichalik\Typo3Routing\Tests\Support\Broken\BrokenParentService;
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AnyMethodRequestTokenController, AuthenticatedController, BrokenAuthenticatorController, CacheIgnoresConstrainedParamController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ClassLevelAuthenticateController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InlinePlaceholderController, InlinePlaceholderLegacyPathController, InvalidAuthenticatorController, InvalidClassLevelAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, InvalidStaticPartCacheController, InvalidStaticPartInvalidatesCacheController, InvalidTagCacheController, InvalidatesCacheController, JsonErrorRouteController, MethodLevelExclusiveController, MultiRoutePlaceholderCacheController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedInvalidatesCacheController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlaceholderTagController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RouteDefaultBreaksConstraintController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnboundPlaceholderCacheController, UnboundPlaceholderInvalidatesCacheController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{AbstractRouteController, AliasCollidesWithRouteController, AnyMethodRequestTokenController, AuthenticatedController, BrokenAuthenticatorController, CacheIgnoresConstrainedParamController, CachedAuthenticatedController, CanonicalController, CaseInsensitiveController, ClassBaseParamController, ClassLevelAuthenticateController, ConflictingDefaultController, ConflictingParamController, CorsController, DeleteRequestTokenController, DeprecatedRouteController, DeprecationSunsetBeforeSinceController, DoubleClassRouteController, DropsAuthenticateOnOverrideController, DropsOneAliasOnOverrideController, DropsOneInheritedRouteController, DuplicateAliasController, DuplicateNameController, DuplicateReturnsStatusController, EmptyPathExclusiveController, EmptyPathNoPrefixController, ExclusiveController, FixtureController, ForgotClassPrefixController, GetOnlyRequestTokenController, InheritedNewsController, InheritedProductController, InheritsProtectedRouteCleanlyController, InlinePlaceholderController, InlinePlaceholderLegacyPathController, InvalidAuthenticatorController, InvalidClassLevelAuthenticatorController, InvalidClassLevelRateLimitController, InvalidCorsCredentialsController, InvalidRateLimitKeyController, InvalidRateLimitPolicyController, InvalidTagCacheController, InvalidatesCacheController, JsonErrorRouteController, MethodLevelExclusiveController, MultiRoutePlaceholderCacheController, NarrowsAuthenticateOnOverrideController, NoRouteMarkerController, OrphanedCorsController, OrphanedDeprecatedRouteController, OrphanedInvalidatesCacheController, OrphanedModifierController, OrphanedReturnsController, OverridingRouteController, ParamContributionController, PlaceholderExclusiveController, PlaceholderTagController, PlainService, PrefixedController, PrefixedEmptyMethodPathController, RateLimitedController, RepeatsAuthenticateOnOverrideController, RepeatsBothAliasesOnOverrideController, RepeatsBothAuthenticateOnOverrideController, ReroutingOverrideController, ReservedDefaultKeyController, ReturnsController, RouteAliasController, RouteDefaultBreaksConstraintController, RoutelessExclusiveController, SecondUnprefixedInheritingController, SecuredInheritingController, SiteLanguageScopedController, SuccessorRouteController, TaggedController, TypedArgumentController, UnicodePathController, UnknownDeprecationSuccessorController, UnparseableDeprecationDateController, UnprefixedInheritingController, UnsupportedArgumentController};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, PassAuthenticator};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Dto\CourseDto;
 use LogicException;
@@ -334,7 +334,7 @@ final class RouteCompilerPassTest extends TestCase
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000068);
-        $this->expectExceptionMessage('"news.item"');
+        $this->expectExceptionMessage('#[Cache] on "invalid::detail()" declares the invalid cache tag "news.item_{id}"');
 
         $this->discover($this->buildContainer(['invalid' => InvalidTagCacheController::class]));
     }
@@ -353,51 +353,13 @@ final class RouteCompilerPassTest extends TestCase
     }
 
     #[Test]
-    public function rejectsACacheTagPlaceholderThatIsNoPathParameter(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000069);
-        $this->expectExceptionMessage('#[Cache] on "unbound::detail()" (route "news_detail") uses the cache tag placeholder(s) "{id}", but its path "/news" declares no such parameter');
-
-        $this->discover($this->buildContainer(['unbound' => UnboundPlaceholderCacheController::class]));
-    }
-
-    #[Test]
     public function rejectsACacheTagPlaceholderMissingFromOneOfTheMethodsRoutes(): void
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000069);
-        $this->expectExceptionMessage('(route "news_latest")');
+        $this->expectExceptionMessage('#[Cache] on "multi::detail()" (route "news_latest") uses the cache tag placeholder(s) "{id}", but its path "/news/latest" declares no such parameter');
 
         $this->discover($this->buildContainer(['multi' => MultiRoutePlaceholderCacheController::class]));
-    }
-
-    #[Test]
-    public function rejectsACacheTagWhoseStaticPartTheCacheFrontendWouldRefuse(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000068);
-        $this->expectExceptionMessage('"tx.news_{id}"');
-
-        $this->discover($this->buildContainer(['invalid' => InvalidStaticPartCacheController::class]));
-    }
-
-    #[Test]
-    public function rejectsAnInvalidationTagPlaceholderThatIsNoPathParameter(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000070);
-
-        $this->discover($this->buildContainer(['unbound' => UnboundPlaceholderInvalidatesCacheController::class]));
-    }
-
-    #[Test]
-    public function rejectsAnInvalidationTagWhoseStaticPartTheCacheFrontendWouldRefuse(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000052);
-
-        $this->discover($this->buildContainer(['invalid' => InvalidStaticPartInvalidatesCacheController::class]));
     }
 
     #[Test]

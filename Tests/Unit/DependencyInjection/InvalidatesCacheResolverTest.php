@@ -15,7 +15,7 @@ namespace KonradMichalik\Typo3Routing\Tests\Unit\DependencyInjection;
 
 use Closure;
 use KonradMichalik\Typo3Routing\DependencyInjection\{CollectedRoutes, InvalidatesCacheResolver};
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EmptyInvalidatesCacheController, InvalidStaticPartInvalidatesCacheController, InvalidTagInvalidatesCacheController, InvalidatesCacheController, PlaceholderTagController};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{EmptyInvalidatesCacheController, InvalidTagInvalidatesCacheController, InvalidatesCacheController, PlaceholderTagController};
 use LogicException;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
@@ -69,9 +69,9 @@ final class InvalidatesCacheResolverTest extends TestCase
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000052);
-        $this->expectExceptionMessageMatches('/#\[InvalidatesCache\] on "svc::create\(\)" \(route "news_create"\) declares the invalid cache tag "news\.item"/');
+        $this->expectExceptionMessageMatches('/#\[InvalidatesCache\] on "svc::update\(\)" \(route "news_update"\) declares the invalid cache tag "news\.item_\{id\}"/');
 
-        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidTagInvalidatesCacheController::class, 'create'), ['POST'], '/news', 'svc', 'news_create', new CollectedRoutes());
+        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidTagInvalidatesCacheController::class, 'update'), ['PUT'], '/news/{id}', 'svc', 'news_update', new CollectedRoutes());
     }
 
     #[Test]
@@ -92,16 +92,6 @@ final class InvalidatesCacheResolverTest extends TestCase
         $this->expectExceptionMessage('#[InvalidatesCache] on "svc::update()" (route "news_update") uses the cache tag placeholder(s) "{id}", but its path "/news/{uid}" declares no such parameter');
 
         (new InvalidatesCacheResolver())->apply(new ReflectionMethod(PlaceholderTagController::class, 'update'), ['PUT'], '/news/{uid}', 'svc', 'news_update', new CollectedRoutes());
-    }
-
-    #[Test]
-    public function rejectsAPlaceholderTagWhoseStaticPartTheCacheFrontendWouldRefuse(): void
-    {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionCode(1750000052);
-        $this->expectExceptionMessage('"tx.news_{id}"');
-
-        (new InvalidatesCacheResolver())->apply(new ReflectionMethod(InvalidStaticPartInvalidatesCacheController::class, 'update'), ['PUT'], '/news/{id}', 'svc', 'news_update', new CollectedRoutes());
     }
 
     #[Test]

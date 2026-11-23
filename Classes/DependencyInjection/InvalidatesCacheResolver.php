@@ -17,7 +17,6 @@ use KonradMichalik\Typo3Routing\Attribute\InvalidatesCache;
 use KonradMichalik\Typo3Routing\Cache\CacheTagPlaceholders;
 use LogicException;
 use ReflectionMethod;
-use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 
 use function array_column;
 use function array_filter;
@@ -26,7 +25,6 @@ use function array_map;
 use function array_merge;
 use function implode;
 use function in_array;
-use function preg_match;
 use function sprintf;
 use function trigger_error;
 
@@ -61,7 +59,7 @@ final readonly class InvalidatesCacheResolver
 
         foreach ($tags as $tag) {
             // The cache frontend rejects such a tag only at flush time, after the controller already wrote.
-            if (1 !== preg_match(FrontendInterface::PATTERN_TAG, CacheTagPlaceholders::withStandIns($tag))) {
+            if (!CacheTagPlaceholders::isValid($tag)) {
                 throw new LogicException(sprintf('#[InvalidatesCache] on "%s::%s()" (route "%s") declares the invalid cache tag "%s": tags may only contain letters, digits, "_", "%%", "-" and "&", at most 250 characters, a placeholder counting as 64.', $serviceId, $method->getName(), $name, $tag), 1750000052);
             }
         }

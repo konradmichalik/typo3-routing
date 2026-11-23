@@ -23,7 +23,6 @@ use ReflectionMethod;
 use Symfony\Component\DependencyInjection\Compiler\{CompilerPassInterface, ServiceLocatorTagPass};
 use Symfony\Component\DependencyInjection\{ContainerBuilder, Definition, Reference};
 use Symfony\Component\Routing\Matcher\Dumper\CompiledUrlMatcherDumper;
-use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 
 use function array_intersect;
 use function array_map;
@@ -32,7 +31,6 @@ use function array_values;
 use function count;
 use function is_a;
 use function is_string;
-use function preg_match;
 use function sprintf;
 use function str_replace;
 use function trigger_error;
@@ -379,7 +377,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $this->deprecationResolver->apply($deprecation, $name, $serviceId, $method->getName(), $collected);
         $this->rateLimitResolver->apply($rateLimit, $name, $serviceId, $method->getName(), $collected);
         $this->returnsResolver->apply($method, $serviceId, $name, $collected);
-        $this->invalidatesCacheResolver->apply($method, $methods, $path, $serviceId, $name, $collected);
+        $this->invalidatesCacheResolver->apply(method: $method, methods: $methods, path: $path, serviceId: $serviceId, name: $name, collected: $collected);
     }
 
     /**
@@ -461,7 +459,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
         $cache = $attributes[0]->newInstance();
         foreach ($cache->tags as $tag) {
             // The cache frontend rejects such a tag only at the first set(), after the controller already ran.
-            if (1 !== preg_match(FrontendInterface::PATTERN_TAG, CacheTagPlaceholders::withStandIns($tag))) {
+            if (!CacheTagPlaceholders::isValid($tag)) {
                 throw new LogicException(sprintf('#[Cache] on "%s::%s()" declares the invalid cache tag "%s": tags may only contain letters, digits, "_", "%%", "-" and "&", at most 250 characters, a placeholder counting as 64.', $serviceId, $method->getName(), $tag), 1750000068);
             }
         }

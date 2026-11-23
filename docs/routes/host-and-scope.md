@@ -24,7 +24,7 @@ http://example.com/api/payment/charge  →  308 →  https://example.com/api/pay
 
 This is not opt-in and not tied to `canonical`: declaring `schemes` states which scheme the route answers on, so the correct target is unambiguous. Several caveats:
 
-- A route that is invisible in the current context — wrong `env`, out of [site or language scope](#site--and-language-bound-routes) — still answers `404`, since a redirect must never reveal it. So does a **host** mismatch: unlike a scheme, there is no single right host to send the client to.
+- A route that is invisible in the current context — wrong `env`, out of [site or language scope](#site--and-language-bound-routes) — answers like an unmatched path, since a redirect must never reveal it. So does a **host** mismatch: unlike a scheme, there is no single right host to send the client to.
 - The port is carried over unchanged, since nothing here knows which port the other scheme listens on.
 - The scheme comes from the request URI, which TYPO3 itself derives proxy-aware (`reverseProxySSL`, or `reverseProxyIP` plus the `X-Forwarded-Proto` header). A TLS-terminating proxy that is *not* declared in that configuration makes TYPO3 believe every request is plain `http`, and this redirect then loops. That configuration was always required for `schemes` to match correctly — the symptom just changes from a permanent `404` to a redirect loop.
 - Combined with [`caseInsensitive`](path-tolerance.md#case-insensitive-paths): a differently-cased request that also uses the wrong scheme answers `404` instead of redirecting — the tolerance and the redirect are separate matcher tiers that are not combined with each other, the same limitation [legacy paths](route-lifecycle.md#legacy-paths-for-renamed-routes) have with `caseInsensitive`. Matching the declared case redirects normally.
@@ -70,7 +70,7 @@ Not inherited from a class-level `#[Route]` — same rule as `methods`.
 
 ## Site- and language-bound routes
 
-`sites` and `languages` scope a route to a subset of the installation the same way `env` scopes it to an application context: out of scope means the route behaves as if it does not exist (`404`), checked at match time against the request's `site`/`language` attributes.
+`sites` and `languages` scope a route to a subset of the installation the same way `env` scopes it to an application context: out of scope means the route behaves as if it does not exist, checked at match time against the request's `site`/`language` attributes. It answers exactly like an unmatched path (`404` inside an [exclusive prefix](../operating/configuration.md#exclusive-path-prefixes), page rendering otherwise), whatever the method: it never causes a `405`, and a route sharing its path advertises only its own methods in `Allow` and in a CORS preflight.
 
 ```php
 #[Route(path: '/api/shop/orders', name: 'shop_orders', sites: ['shop-de', 'shop-at'])]

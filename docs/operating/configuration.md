@@ -47,7 +47,7 @@ The tolerance costs nothing in the normal case: the extra match attempt only run
 Two things stay untouched by it:
 
 - **The declared form stays canonical.** Generated URLs ([`{routing:uri()}`, `RouteUrlGenerator`](../routes/url-generation.md)) keep exactly the form you wrote, and so do the route exports that report it — [`routing:debug`](commands.md#routingdebug) and the [OpenAPI document](openapi.md).
-- **`405` beats the retry.** A path that matches a route under the active `trailingSlash` policy but uses the wrong HTTP method answers `405` with its `Allow` header. With `trailingSlash: 0`, the opposite-slash form is not a path match at all and stays a plain `404`, not a `405`.
+- **`405` beats the retry.** A path that matches a route under the active `trailingSlash` policy but uses the wrong HTTP method answers `405` with its `Allow` header (listing only routes visible in the current context, see [Environment-bound routes](#environment-bound-routes)). With `trailingSlash: 0`, the opposite-slash form is not a path match at all and stays a plain `404`, not a `405`.
 
 Case is a separate matter and has no global switch: a route opts into it individually with `#[Route(caseInsensitive: true)]`, see [Case-insensitive paths](../routes/path-tolerance.md#case-insensitive-paths).
 
@@ -68,7 +68,7 @@ This is **not** needed to make routes work — only to control what happens to u
 | `/api/item/abc` (violates a requirement)   | page rendering → TYPO3 404 page     | JSON `404`                  |
 | `/some/page`                               | page rendering                      | page rendering              |
 
-A path that matches a route's shape but the wrong HTTP method always gets a hard `405` regardless, since that path was deliberately claimed by that route.
+A path that matches a route's shape but the wrong HTTP method always gets a hard `405` regardless, since that path was deliberately claimed by that route. A route invisible in the current context claims nothing: its path answers like any unmatched one.
 
 Reach for `exclusivePrefixes` when API clients should receive machine-readable errors for mistyped endpoints. Leave it empty when your routes coexist with ordinary pages.
 
@@ -94,13 +94,13 @@ final class ApiNotFound
 ```
 
 - **It fires after every matcher tier.** A trailing-slash or case variant, a legacy path or a scheme redirect still reaches its route.
-- **It also covers hidden routes.** A route hidden by [`env`](#environment-bound-routes), `sites` or `languages` answers through the same event, and the event carries no route data, so a hidden route stays indistinguishable from a missing one.
+- **It also covers hidden routes.** A route hidden by [`env`](#environment-bound-routes), `sites` or `languages` inside an exclusive prefix answers through the same event, and the event carries no route data, so a hidden route stays indistinguishable from a missing one.
 - **It does not cover a controller's own `404`**, such as an [entity](../routes/arguments.md#entity-resolution) without a matching record, or a path outside any exclusive prefix, which falls through to page rendering.
 - Without a listener response, the default JSON `404` is sent. The usual headers (request id, CORS) are added either way.
 
 ## Environment-bound routes
 
-A route with `env: 'Development'` only exists while the top-level application context matches (case-insensitive). Outside that context the route behaves as if it does not exist (`404`) — no ExpressionLanguage, just a match-time check against `Environment::getContext()`.
+A route with `env: 'Development'` only exists while the top-level application context matches (case-insensitive). Outside that context the route behaves as if it does not exist — no ExpressionLanguage, just a match-time check against `Environment::getContext()`. Its path answers exactly like an unmatched one (`404` inside an [exclusive prefix](#exclusive-path-prefixes), page rendering otherwise), for every method: it never causes a `405`, and a visible route on the same path advertises only its own methods, in `Allow` as in a CORS preflight.
 
 ```php
 #[Route(path: '/api/debug/dump', name: 'debug_dump', env: 'Development')]

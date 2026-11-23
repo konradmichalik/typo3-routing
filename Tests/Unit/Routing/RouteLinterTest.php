@@ -333,6 +333,7 @@ final class RouteLinterTest extends TestCase
 
         self::assertCount(1, $findings);
         self::assertSame('missing-request-token', $findings[0]['check']);
+        self::assertStringContainsString('list its methods explicitly', $findings[0]['message']);
     }
 
     #[Test]

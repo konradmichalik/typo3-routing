@@ -60,10 +60,8 @@ final readonly class RouteLinter
     }
 
     /**
-     * A cookie-session route that accepts a state-changing method without `#[RequireRequestToken]` is
-     * guarded only by the SameSite attribute of TYPO3's session cookie: form-encoded bodies need no
-     * CORS preflight, so a cross-site form POST reaches it. Custom authenticators are not considered,
-     * since the linter cannot tell whether they are cookie-based.
+     * Only the SameSite cookie attribute guards such a route: form-encoded bodies need no CORS preflight.
+     * Custom authenticators are skipped, the linter cannot tell whether they are cookie-based.
      *
      * @param array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, priority?: int, defaults?: array<string, mixed>, schemes?: list<string>, host?: string|null, description?: string|null, caseInsensitive?: bool}> $routes
      *
@@ -82,7 +80,7 @@ final readonly class RouteLinter
                 'check' => 'missing-request-token',
                 'route' => $name,
                 'controller' => $route['controller'],
-                'message' => 'Route authenticates through a cookie session and accepts a state-changing method, but has no #[RequireRequestToken]; only the SameSite cookie attribute stands between it and a cross-site form POST.',
+                'message' => 'Route authenticates through a cookie session and accepts a state-changing method, but has no #[RequireRequestToken]; only the SameSite cookie attribute stands between it and a cross-site form POST. A route accepting any method has to list its methods explicitly before #[RequireRequestToken] is allowed.',
             ];
         }
 

@@ -70,7 +70,7 @@ None of these are provided, and none should be inferred from TCA:
 - **`pid` scope on the detail endpoint.** Without it, `/products/{uid}` is an enumeration oracle over the entire table, regardless of which records the site is supposed to expose. Entity binding resolves any valid identifier without an ownership check — see the [warning in Entity resolution](arguments.md#entity-resolution).
 - **Restrictions.** `deleted`, `hidden`, `starttime`/`endtime` and `fe_group` all need to be applied. The frontend restriction container is the correct default, not `QueryBuilder`'s own defaults.
 - **Language overlay and site scope.** A record API that ignores language returns default-language rows to a translated request.
-- **Cache tags.** A list response cached with [`#[Cache]`](../features/caching.md) is flushed on a DataHandler change only through a tag that names the table (`tags: ['tx_shop_product']`), and then on a change to any record of it. The attribute does not derive tags for you, and a tag cannot carry a path parameter, so a detail response has no per-record tag.
+- **Cache tags.** A response cached with [`#[Cache]`](../features/caching.md) is flushed on a DataHandler change only through the static tags you declare: a tag that names the table (`tags: ['tx_shop_product']`) on a change to any record of it, a fixed `{table}_{uid}` tag (`tx_shop_product_5`) on a change to that one record. The attribute does not derive tags for you, and a tag cannot carry a path parameter, so a detail route serving any `{uid}` has no per-record tag and needs the table tag.
 - **Workspaces**, if the project uses them.
 
 ## Decision: why this is documentation, not a feature

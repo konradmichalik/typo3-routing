@@ -430,7 +430,7 @@ final readonly class RouteCompilerPass implements CompilerPassInterface
 
         // Empty methods mean "any method", which includes the protected ones.
         if ([] !== $methods && [] === array_intersect(RequireRequestToken::PROTECTED_METHODS, $methods)) {
-            throw new LogicException(sprintf('#[RequireRequestToken] on "%s::%s()" (route "%s") is pointless: the route only allows "%s". Request tokens are verified for POST/PUT/PATCH/DELETE only.', $serviceId, $method->getName(), $name, implode('", "', $methods)), 1750000012);
+            throw new LogicException(sprintf('#[RequireRequestToken] on "%s::%s()" (route "%s") is pointless: the route only allows "%s". Request tokens are verified for %s only.', $serviceId, $method->getName(), $name, implode('", "', $methods), implode('/', RequireRequestToken::PROTECTED_METHODS)), 1750000012);
         }
 
         $collected->requestTokenScopes[$name] = $requestToken->scope ?? 'routing/'.$name;

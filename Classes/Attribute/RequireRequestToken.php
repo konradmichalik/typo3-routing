@@ -25,9 +25,6 @@ use Attribute;
 #[Attribute(Attribute::TARGET_METHOD)]
 final readonly class RequireRequestToken
 {
-    /**
-     * The state-changing methods a request token is verified for.
-     */
     public const PROTECTED_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
     /**

@@ -25,14 +25,14 @@ use function preg_match;
 final readonly class RequirementPattern
 {
     /**
-     * The full-match regex for a requirement, built the way Symfony compiles a placeholder: `{}`
-     * delimiters so a `#` or `/` in the requirement stays literal, `D` so `$` does not also match
-     * before a trailing newline, and `u` when the route was compiled in UTF-8 mode
+     * The full-match regex for a requirement: a `\x01` delimiter, which no requirement contains, so
+     * `#`, `/` and unbalanced braces such as `[^}]+` stay literal. `D` keeps `$` from also matching
+     * before a trailing newline, and `u` applies when the route was compiled in UTF-8 mode
      * ({@see RouteRegistry::routeNeedsUtf8()}).
      */
     public static function regex(string $requirement, bool $utf8 = false): string
     {
-        return '{^(?:'.$requirement.')$}sD'.($utf8 ? 'u' : '');
+        return "\x01^(?:".$requirement.")$\x01sD".($utf8 ? 'u' : '');
     }
 
     /**

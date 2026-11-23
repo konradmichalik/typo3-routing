@@ -43,6 +43,8 @@ final class RequirementPatternTest extends TestCase
         yield 'alternation stays anchored' => ['asc|desc', 'ascending', false, false];
         yield 'hash in requirement' => ['#\d+', '#12', false, true];
         yield 'brace quantifier' => ['\d{3}', '123', false, true];
+        yield 'unbalanced closing brace in a class' => ['[^}]+', 'abc', false, true];
+        yield 'unbalanced opening brace in a class' => ['[{]x', '{x', false, true];
         yield 'dot matches newline' => ['.+', "a\nb", false, true];
         yield 'unicode in utf8 mode' => ['\p{L}+', 'Zoë', true, true];
         yield 'unicode without utf8 mode' => ['\p{L}+', 'Zoë', false, false];

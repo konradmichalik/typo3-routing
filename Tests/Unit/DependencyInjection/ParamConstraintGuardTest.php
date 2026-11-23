@@ -258,6 +258,7 @@ final class ParamConstraintGuardTest extends TestCase
         yield 'query' => ['query', []];
         yield 'body' => ['body', []];
         yield 'variadic' => ['variadic', []];
+        yield 'source the guard does not know yet' => ['cookie', []];
     }
 
     /**
@@ -269,7 +270,7 @@ final class ParamConstraintGuardTest extends TestCase
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000066);
-        $this->expectExceptionMessage('#[Cache(ignoreParams:)] on "ctrl::list()" names "limit", which a controller argument reads.');
+        $this->expectExceptionMessage('#[Cache(ignoreParams:)] on "ctrl::list()" names "limit", which a controller argument reads. A cached response would be served for every value of it. Remove it from ignoreParams.');
 
         ParamConstraintGuard::assertNotIgnoredByCache([
             $this->spec('page', 'int', 'input', []),

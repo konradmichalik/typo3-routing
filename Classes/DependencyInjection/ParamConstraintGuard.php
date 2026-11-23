@@ -85,10 +85,8 @@ final class ParamConstraintGuard
     }
 
     /**
-     * The response cache answers before arguments are resolved, so a consumed argument it ignores would be
-     * served the first cached response for every value, an invalid one getting that 200 instead of its 400.
-     * Only declared arguments are checked: a controller taking the request may still ignore any undeclared
-     * parameter. A placeholder is part of the path or host, which the cache key always includes.
+     * The cache answers before arguments resolve, so an ignored consumed argument would get one cached response
+     * for every value. Undeclared parameters stay ignorable.
      *
      * @param list<array{name: string, type: string|null, source: string, nullable: bool, hasDefault: bool, default: mixed, min?: int|float, max?: int|float, minLength?: int, maxLength?: int}> $specs
      * @param list<string>                                                                                                                                                                       $ignoreParams
@@ -96,8 +94,8 @@ final class ParamConstraintGuard
     public static function assertNotIgnoredByCache(array $specs, array $ignoreParams, string $where): void
     {
         foreach ($specs as $spec) {
-            if (in_array($spec['name'], $ignoreParams, true) && in_array($spec['source'], ['query', 'body', 'input', 'variadic'], true)) {
-                throw new LogicException(sprintf('#[Cache(ignoreParams:)] on "%s" names "%s", which a controller argument reads. A cached response would be served for every value of it, without validating it. Remove it from ignoreParams.', $where, $spec['name']), 1750000066);
+            if (in_array($spec['name'], $ignoreParams, true) && !in_array($spec['source'], ['path', 'host', 'request', 'upload'], true)) {
+                throw new LogicException(sprintf('#[Cache(ignoreParams:)] on "%s" names "%s", which a controller argument reads. A cached response would be served for every value of it. Remove it from ignoreParams.', $where, $spec['name']), 1750000066);
             }
         }
     }

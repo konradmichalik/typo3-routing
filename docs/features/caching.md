@@ -35,7 +35,9 @@ public function list(int $page = 1): ResponseInterface
 
 > [!WARNING]
 > This safeguard only triggers on `#[Authenticate]`. A **public** `#[Cache]` route whose controller inspects the frontend-user context itself (e.g. via the `frontend.user` aspect) shares one cache entry across all visitors — the first user's personalized response would be served to everyone. Don't combine `#[Cache]` with identity-dependent output; protect such routes with `#[Authenticate]` (which disables the cache) instead.
-- The cache is bypassed entirely — neither read nor written — for a **logged-in backend user** (so editors always see live content while previewing) and for a request sending `Cache-Control: no-store`. A plain `Cache-Control: no-cache` only skips **reading** the stored entry; the fresh response still refreshes the cache for later requests.
+- The cache is bypassed entirely, neither read nor written, only for a **logged-in backend user**, so editors always see live content while previewing.
+- **Clients cannot bypass the cache.** A request header such as `Cache-Control: no-cache` or `no-store` is ignored: the stored entry is served, and on a miss the fresh response is stored as usual. Otherwise any client could skip the cache and force a controller run on every request.
+- To force a fresh response as an operator, flush the entry instead: through its tags (a DataHandler change of the tagged record, or a write route with [`#[InvalidatesCache]`](#invalidating-from-a-write-route)), or by clearing the page cache as described above.
 
 - [Invalidating from a write route](#invalidating-from-a-write-route)
 - [ETag / conditional GET](#etag--conditional-get)

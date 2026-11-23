@@ -37,13 +37,12 @@ final class Configuration
     /**
      * Register the response cache (uses the TYPO3 default backend). Group "pages" lets the core
      * DataHandler flush its `{table}` and `{table}_{uid}` tags and makes "Flush frontend caches" clear it.
+     * Filled in key by key, so a preconfigured backend keeps the group; explicitly set groups win.
      */
     public static function registerResponseCache(): void
     {
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER] ??= [
-            'frontend' => VariableFrontend::class,
-            'groups' => ['pages', 'all'],
-        ];
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER]['frontend'] ??= VariableFrontend::class;
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER]['groups'] ??= ['pages', 'all'];
     }
 
     /**

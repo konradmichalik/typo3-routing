@@ -52,6 +52,32 @@ final class ConfigurationTest extends TestCase
     }
 
     #[Test]
+    public function addsThePagesGroupToAPreconfiguredResponseCacheWithoutGroups(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER] = ['backend' => 'RedisBackend'];
+
+        Configuration::registerResponseCache();
+
+        /** @var array{backend: string, frontend: string, groups: list<string>} $config */
+        $config = $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER];
+        self::assertSame('RedisBackend', $config['backend']);
+        self::assertSame(VariableFrontend::class, $config['frontend']);
+        self::assertSame(['pages', 'all'], $config['groups']);
+    }
+
+    #[Test]
+    public function keepsExplicitlyConfiguredResponseCacheGroups(): void
+    {
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER] = ['groups' => ['all']];
+
+        Configuration::registerResponseCache();
+
+        /** @var array{groups: list<string>} $config */
+        $config = $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER];
+        self::assertSame(['all'], $config['groups']);
+    }
+
+    #[Test]
     public function registersTheRateLimitCacheOutsideTheAllGroup(): void
     {
         Configuration::registerRateLimitCache();

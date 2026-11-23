@@ -248,14 +248,33 @@ final class ParamConstraintGuardTest extends TestCase
         ], ['limit' => $default], 'ctrl::list()');
     }
 
+    /**
+     * @return iterable<string, array{string, array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int}}>
+     */
+    public static function argumentsTheCacheMustNotIgnore(): iterable
+    {
+        yield 'unconstrained input' => ['input', []];
+        yield 'constrained input' => ['input', ['max' => 100]];
+        yield 'query' => ['query', []];
+        yield 'body' => ['body', []];
+        yield 'variadic' => ['variadic', []];
+    }
+
+    /**
+     * @param array{min?: int|float, max?: int|float, minLength?: int, maxLength?: int} $constraints
+     */
     #[Test]
-    public function rejectsACacheIgnoringAConstrainedInput(): void
+    #[DataProvider('argumentsTheCacheMustNotIgnore')]
+    public function rejectsACacheIgnoringAConsumedArgument(string $source, array $constraints): void
     {
         $this->expectException(LogicException::class);
         $this->expectExceptionCode(1750000066);
-        $this->expectExceptionMessage('#[Cache(ignoreParams:)] on "ctrl::list()" names "limit", which has a #[Param] value constraint');
+        $this->expectExceptionMessage('#[Cache(ignoreParams:)] on "ctrl::list()" names "limit", which a controller argument reads.');
 
-        ParamConstraintGuard::assertNotIgnoredByCache([$this->spec('limit', 'int', 'input', ['max' => 100])], ['limit'], 'ctrl::list()');
+        ParamConstraintGuard::assertNotIgnoredByCache([
+            $this->spec('page', 'int', 'input', []),
+            $this->spec('limit', 'int', $source, $constraints),
+        ], ['limit'], 'ctrl::list()');
     }
 
     /**
@@ -263,9 +282,10 @@ final class ParamConstraintGuardTest extends TestCase
      */
     public static function argumentsTheCacheMayIgnore(): iterable
     {
-        yield 'unconstrained input' => ['input', []];
         yield 'constrained path placeholder, part of the cache key anyway' => ['path', ['max' => 100]];
         yield 'constrained host placeholder, part of the cache key anyway' => ['host', ['max' => 100]];
+        yield 'request, not a parameter on the wire' => ['request', []];
+        yield 'upload, not part of a cacheable GET' => ['upload', []];
     }
 
     /**
@@ -273,7 +293,7 @@ final class ParamConstraintGuardTest extends TestCase
      */
     #[Test]
     #[DataProvider('argumentsTheCacheMayIgnore')]
-    public function acceptsACacheIgnoringAnArgumentThatCannotFail(string $source, array $constraints): void
+    public function acceptsACacheIgnoringAnArgumentOutsideTheQueryAndBody(string $source, array $constraints): void
     {
         $this->expectNotToPerformAssertions();
 
@@ -281,6 +301,14 @@ final class ParamConstraintGuardTest extends TestCase
             $this->spec('limit', 'int', $source, $constraints),
             $this->spec('page', 'int', 'input', ['min' => 1]),
         ], ['limit'], 'ctrl::list()');
+    }
+
+    #[Test]
+    public function acceptsACacheIgnoringAnUndeclaredParameter(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        ParamConstraintGuard::assertNotIgnoredByCache([$this->spec('page', 'int', 'input', [])], ['utm_source'], 'ctrl::list()');
     }
 
     /**

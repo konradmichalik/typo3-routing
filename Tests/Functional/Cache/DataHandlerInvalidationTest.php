@@ -79,11 +79,14 @@ final class DataHandlerInvalidationTest extends FunctionalTestCase
     #[Test]
     public function clearCacheDisableInPageTsConfigSuppressesTheFlush(): void
     {
-        $this->store('route_table', self::TABLE);
+        $this->store('route_flushed', self::TABLE.'_5');
+        $this->store('route_kept', self::TABLE.'_7');
 
-        $this->runDataHandler([self::TABLE => [7 => ['title' => 'Changed']]], []);
+        // Record 5 is the control: if it is not flushed either, the suppression proves nothing.
+        $this->runDataHandler([self::TABLE => [5 => ['title' => 'Changed'], 7 => ['title' => 'Changed']]], []);
 
-        self::assertNotNull($this->responseCache->get('route_table'));
+        self::assertNull($this->responseCache->get('route_flushed'));
+        self::assertNotNull($this->responseCache->get('route_kept'));
     }
 
     #[Test]

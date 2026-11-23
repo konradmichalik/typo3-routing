@@ -43,6 +43,7 @@ final class CorsHandlerTest extends TestCase
         // A disabled handler never touches the response.
         $response = $handler->decorate(new Response('php://temp', 200), $this->request('https://app.example.com'));
         self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('', $response->getHeaderLine('Vary'));
     }
 
     #[Test]
@@ -120,13 +121,58 @@ final class CorsHandlerTest extends TestCase
     }
 
     #[Test]
-    public function decorateLeavesDisallowedOriginUntouched(): void
+    public function decorateVariesByOriginButGrantsNothingToADisallowedOrigin(): void
     {
         $handler = $this->handler(['allowedOrigins' => 'https://app.example.com']);
 
         $response = $handler->decorate(new Response('php://temp', 200), $this->request('https://evil.example'));
 
         self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        // A shared cache must not hand this header-less variant to an allowed origin.
+        self::assertSame('Origin', $response->getHeaderLine('Vary'));
+    }
+
+    #[Test]
+    public function decorateVariesByOriginWhenTheRequestCarriesNoOrigin(): void
+    {
+        $handler = $this->handler(['allowedOrigins' => 'https://app.example.com']);
+
+        $response = $handler->decorate(new Response('php://temp', 200), Requests::get('https://example.com/api/count')->build());
+
+        self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('Origin', $response->getHeaderLine('Vary'));
+    }
+
+    #[Test]
+    public function decorateAddsVaryOriginOnlyOnceForAnAllowedOrigin(): void
+    {
+        $handler = $this->handler(['allowedOrigins' => 'https://app.example.com']);
+
+        $response = $handler->decorate(new Response('php://temp', 200, ['Vary' => 'Accept']), $this->request('https://app.example.com'));
+
+        self::assertSame(['Accept', 'Origin'], $response->getHeader('Vary'));
+    }
+
+    #[Test]
+    public function preflightVariesByOriginButGrantsNothingToADisallowedOrigin(): void
+    {
+        $handler = $this->handler(['allowedOrigins' => 'https://app.example.com']);
+
+        $response = $handler->preflightResponse(['GET'], $this->request('https://evil.example'));
+
+        self::assertSame('', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('Origin', $response->getHeaderLine('Vary'));
+    }
+
+    #[Test]
+    public function wildcardPreflightDoesNotVaryByOrigin(): void
+    {
+        $handler = $this->handler(['allowedOrigins' => '*']);
+
+        $response = $handler->preflightResponse(['GET'], $this->request('https://anywhere.example'));
+
+        self::assertSame('*', $response->getHeaderLine('Access-Control-Allow-Origin'));
+        self::assertSame('', $response->getHeaderLine('Vary'));
     }
 
     #[Test]

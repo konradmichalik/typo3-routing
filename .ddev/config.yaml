@@ -13,6 +13,11 @@ database:
 webimage_extra_packages: [libxml2-utils, php8.2-pcov]
 use_dns_when_possible: true
 corepack_enable: false
+web_environment:
+  - typo3DatabaseName=db
+  - typo3DatabaseHost=db
+  - typo3DatabaseUsername=root
+  - typo3DatabasePassword=root
 hooks:
   post-start:
     - exec: composer install --ignore-platform-reqs --no-scripts

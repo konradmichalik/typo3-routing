@@ -59,11 +59,12 @@ public function detail(int $id): ResponseInterface
 }
 ```
 
-A DataHandler change of news record 5 makes the core flush `tx_news_domain_model_news_5`, so only the entry for `/api/news/5` is dropped and every other detail entry stays cached. Leave the table tag off a detail route: the core flushes `{table}` on a change of any record of that table, which would empty all detail entries again.
+A DataHandler change of news record 5 makes the core flush `tx_news_domain_model_news_5`, so only the entry for `/api/news/5` is dropped and every other detail entry stays cached. The core also flushes `{table}` on a change of any record of that table, so a table tag on the detail route would empty all detail entries again. Leave it off only when records are not translated: a change to a translation (uid 12, `l10n_parent` 5) makes the core flush `tx_news_domain_model_news_12`, not `tx_news_domain_model_news_5`, so the entry for `/api/news/5` would stay stale. Keep the table tag when records are translated or otherwise flushed under a different uid than the one in the path.
 
 - Placeholders resolve from path parameters only, including a class-level `#[Route]` prefix. A placeholder that is not a path parameter of the route fails the build, also when the controller reads it from the query or body: a client could otherwise create tags at will. Host placeholders do not count either.
 - A method with several `#[Route]` attributes needs the placeholder in the path of every one of them, otherwise the build fails for the route that lacks it.
-- A value with a character outside `A-Z`, `a-z`, `0-9`, `_` and `-`, an empty value, or one longer than 64 characters becomes `h` followed by the first 16 hex characters of its SHA-256 hash, instead of a silently altered value. Storing and flushing apply the same rule, so the same value always yields the same tag.
+- An integer-like value loses its leading zeros, the way an `int` argument receives it and the core builds `{table}_{uid}`: `/api/news/05` and `/api/news/5` share the tag `tx_news_domain_model_news_5`. A string slug like `007` therefore shares its tag with `7`, which can only cause an extra flush, never a missed one.
+- A value with a character outside `A-Z`, `a-z`, `0-9`, `_` and `-`, an empty value, or one longer than 64 characters becomes `h` followed by the first 16 hex characters of its SHA-256 hash, instead of a silently altered value. Storing and flushing apply the same rule, so the same value always yields the same tag. A literal value that already has that shape (`h` and 16 lowercase hex characters) is hashed as well, so it never collides with another value's hash form.
 - The build checks the static parts of the tag: `tx_news_{id}` passes, `tx.news_{id}` fails. Each placeholder counts as 64 characters toward the 250-character limit.
 - `routing:debug <name>` lists the tags as declared, with their placeholders.
 

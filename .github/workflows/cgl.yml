@@ -10,3 +10,4 @@ jobs:
     with:
       # composer-unused 0.9.9 requires PHP 8.3
       php-version: '8.3'
+      sca-typo3-version: "14.3"

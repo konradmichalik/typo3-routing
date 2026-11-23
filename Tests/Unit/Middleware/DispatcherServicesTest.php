@@ -56,14 +56,13 @@ final class DispatcherServicesTest extends TestCase
         $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
         $context = new Context();
 
-        $matcher = new RouteMatcher($registry, $extensionConfiguration);
+        $matcher = new RouteMatcher($registry, $extensionConfiguration, new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class)));
         $cache = $this->createResponseCacheManager();
         $rateLimitCheck = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()));
         $invoker = new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class));
         $accessGuard = new AccessGuard($registry, $context);
         $cors = new CorsHandler($extensionConfiguration);
-        $siteLanguageScope = new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
-        $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors, $invoker, $siteLanguageScope);
+        $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors);
         $cacheBypass = new CacheBypassGuard($context);
         $cacheInvalidator = new CacheInvalidator($registry, $cache);
         $clientKeyResolver = new ClientKeyResolver($context);
@@ -83,7 +82,6 @@ final class DispatcherServicesTest extends TestCase
             CacheInvalidator::class => static fn (): CacheInvalidator => $cacheInvalidator,
             ClientKeyResolver::class => static fn (): ClientKeyResolver => $clientKeyResolver,
             RouteUrlGenerator::class => static fn (): RouteUrlGenerator => $urlGenerator,
-            SiteLanguageScope::class => static fn (): SiteLanguageScope => $siteLanguageScope,
             DeprecationHeaders::class => static fn (): DeprecationHeaders => $deprecation,
             EventDispatcherInterface::class => static fn (): EventDispatcherInterface => $eventDispatcher,
         ]));
@@ -99,7 +97,6 @@ final class DispatcherServicesTest extends TestCase
         self::assertSame($cacheInvalidator, $services->cacheInvalidator());
         self::assertSame($clientKeyResolver, $services->clientKeyResolver());
         self::assertSame($urlGenerator, $services->urlGenerator());
-        self::assertSame($siteLanguageScope, $services->siteLanguageScope());
         self::assertSame($deprecation, $services->deprecation());
         self::assertSame($eventDispatcher, $services->eventDispatcher());
     }

@@ -499,28 +499,6 @@ final class ControllerInvokerTest extends TestCase
         self::assertSame('multipart/form-data', $response->getHeaderLine('Accept-Post'));
     }
 
-    #[Test]
-    public function treatsARouteWithoutAnEnvAsVisibleEverywhere(): void
-    {
-        self::assertTrue($this->invoker()->isVisibleInCurrentContext(null));
-        self::assertTrue($this->invoker()->isVisibleInCurrentContext(''));
-    }
-
-    #[Test]
-    #[InApplicationContext('Development')]
-    public function matchesTheCurrentApplicationContextCaseInsensitively(): void
-    {
-        self::assertTrue($this->invoker()->isVisibleInCurrentContext('development'));
-        self::assertFalse($this->invoker()->isVisibleInCurrentContext('Production'));
-    }
-
-    #[Test]
-    #[InApplicationContext('Development/Local')]
-    public function comparesOnlyTheFirstSegmentOfTheApplicationContext(): void
-    {
-        self::assertTrue($this->invoker()->isVisibleInCurrentContext('Development'));
-    }
-
     private function invoker(?LogManager $logManager = null): ControllerInvoker
     {
         return new ControllerInvoker(

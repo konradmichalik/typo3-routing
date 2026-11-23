@@ -94,16 +94,10 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $handler->handle($request);
         }
 
-        // CORS preflight is answered up front — before env/auth — so the browser gets its 204 without
-        // credentials ever being required. A path that matches no route falls through to the gauntlet,
-        // and one that matches only a route invisible in this context is answered like a missing path.
-        try {
-            $preflight = $this->preflight($request, $path);
-        } catch (ResourceNotFoundException) {
-            $notFound = $this->unmatched($request, $path);
-
-            return null === $notFound ? $handler->handle($request) : $this->finish($notFound, $request, null, null);
-        }
+        // CORS preflight is answered up front, before auth, so the browser gets its 204 without
+        // credentials ever being required. A path that matches no visible route falls through to the
+        // gauntlet, which then answers it like any other missing path.
+        $preflight = $this->preflight($request, $path);
         if ($preflight instanceof ResponseInterface) {
             return $preflight;
         }
@@ -138,7 +132,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
 
     /**
      * The dispatcher's own "nothing here" 404, after every matcher tier ran. Listeners may replace it, see
-     * UnmatchedRouteResponseEvent. A hidden route takes this path too, so it looks like a missing one.
+     * UnmatchedRouteResponseEvent.
      */
     private function notFound(ServerRequestInterface $request, string $path): ResponseInterface
     {
@@ -166,7 +160,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      */
     private function handleApiRequest(ServerRequestInterface $request, string $path, ?array &$corsConfig, ?string &$routeName): ?ResponseInterface
     {
-        // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try).
+        // 2. Matching → 404 / 405, or null (path not claimed exclusively, let the page router try). The
+        //    matcher already left invisible routes out, so no redirect below can reveal one.
         $match = $this->matchRoute($request, $path);
         if (null === $match || $match instanceof ResponseInterface) {
             return $match;
@@ -175,26 +170,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $routeName = (string) ($match['_route'] ?? '');
         $corsConfig = $this->registry->getCorsConfig($routeName);
 
-        // 3. Env filter (match-time, no ExpressionLanguage): an env-bound route is invisible elsewhere.
-        if (!$this->services->invoker()->isVisibleInCurrentContext($match['_env'] ?? null)) {
-            // Its own deprecation and CORS headers would reveal the route, so forget it for the 404.
-            $corsConfig = $routeName = null;
-
-            return $this->notFound($request, $path);
-        }
-
-        // 3b. Site/language scope: a route not bound to the current site or language is invisible too.
-        //     Checked before either redirect below for the same reason as the env filter above: a
-        //     redirect must never reveal a route invisible in the current context.
-        if (!$this->services->siteLanguageScope()->isVisibleForSite($match['_sites'] ?? null, $request)
-            || !$this->services->siteLanguageScope()->isVisibleForLanguage($match['_languages'] ?? null, $request)) {
-            // Its own deprecation and CORS headers would reveal the route, so forget it for the 404.
-            $corsConfig = $routeName = null;
-
-            return $this->notFound($request, $path);
-        }
-
-        // 3c. Legacy path (opt-in): a request that reached this route through one of its old paths
+        // 3a. Legacy path (opt-in): a request that reached this route through one of its old paths
         //     either redirects (default) or is served directly (`legacyAlias: true`). Checked before the
         //     canonical-variant redirect below: a legacy path's redirect behaviour is governed
         //     exclusively by `legacyAlias`, never by whether the target route separately opted into
@@ -204,7 +180,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $redirect;
         }
 
-        // 3d. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
+        // 3b. Canonical redirect (opt-in): a route matched via a tolerated path variant (trailing slash,
         //     or case) answers 308 to its declared form instead of serving directly, so exactly one URL
         //     survives for caches and search indexing. Checked before the checks below so a client on
         //     the wrong URL is redirected instead of getting a body/requirement error for a request it
@@ -215,7 +191,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $redirect;
         }
 
-        // 3e. Scheme redirect: the path matched, only the route's declared `schemes` did not. Answered
+        // 3c. Scheme redirect: the path matched, only the route's declared `schemes` did not. Answered
         //     with the same URL under the declared scheme instead of the 404 a plain miss would get.
         //     Reached last of the three redirects because both of those already generate their target
         //     through RouteUrlGenerator, which targets the declared scheme on its own — so a request
@@ -358,7 +334,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     private function matchRoute(ServerRequestInterface $request, string $path): array|ResponseInterface|null
     {
         try {
-            return $this->services->matcher()->match($path, $this->requestContext($request));
+            return $this->services->matcher()->match($path, $this->requestContext($request), $request);
         } catch (ResourceNotFoundException) {
             return $this->unmatched($request, $path);
         } catch (MethodNotAllowedException $exception) {

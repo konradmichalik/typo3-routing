@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Routing;
 
+use KonradMichalik\Ttt\Attribute\InApplicationContext;
 use KonradMichalik\Ttt\Http\Requests;
 use KonradMichalik\Typo3Routing\Routing\SiteLanguageScope;
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
@@ -34,13 +35,13 @@ final class SiteLanguageScopeTest extends TestCase
     #[Test]
     public function everySiteIsVisibleWhenSitesIsNull(): void
     {
-        self::assertTrue($this->scope()->isVisibleForSite(null, $this->request()));
+        self::assertTrue($this->scope()->isMatchVisible(['_sites' => null], $this->request()));
     }
 
     #[Test]
     public function everySiteIsVisibleWhenSitesIsEmpty(): void
     {
-        self::assertTrue($this->scope()->isVisibleForSite([], $this->request()));
+        self::assertTrue($this->scope()->isMatchVisible(['_sites' => []], $this->request()));
     }
 
     #[Test]
@@ -48,7 +49,7 @@ final class SiteLanguageScopeTest extends TestCase
     {
         $request = $this->requestWithSite('main');
 
-        self::assertTrue($this->scope()->isVisibleForSite(['main', 'intranet'], $request));
+        self::assertTrue($this->scope()->isMatchVisible(['_sites' => ['main', 'intranet']], $request));
     }
 
     #[Test]
@@ -56,25 +57,25 @@ final class SiteLanguageScopeTest extends TestCase
     {
         $request = $this->requestWithSite('main');
 
-        self::assertFalse($this->scope()->isVisibleForSite(['intranet'], $request));
+        self::assertFalse($this->scope()->isMatchVisible(['_sites' => ['intranet']], $request));
     }
 
     #[Test]
     public function isNotVisibleWhenTheRequestCarriesNoSiteAttribute(): void
     {
-        self::assertFalse($this->scope()->isVisibleForSite(['intranet'], $this->request()));
+        self::assertFalse($this->scope()->isMatchVisible(['_sites' => ['intranet']], $this->request()));
     }
 
     #[Test]
     public function everyLanguageIsVisibleWhenLanguagesIsNull(): void
     {
-        self::assertTrue($this->scope()->isVisibleForLanguage(null, $this->request()));
+        self::assertTrue($this->scope()->isMatchVisible(['_languages' => null], $this->request()));
     }
 
     #[Test]
     public function everyLanguageIsVisibleWhenLanguagesIsEmpty(): void
     {
-        self::assertTrue($this->scope()->isVisibleForLanguage([], $this->request()));
+        self::assertTrue($this->scope()->isMatchVisible(['_languages' => []], $this->request()));
     }
 
     #[Test]
@@ -82,7 +83,7 @@ final class SiteLanguageScopeTest extends TestCase
     {
         $request = $this->requestWithLanguage(0);
 
-        self::assertTrue($this->scope()->isVisibleForLanguage([0, 2], $request));
+        self::assertTrue($this->scope()->isMatchVisible(['_languages' => [0, 2]], $request));
     }
 
     #[Test]
@@ -90,13 +91,57 @@ final class SiteLanguageScopeTest extends TestCase
     {
         $request = $this->requestWithLanguage(0);
 
-        self::assertFalse($this->scope()->isVisibleForLanguage([2], $request));
+        self::assertFalse($this->scope()->isMatchVisible(['_languages' => [2]], $request));
     }
 
     #[Test]
     public function isNotVisibleWhenTheRequestCarriesNoLanguageAttribute(): void
     {
-        self::assertFalse($this->scope()->isVisibleForLanguage([0], $this->request()));
+        self::assertFalse($this->scope()->isMatchVisible(['_languages' => [0]], $this->request()));
+    }
+
+    #[Test]
+    public function aMatchWithoutAnEnvIsVisibleEverywhere(): void
+    {
+        self::assertTrue($this->scope()->isMatchVisible(['_env' => null], $this->request()));
+        self::assertTrue($this->scope()->isMatchVisible(['_env' => ''], $this->request()));
+        self::assertTrue($this->scope()->isMatchVisible([], $this->request()));
+    }
+
+    #[Test]
+    #[InApplicationContext('Development')]
+    public function matchesTheCurrentApplicationContextCaseInsensitively(): void
+    {
+        self::assertTrue($this->scope()->isMatchVisible(['_env' => 'development'], $this->request()));
+        self::assertFalse($this->scope()->isMatchVisible(['_env' => 'Production'], $this->request()));
+    }
+
+    #[Test]
+    #[InApplicationContext('Development/Local')]
+    public function comparesOnlyTheFirstSegmentOfTheApplicationContext(): void
+    {
+        self::assertTrue($this->scope()->isMatchVisible(['_env' => 'Development'], $this->request()));
+    }
+
+    #[Test]
+    public function aMatchMustPassEveryConstraintAtOnce(): void
+    {
+        $request = $this->requestWithSite('main');
+
+        self::assertTrue($this->scope()->isMatchVisible(['_env' => 'Testing', '_sites' => ['main'], '_languages' => []], $request));
+        self::assertFalse($this->scope()->isMatchVisible(['_env' => 'Production', '_sites' => ['main']], $request));
+        self::assertFalse($this->scope()->isMatchVisible(['_env' => 'Testing', '_sites' => ['intranet']], $request));
+    }
+
+    #[Test]
+    public function readsARoutesOwnDefinitionWithoutTheMatchPrefix(): void
+    {
+        $request = $this->requestWithSite('main');
+
+        self::assertTrue($this->scope()->isRouteVisible(['env' => null, 'sites' => ['main'], 'languages' => []], $request));
+        self::assertFalse($this->scope()->isRouteVisible(['env' => 'Production'], $request));
+        self::assertFalse($this->scope()->isRouteVisible(['env' => null, 'sites' => ['intranet']], $request));
+        self::assertFalse($this->scope()->isRouteVisible(['env' => null, 'languages' => [3]], $request));
     }
 
     #[Test]
@@ -117,8 +162,8 @@ final class SiteLanguageScopeTest extends TestCase
         $request = $this->requestWithSite('main');
 
         // Evaluated twice with the exact same list — the warning fires only the first time.
-        $scope->isVisibleForSite(['totally-unknown-site-xyz'], $request);
-        $scope->isVisibleForSite(['totally-unknown-site-xyz'], $request);
+        $scope->isMatchVisible(['_sites' => ['totally-unknown-site-xyz']], $request);
+        $scope->isMatchVisible(['_sites' => ['totally-unknown-site-xyz']], $request);
     }
 
     #[Test]
@@ -135,7 +180,7 @@ final class SiteLanguageScopeTest extends TestCase
 
         $scope = new SiteLanguageScope($siteFinder, $logManager);
 
-        $scope->isVisibleForSite(['main'], $this->requestWithSite('main'));
+        $scope->isMatchVisible(['_sites' => ['main']], $this->requestWithSite('main'));
     }
 
     private function scope(): SiteLanguageScope

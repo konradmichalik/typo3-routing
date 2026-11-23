@@ -57,7 +57,7 @@ A live Swagger UI is a thin, opt-in HTTP layer on top of the same export — no 
 - `GET /api/_routing/openapi.json` — the OpenAPI document, generated the same way as `routing:openapi`
 - `GET /api/_routing/docs` — a minimal HTML page loading Swagger UI from a CDN, pointed at the JSON route above
 
-Both routes are double-gated: they only exist in the `Development` [application context](configuration.md#environment-bound-routes) **and** only when explicitly enabled. Outside either condition they behave as if they don't exist (`404`), same as any other environment-bound route.
+Both routes are double-gated: they only exist in the `Development` [application context](configuration.md#environment-bound-routes) **and** only when explicitly enabled. Outside either condition they behave as if they don't exist, same as any other environment-bound route.
 
 | Setting     | Description                                                                                   | Default |
 |-------------|-------------------------------------------------------------------------------------------------|---------|

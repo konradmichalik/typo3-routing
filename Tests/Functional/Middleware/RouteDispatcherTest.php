@@ -145,13 +145,52 @@ final class RouteDispatcherTest extends FunctionalTestCase
         self::assertSame($sentinel, $response);
     }
 
+    /**
+     * Nothing is claimed exclusively here, so a hidden route falls through to the page router exactly
+     * like an unknown path. See ExclusivePrefixesTest for the 404 under a configured claim.
+     */
     #[Test]
     public function hidesEnvBoundRouteOutsideItsContext(): void
     {
         // The functional test runs in the "Testing" context, so the Development-bound route is invisible.
-        $response = $this->process($this->request('GET', 'https://example.com/api/example/dev'));
+        $sentinel = new Response('php://temp', 418);
 
-        self::assertSame(404, $response->getStatusCode());
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/dev'), $sentinel);
+
+        self::assertSame($sentinel, $response);
+    }
+
+    #[Test]
+    public function answersAWrongMethodOnAnEnvBoundRouteOutsideItsContextLikeAnUnknownPath(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+
+        $response = $this->process($this->request('POST', 'https://example.com/api/example/dev'), $sentinel);
+
+        self::assertSame($sentinel, $response);
+    }
+
+    /**
+     * "example_shared_env_write" (POST) is bound to Development, so in "Testing" only the GET route of
+     * the shared path exists — for its own method and for the hidden route's alike.
+     */
+    #[Test]
+    #[DataProvider('methodsNotAllowedOnTheSharedPath')]
+    public function aVisibleRouteSharingThePathWithAnEnvBoundOneOnlyAdvertisesItsOwnMethods(string $method): void
+    {
+        $response = $this->process($this->request($method, 'https://example.com/api/example/shared-env'));
+
+        self::assertSame(405, $response->getStatusCode());
+        self::assertSame('GET', $response->getHeaderLine('Allow'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function methodsNotAllowedOnTheSharedPath(): iterable
+    {
+        yield 'a method no route declares' => ['DELETE'];
+        yield 'the hidden route\'s method' => ['POST'];
     }
 
     #[Test]
@@ -191,9 +230,11 @@ final class RouteDispatcherTest extends FunctionalTestCase
     #[Test]
     public function hidesARouteScopedToADifferentSite(): void
     {
-        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-site-other'));
+        $sentinel = new Response('php://temp', 418);
 
-        self::assertSame(404, $response->getStatusCode());
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-site-other'), $sentinel);
+
+        self::assertSame($sentinel, $response);
     }
 
     #[Test]
@@ -207,9 +248,11 @@ final class RouteDispatcherTest extends FunctionalTestCase
     #[Test]
     public function hidesARouteScopedToADifferentLanguage(): void
     {
-        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-language-other'));
+        $sentinel = new Response('php://temp', 418);
 
-        self::assertSame(404, $response->getStatusCode());
+        $response = $this->process($this->request('GET', 'https://example.com/api/example/scoped-language-other'), $sentinel);
+
+        self::assertSame($sentinel, $response);
     }
 
     #[Test]
@@ -255,10 +298,12 @@ final class RouteDispatcherTest extends FunctionalTestCase
     #[Test]
     public function hidesTheSwaggerUiRoutesOutsideDevelopmentByDefault(): void
     {
-        // Inert by default: the functional suite runs in "Testing" (not "Development"), and the
-        // swaggerUi flag is unset — both gates independently keep these routes a 404.
-        self::assertSame(404, $this->process($this->request('GET', 'https://example.com/api/_routing/openapi.json'))->getStatusCode());
-        self::assertSame(404, $this->process($this->request('GET', 'https://example.com/api/_routing/docs'))->getStatusCode());
+        // Inert by default: the functional suite runs in "Testing" (not "Development"), so both routes
+        // are hidden and, with nothing claimed exclusively, fall through like any unknown path.
+        $sentinel = new Response('php://temp', 418);
+
+        self::assertSame($sentinel, $this->process($this->request('GET', 'https://example.com/api/_routing/openapi.json'), $sentinel));
+        self::assertSame($sentinel, $this->process($this->request('GET', 'https://example.com/api/_routing/docs'), $sentinel));
     }
 
     #[Test]

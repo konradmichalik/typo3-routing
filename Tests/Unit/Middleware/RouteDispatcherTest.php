@@ -1103,6 +1103,41 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    #[WithEnvironment(context: 'Production')]
+    public function preflightForAnEnvHiddenRouteAnswersLikeAnUnknownPath(): void
+    {
+        $dispatcher = $this->dispatcherWithCors(['allowedOrigins' => 'https://app.example.com']);
+        $preflight = fn (string $path): ResponseInterface => $dispatcher->process(
+            $this->request('OPTIONS', 'https://example.com'.$path)
+                ->withHeader('Origin', 'https://app.example.com')
+                ->withHeader('Access-Control-Request-Method', 'GET'),
+            $this->handler(new Response('php://temp', 200)),
+        );
+
+        $hidden = $preflight('/api/dev');
+        $missing = $preflight('/api/missing');
+
+        self::assertSame($missing->getStatusCode(), $hidden->getStatusCode());
+        self::assertSame((string) $missing->getBody(), (string) $hidden->getBody());
+        self::assertSame($this->withoutRequestId($missing->getHeaders()), $this->withoutRequestId($hidden->getHeaders()));
+    }
+
+    #[Test]
+    #[WithEnvironment(context: 'Production')]
+    public function preflightForAnEnvHiddenRouteFallsThroughToThePageWhenNothingIsClaimedExclusively(): void
+    {
+        $sentinel = new Response('php://temp', 418);
+        $dispatcher = $this->dispatcherWithExclusivePrefixes('');
+        $request = $this->request('OPTIONS', 'https://example.com/api/dev')
+            ->withHeader('Origin', 'https://app.example.com')
+            ->withHeader('Access-Control-Request-Method', 'GET');
+
+        $response = $dispatcher->process($request, $this->handler($sentinel));
+
+        self::assertSame($sentinel, $response);
+    }
+
+    #[Test]
     public function routeOwnCorsOverrideAppliesEvenWhenGlobalCorsIsDisabled(): void
     {
         $dispatcher = $this->dispatcher();
@@ -1388,6 +1423,18 @@ final class RouteDispatcherTest extends TestCase
         self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', $response->getHeaderLine('X-Request-ID'));
     }
 
+    /**
+     * @param array<array<string>> $headers
+     *
+     * @return array<array<string>>
+     */
+    private function withoutRequestId(array $headers): array
+    {
+        unset($headers['X-Request-ID']);
+
+        return $headers;
+    }
+
     private function dispatch(ServerRequestInterface $request, ?ResponseInterface $fallThrough = null, ?Context $context = null): ResponseInterface
     {
         return $this->dispatcher($context)->process($request, $this->handler($fallThrough ?? new Response('php://temp', 200)));
@@ -1449,7 +1496,7 @@ final class RouteDispatcherTest extends TestCase
             ControllerInvoker::class => fn (): ControllerInvoker => new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)),
             AccessGuard::class => static fn (): AccessGuard => $accessGuard,
             CorsHandler::class => static fn (): CorsHandler => $cors,
-            CorsPreflightResolver::class => static fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors),
+            CorsPreflightResolver::class => fn (): CorsPreflightResolver => new CorsPreflightResolver($registry, $matcher, $cors, new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class)), $this->siteLanguageScope()),
             CacheBypassGuard::class => static fn (): CacheBypassGuard => new CacheBypassGuard($context),
             CacheInvalidator::class => fn (): CacheInvalidator => new CacheInvalidator($registry, $this->responseCache),
             ClientKeyResolver::class => static fn (): ClientKeyResolver => new ClientKeyResolver($context),

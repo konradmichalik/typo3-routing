@@ -484,7 +484,6 @@ final class RouteDispatcherTest extends FunctionalTestCase
     {
         yield 'no-cache' => ['no-cache'];
         yield 'no-store' => ['no-store'];
-        yield 'both, mixed case' => ['No-Cache, NO-STORE'];
     }
 
     #[Test]

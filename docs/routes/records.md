@@ -75,7 +75,7 @@ None of these are provided, and none should be inferred from TCA:
 
 ## Decision: why this is documentation, not a feature
 
-- **Dependency surface.** The extension currently depends on routing, DI and PSR interfaces, a stable base that keeps the PHP 8.2–8.5 × TYPO3 13.4/14.0/14.3 support matrix cheap. A record layer would add TCA, `QueryBuilder`, restrictions, language overlay and workspaces: the fastest-moving part of the platform. Every break there would land on consumers who only wanted routes.
+- **Dependency surface.** The extension currently depends on routing, DI and PSR interfaces, a stable base that keeps the PHP 8.2 to 8.6 × TYPO3 13.4/14.0/14.3 support matrix cheap. A record layer would add TCA, `QueryBuilder`, restrictions, language overlay and workspaces: the fastest-moving part of the platform. Every break there would land on consumers who only wanted routes.
 - **Semver cost.** A record layer binds three contracts to semver at once: filter grammar, pagination envelope, serialisation shape, none of which are reliably right on the first attempt.
 - **Positioning.** The value of [How it compares](../background/comparison.md) is that this extension is *smaller* than the alternatives it lists. A record API would blur that line rather than sharpen it.
 - **Entity binding is not a precedent for this.** It is argument resolution: one identifier to one object, through Extbase's persistence, with no query semantics and no output format. A record API would own query construction and response shape, a categorically larger commitment.

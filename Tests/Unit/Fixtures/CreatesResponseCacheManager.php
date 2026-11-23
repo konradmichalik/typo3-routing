@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace KonradMichalik\Typo3Routing\Tests\Unit\Fixtures;
 
 use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
+use KonradMichalik\Typo3Routing\Routing\ControllerArgumentResolver;
 use TYPO3\CMS\Core\Cache\CacheManager;
+use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 /**
  * CreatesResponseCacheManager.
@@ -23,11 +25,11 @@ use TYPO3\CMS\Core\Cache\CacheManager;
  */
 trait CreatesResponseCacheManager
 {
-    private function createResponseCacheManager(): ResponseCacheManager
+    private function createResponseCacheManager(?PersistenceManagerInterface $persistenceManager = null): ResponseCacheManager
     {
         $cacheManager = $this->createMock(CacheManager::class);
         $cacheManager->method('getCache')->willReturn(new InMemoryCacheFrontend());
 
-        return new ResponseCacheManager($cacheManager);
+        return new ResponseCacheManager($cacheManager, new ControllerArgumentResolver($persistenceManager ?? $this->createMock(PersistenceManagerInterface::class)));
     }
 }

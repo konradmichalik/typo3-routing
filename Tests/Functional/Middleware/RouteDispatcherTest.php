@@ -666,6 +666,46 @@ final class RouteDispatcherTest extends FunctionalTestCase
     }
 
     #[Test]
+    public function valuesTheControllerReceivesIdenticallyShareTheCacheEntry(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=1'));
+        $leadingZero = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=01'));
+        $manyZeros = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=0001'));
+        $missing = $this->process($this->request('GET', 'https://example.com/api/example/cached-page'));
+        $empty = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page='));
+
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        foreach ([$leadingZero, $manyZeros, $missing, $empty] as $response) {
+            self::assertSame('HIT', $response->getHeaderLine('X-TYPO3-API-Cache'));
+            self::assertSame((string) $first->getBody(), (string) $response->getBody());
+        }
+    }
+
+    #[Test]
+    public function anInvalidValueAnswers400AndNeverTouchesTheCache(): void
+    {
+        $first = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=abc'));
+        $second = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=abc'));
+        $valid = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=1'));
+
+        self::assertSame(400, $first->getStatusCode());
+        self::assertSame(400, $second->getStatusCode());
+        self::assertSame('MISS', $first->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame('MISS', $second->getHeaderLine('X-TYPO3-API-Cache'));
+        self::assertSame(200, $valid->getStatusCode());
+        self::assertSame('MISS', $valid->getHeaderLine('X-TYPO3-API-Cache'));
+    }
+
+    #[Test]
+    public function anInvalidValueIsNotServedFromAnEntryOfTheValidOnes(): void
+    {
+        $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=1'));
+        $invalid = $this->process($this->request('GET', 'https://example.com/api/example/cached-page?page=abc'));
+
+        self::assertSame(400, $invalid->getStatusCode());
+    }
+
+    #[Test]
     public function aRouteTakingTheRequestVariesOnTheFullQuery(): void
     {
         $first = $this->process($this->request('GET', 'https://example.com/api/example/cached-request?x=1'));

@@ -24,7 +24,7 @@ use KonradMichalik\Typo3Routing\Middleware\{DispatcherServices, RouteDispatcher}
 use KonradMichalik\Typo3Routing\RateLimit\{ClientKeyResolver, RateLimitCheck, RateLimitEnforcer};
 use KonradMichalik\Typo3Routing\Routing\{ControllerArgumentResolver, ControllerInvoker, RouteMatcher, RouteRegistry, SiteLanguageScope};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Authentication\{DenyAuthenticator, FakeUser, PassAuthenticator};
-use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController, RecordingUnmatchedRouteDispatcher};
+use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\{CreatesResponseCacheManager, EntityController, LanguageReadCountingRequest, RecordingUnmatchedRouteDispatcher};
 use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Entity\Item;
 use PHPUnit\Framework\Attributes\{CoversClass, Test, TestWith};
 use PHPUnit\Framework\TestCase;
@@ -1398,6 +1398,15 @@ final class RouteDispatcherTest extends TestCase
     }
 
     #[Test]
+    public function aBackendUsersRequestDoesNotBuildACacheKey(): void
+    {
+        $anonymousReads = $this->languageReadsFor(null);
+        $backendUserReads = $this->languageReadsFor($this->backendUserContext());
+
+        self::assertSame(1, $anonymousReads - $backendUserReads);
+    }
+
+    #[Test]
     public function aBackendUsersResponseIsNeverStoredForLaterAnonymousRequests(): void
     {
         $this->dispatch($this->request('GET', 'https://example.com/api/cached'), null, $this->backendUserContext());
@@ -1678,6 +1687,19 @@ final class RouteDispatcherTest extends TestCase
         $context->setAspect('frontend.user', new UserAspect($user));
 
         return $context;
+    }
+
+    private function languageReadsFor(?Context $context): int
+    {
+        $base = $this->request('GET', 'https://example.com/api/cached');
+        $request = (new LanguageReadCountingRequest($base->getUri(), 'GET'))
+            ->withAttribute('site', $base->getAttribute('site'))
+            ->withAttribute('language', $base->getAttribute('language'));
+        LanguageReadCountingRequest::$languageReads = 0;
+
+        $this->dispatch($request, null, $context);
+
+        return LanguageReadCountingRequest::$languageReads;
     }
 
     private function backendUserContext(): Context

@@ -414,7 +414,8 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             ? $this->registry->getCacheConfig($routeName)
             : null;
 
-        $cached = $this->readCache($cacheConfig, $match, $request);
+        $key = $this->cacheKey($cacheConfig, $match, $request);
+        $cached = $this->readCache($key);
         if ($cached instanceof ResponseInterface) {
             // A cached entry already carries its ETag, so a conditional GET can short-circuit.
             $cached = $this->services->cache()->withCacheStatus($cached, $cacheConfig, $request, 'HIT');
@@ -426,7 +427,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $this->services->cacheInvalidator()->afterResponse($match, $response);
         // The real body is stored (and returned) here; process() empties it for HEAD afterwards — a HEAD
         // request must prime the same cache entry a subsequent GET reads, not an empty one.
-        $response = $this->writeCache($cacheConfig, $match, $request, $response);
+        $response = $this->writeCache($cacheConfig, $key, $match, $response);
         $response = $this->services->cache()->withCacheStatus($response, $cacheConfig, $request, 'MISS');
 
         // notModified is a no-op unless the response was cached (only then does it carry an ETag).
@@ -450,18 +451,17 @@ final readonly class RouteDispatcher implements MiddlewareInterface
     }
 
     /**
-     * Serves a cached response for a cacheable GET, or null (miss, non-GET, or caching not opted in).
+     * Serves a cached response for a cacheable GET, or null (miss, no key, or caching not opted in).
      *
-     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
-     * @param array<string, mixed>                                                      $match
+     * @param string|null $key see cacheKey(), null never reads
      */
-    private function readCache(?array $cacheConfig, array $match, ServerRequestInterface $request): ?ResponseInterface
+    private function readCache(?string $key): ?ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || $this->services->cacheBypass()->isBypassed()) {
+        if (null === $key) {
             return null;
         }
 
-        return $this->services->cache()->get($this->cacheKey($cacheConfig, $match, $request));
+        return $this->services->cache()->get($key);
     }
 
     /**
@@ -470,29 +470,38 @@ final readonly class RouteDispatcher implements MiddlewareInterface
      * share the validator), otherwise the response unchanged.
      *
      * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
+     * @param string|null                                                               $key         see cacheKey(), null never writes
      * @param array<string, mixed>                                                      $match
      */
-    private function writeCache(?array $cacheConfig, array $match, ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    private function writeCache(?array $cacheConfig, ?string $key, array $match, ResponseInterface $response): ResponseInterface
     {
-        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || 200 !== $response->getStatusCode() || $this->services->cacheBypass()->isBypassed()) {
+        if (null === $cacheConfig || null === $key || 200 !== $response->getStatusCode()) {
             return $response;
         }
 
         // Attach the ETag before storing so this first response and later cache hits share the validator.
         $response = $this->services->cache()->withETag($response);
-        $this->services->cache()->store($this->cacheKey($cacheConfig, $match, $request), $response, $cacheConfig['lifetime'], CacheTagPlaceholders::resolve($cacheConfig['tags'], $match));
+        $this->services->cache()->store($key, $response, $cacheConfig['lifetime'], CacheTagPlaceholders::resolve($cacheConfig['tags'], $match));
 
         return $response;
     }
 
     /**
-     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>} $cacheConfig
-     * @param array<string, mixed>                                                 $match
+     * The key of a cacheable GET, null for everything that never touches the cache: no #[Cache], another
+     * method, a bypassing backend user, or an invalid consumed value (it answers 400 uncached).
+     *
+     * @param array{lifetime: int, tags: list<string>, ignoreParams: list<string>}|null $cacheConfig
+     * @param array<string, mixed>                                                      $match
      */
-    private function cacheKey(array $cacheConfig, array $match, ServerRequestInterface $request): string
+    private function cacheKey(?array $cacheConfig, array $match, ServerRequestInterface $request): ?string
     {
-        $arguments = $this->registry->getArguments((string) ($match['_route'] ?? ''));
+        if (null === $cacheConfig || 'GET' !== $this->services->cache()->cacheableMethod($request) || $this->services->cacheBypass()->isBypassed()) {
+            return null;
+        }
 
-        return $this->services->cache()->buildKey($match, $request, $cacheConfig['ignoreParams'], $arguments);
+        $arguments = $this->registry->getArguments((string) ($match['_route'] ?? ''));
+        $tags = CacheTagPlaceholders::resolve($cacheConfig['tags'], $match);
+
+        return $this->services->cache()->buildKey($match, $request, $cacheConfig['ignoreParams'], $arguments, $tags);
     }
 }

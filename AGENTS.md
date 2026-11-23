@@ -8,7 +8,7 @@ TYPO3 extension `typo3_routing` (`konradmichalik/typo3-routing`). It registers f
 
 - Extension key: `typo3_routing` (not `routing`, to avoid a clash with core page routing)
 - Namespace: `KonradMichalik\Typo3Routing\`
-- PHP: `~8.2 || ~8.3 || ~8.4 || ~8.5`
+- PHP: `~8.2 || ~8.3 || ~8.4 || ~8.5 || ~8.6`
 - TYPO3: `^13.4 || ^14.0`
 
 ## Structure
@@ -59,7 +59,7 @@ ddev composer test:functional  # functional tests, need a database
 
 Functional tests need database credentials via `typo3Database*` environment variables and run inside DDEV. Unit tests use `konradmichalik/ttt`, registered as PHPUnit extension in `phpunit.xml` only, not in `phpunit.functional.xml`. The unit bootstrap `Tests/Unit/UnitTestsBootstrap.php` initializes the TYPO3 `Environment` once per process.
 
-CI runs PHPUnit through a reusable workflow on PHP 8.2 to 8.5, TYPO3 13.4, 14.0 and 14.3, with highest and lowest dependencies. It also runs CGL, a security workflow and OpenSSF Scorecard.
+CI runs PHPUnit through a reusable workflow on PHP 8.2 to 8.6, TYPO3 13.4, 14.0 and 14.3, with highest and lowest dependencies. It also runs CGL, a security workflow and OpenSSF Scorecard.
 
 ## Code style and static analysis
 

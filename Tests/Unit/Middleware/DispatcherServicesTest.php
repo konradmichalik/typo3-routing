@@ -62,12 +62,12 @@ final class DispatcherServicesTest extends TestCase
         $invoker = new ControllerInvoker($registry, new ControllerArgumentResolver($this->createMock(PersistenceManagerInterface::class)), $this->createMock(LogManager::class));
         $accessGuard = new AccessGuard($registry, $context);
         $cors = new CorsHandler($extensionConfiguration);
-        $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors);
+        $siteLanguageScope = new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
+        $corsPreflight = new CorsPreflightResolver($registry, $matcher, $cors, $invoker, $siteLanguageScope);
         $cacheBypass = new CacheBypassGuard($context);
         $cacheInvalidator = new CacheInvalidator($registry, $cache);
         $clientKeyResolver = new ClientKeyResolver($context);
         $urlGenerator = new RouteUrlGenerator($registry, new SiteBasePathResolver());
-        $siteLanguageScope = new SiteLanguageScope($this->createMock(SiteFinder::class), $this->createMock(LogManager::class));
         $deprecation = new DeprecationHeaders($registry, $urlGenerator);
         $eventDispatcher = $this->createMock(EventDispatcherInterface::class);
 

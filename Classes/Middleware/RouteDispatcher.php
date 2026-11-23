@@ -94,8 +94,15 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         }
 
         // CORS preflight is answered up front — before env/auth — so the browser gets its 204 without
-        // credentials ever being required. A path that matches no route falls through to the gauntlet.
-        $preflight = $this->preflight($request, $path);
+        // credentials ever being required. A path that matches no route falls through to the gauntlet,
+        // and one that matches only a route invisible in this context is answered like a missing path.
+        try {
+            $preflight = $this->preflight($request, $path);
+        } catch (ResourceNotFoundException) {
+            $notFound = $this->unmatched($request, $path);
+
+            return null === $notFound ? $handler->handle($request) : $this->finish($notFound, $request, null, null);
+        }
         if ($preflight instanceof ResponseInterface) {
             return $preflight;
         }
@@ -108,6 +115,14 @@ final readonly class RouteDispatcher implements MiddlewareInterface
             return $handler->handle($request);
         }
 
+        return $this->finish($response, $request, $routeName, $corsConfig);
+    }
+
+    /**
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $corsConfig
+     */
+    private function finish(ResponseInterface $response, ServerRequestInterface $request, ?string $routeName, ?array $corsConfig): ResponseInterface
+    {
         // Every attribute-route response gets a correlation id, the deprecation headers of the route
         // it came from (a no-op unless it opted in), and finally the CORS headers stamped on — using
         // the matched route's own #[Cors] override when it declared one, else the global config.
@@ -130,6 +145,15 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         $this->services->eventDispatcher()->dispatch($event);
 
         return $event->getResponse() ?? JsonErrorResponse::create(404, 'Not Found');
+    }
+
+    /**
+     * A path no route matches: the dispatcher's 404 inside an exclusively claimed prefix, else null so
+     * the page router gets it.
+     */
+    private function unmatched(ServerRequestInterface $request, string $path): ?ResponseInterface
+    {
+        return $this->exclusive->matches($path) ? $this->notFound($request, $path) : null;
     }
 
     /**
@@ -335,7 +359,7 @@ final readonly class RouteDispatcher implements MiddlewareInterface
         try {
             return $this->services->matcher()->match($path, $this->requestContext($request));
         } catch (ResourceNotFoundException) {
-            return $this->exclusive->matches($path) ? $this->notFound($request, $path) : null;
+            return $this->unmatched($request, $path);
         } catch (MethodNotAllowedException $exception) {
             return JsonErrorResponse::create(405, 'Method Not Allowed', [
                 'Allow' => implode(', ', $exception->getAllowedMethods()),

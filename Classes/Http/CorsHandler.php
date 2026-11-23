@@ -81,7 +81,8 @@ final readonly class CorsHandler
 
     /**
      * Adds the CORS response headers to an actual (non-preflight) response when the request origin is
-     * allowed. A disallowed or absent origin leaves the response untouched.
+     * allowed. A disallowed or absent origin gets no CORS headers, only `Vary: Origin` under an
+     * allow-list policy.
      *
      * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int}|null $routeCors
      */
@@ -92,6 +93,7 @@ final readonly class CorsHandler
             return $response;
         }
 
+        $response = $this->withVaryOrigin($response, $policy);
         $origin = $this->resolveAllowedOrigin($request, $policy);
         if (null === $origin) {
             return $response;
@@ -115,7 +117,7 @@ final readonly class CorsHandler
     public function preflightResponse(array $allowedMethods, ServerRequestInterface $request, ?array $routeCors = null): ResponseInterface
     {
         $policy = $this->resolvePolicy($routeCors);
-        $response = new Response('php://temp', 204);
+        $response = $this->withVaryOrigin(new Response('php://temp', 204), $policy);
 
         $origin = $this->resolveAllowedOrigin($request, $policy);
         if (null !== $origin) {
@@ -172,15 +174,27 @@ final readonly class CorsHandler
     private function applyOriginHeaders(ResponseInterface $response, string $origin, array $policy): ResponseInterface
     {
         $response = $response->withHeader('Access-Control-Allow-Origin', $origin);
-        if ('*' !== $origin) {
-            // Responses vary by Origin so shared caches don't serve one origin's headers to another.
-            $response = $response->withAddedHeader('Vary', 'Origin');
-        }
         if ($policy['allowCredentials']) {
             $response = $response->withHeader('Access-Control-Allow-Credentials', 'true');
         }
 
         return $response;
+    }
+
+    /**
+     * Under an allow list the response depends on Origin whether or not this request's origin matched,
+     * so a shared cache must never hand one origin's variant to another. The wildcard answers every
+     * origin alike and does not vary.
+     *
+     * @param array{allowedOrigins: list<string>, allowedHeaders: string, allowCredentials: bool, exposeHeaders: string, maxAge: int} $policy
+     */
+    private function withVaryOrigin(ResponseInterface $response, array $policy): ResponseInterface
+    {
+        if ([] === $policy['allowedOrigins'] || in_array('*', $policy['allowedOrigins'], true)) {
+            return $response;
+        }
+
+        return $response->withAddedHeader('Vary', 'Origin');
     }
 
     /**

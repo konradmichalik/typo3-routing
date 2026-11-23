@@ -378,7 +378,8 @@ final readonly class JsonSchemaMapper
     /**
      * Drops the cases a non-empty route requirement rejects, so the `enum` list states what the route
      * accepts rather than what the PHP type allows. Matching mirrors how the requirement is enforced
-     * for real, via the same {@see RequirementPattern} regex ControllerInvoker and RouteMatcher use.
+     * for real, via the same {@see RequirementPattern} regex ControllerInvoker and RouteMatcher use. The
+     * mapper has no route, so it always matches in byte mode, never in a UTF-8 route's `u` mode.
      *
      * @param list<int|string> $values
      *

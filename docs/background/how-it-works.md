@@ -60,7 +60,7 @@ Several ordering decisions in there are deliberate rather than incidental:
 - **The env filter and site/language scope run before the canonical redirect**, so a redirect never reveals a route that is otherwise invisible in the current context.
 - **The scheme redirect runs after the canonical and legacy-path ones**, because both of those regenerate their target through `RouteUrlGenerator`, which already points at the declared scheme. A request that is wrong in two ways at once therefore still costs exactly one redirect.
 - **Rate limiting runs before authentication**, so a coarse per-IP limit absorbs token brute-force attempts before any authentication logic executes.
-- **Access control runs before body and input validation**, so an unauthenticated client gets `401` rather than a `400` naming the parameters of a protected route, and its body is never decoded. Those validation errors still count against the rate limit.
+- **Access control runs before body and input validation**, so an unauthenticated client gets `401` rather than a `400` naming the parameters of a protected route, and its JSON body is never decoded. Those validation errors still count against the rate limit.
 - **The body shape is checked before the requirements**, so a malformed body is named as such instead of surfacing as a derived missing parameter.
 - **The response cache is consulted after the rate limit**, so a cacheable response cannot be used to bypass the limit.
 

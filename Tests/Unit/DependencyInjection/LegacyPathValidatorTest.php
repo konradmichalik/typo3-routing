@@ -162,6 +162,24 @@ final class LegacyPathValidatorTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    /**
+     * The root path has no trailing-slash variant (stripping would leave the empty path), so only `/`
+     * itself is tried against the matcher.
+     */
+    #[Test]
+    public function allowsTheRootAsALegacyPathWhenNoDeclaredRouteMatchesIt(): void
+    {
+        $collected = new CollectedRoutes();
+        $collected->routes = [
+            'item' => ['path' => '/api/item/{id}', 'methods' => ['GET'], 'controller' => 'ctrl::item', 'env' => null, 'requirements' => ['id' => '\d+']],
+            'renamed' => ['path' => '/api/renamed', 'methods' => ['GET'], 'controller' => 'ctrl::renamed', 'env' => null, 'requirements' => [], 'legacyPaths' => ['/']],
+        ];
+
+        (new LegacyPathValidator())->assertNoCollisions($collected);
+
+        $this->addToAssertionCount(1);
+    }
+
     #[Test]
     public function doesNothingWhenLegacyAndDeclaredPlaceholdersMatch(): void
     {

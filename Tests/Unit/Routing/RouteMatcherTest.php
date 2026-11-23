@@ -230,6 +230,26 @@ final class RouteMatcherTest extends TestCase
         self::assertSame('café', $match['name']);
     }
 
+    /**
+     * An omitted optional placeholder carries its declared default, which need not be a string and was
+     * never subject to the path regex, so the requirement re-check must leave it alone.
+     */
+    #[Test]
+    public function aNonStringDefaultOfAnOmittedPlaceholderPassesTheCaseInsensitiveRecheck(): void
+    {
+        $extensionConfiguration = $this->createMock(ExtensionConfiguration::class);
+        $extensionConfiguration->method('get')->willReturn('1');
+
+        /** @var array<string, array{path: string, methods: list<string>, controller: string, env: string|null, requirements: array<string, string>, defaults: array<string, mixed>, caseInsensitive: bool}> $routes */
+        $routes = ['pages' => ['path' => '/api/pages/{page}', 'methods' => ['GET'], 'controller' => 'ctrl::pages', 'env' => null, 'requirements' => ['page' => '\d+'], 'defaults' => ['page' => 1], 'caseInsensitive' => true]];
+        $matcher = new RouteMatcher(new RouteRegistry($routes, new ServiceLocator([])), $extensionConfiguration);
+
+        $match = $matcher->match('/API/Pages', $this->context());
+
+        self::assertSame('pages', $match['_route']);
+        self::assertSame(1, $match['page']);
+    }
+
     #[Test]
     public function aLegacyPathMatchesAndRewritesItsRouteNameToTheOwner(): void
     {

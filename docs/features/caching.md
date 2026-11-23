@@ -20,13 +20,16 @@ public function list(int $page = 1): ResponseInterface
 | Parameter      | Type           | Default | Description                                                                       |
 |----------------|----------------|---------|-----------------------------------------------------------------------------------|
 | `lifetime`     | `int`          | `86400` | Time to live in seconds (fallback when no tag is invalidated).                    |
-| `tags`         | `list<string>` | `[]`    | Cache tags. A tag matching a table name is flushed automatically when a record of that table changes (via DataHandler). |
+| `tags`         | `list<string>` | `[]`    | Static cache tags. A tag `{table}` is flushed automatically when a record of that table changes through the DataHandler, a fixed tag `{table}_{uid}` (e.g. `tx_news_domain_model_news_5`) when that one record does. |
 | `ignoreParams` | `list<string>` | `[]`    | Query parameters excluded from the cache key, such as tracking parameters (`utm_source`).  |
 
 - Only **successful (`200`) GET responses** are cached. The cache key is built from route name, host, path, query string (minus `ignoreParams`) and language, so host/query/language variants are cached separately — in a multi-site install two sites never share a cache entry.
 - A parameter with a [`#[Param]` value constraint](../routes/arguments.md) (`min`, `max`, `minLength`, `maxLength`) cannot be listed in `ignoreParams`, the build fails. The cache answers before arguments are checked, so a request with an invalid value would get the cached `200` instead of `400`.
 - List only parameters the controller does not read. An ignored parameter that binds a controller argument gets the response cached for another value, and an invalid value (`?page=abc` on `int $page`) gets that cached `200` instead of `400`. The build does not catch this for unconstrained parameters.
-- Invalidation rides on the TYPO3 caching framework: changing a record of a tagged table flushes the matching entries once the DataHandler run finishes, each tag once per run however many records changed; `lifetime` is the fallback. Tables no `#[Cache]` route uses as a tag are skipped. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).
+- Invalidation rides on the TYPO3 caching framework: the response cache `typo3_routing` is in cache group `pages`, so the core DataHandler flushes it exactly like the page cache. Once its run finishes, it flushes the tags `{table}` and `{table}_{uid}` of every changed record; `lifetime` is the fallback. The response is stored via the TYPO3 cache backend (no extra cache layer of its own).
+- Core rules apply to that flush: page TSconfig `TCEMAIN.clearCache_disable` on the record's page suppresses it, and a change to a workspace version flushes nothing.
+- If you configure the `typo3_routing` cache yourself (e.g. a Redis backend), leave `groups` unset or include `pages` in it; without `pages` the DataHandler no longer flushes it.
+- Clearing the page cache ("Flush frontend caches" in the backend, `typo3 cache:flush --group pages`) also empties the response cache, as does "Flush all caches".
 
 - Routes carrying an [`#[Authenticate]`](authentication.md) attribute are **never cached** (forced `no-store`): the cache key does not vary by identity, so a shared entry could leak one client's response to another. Combining `#[Cache]` with `#[Authenticate]` raises a build-time warning and the cache is ignored.
 
@@ -40,7 +43,7 @@ public function list(int $page = 1): ResponseInterface
 
 ## Invalidating from a write route
 
-The DataHandler hook only sees writes that go through the DataHandler. A route persisting through an Extbase repository or the QueryBuilder never reaches it, so the cached `GET` response stays stale until `lifetime` expires. Declare the tags the write route invalidates with `#[InvalidatesCache]`:
+The core flush only covers writes that go through the DataHandler. A route persisting through an Extbase repository or the QueryBuilder never reaches it, so the cached `GET` response stays stale until `lifetime` expires. Declare the tags the write route invalidates with `#[InvalidatesCache]`:
 
 ```php
 use KonradMichalik\Typo3Routing\Attribute\InvalidatesCache;

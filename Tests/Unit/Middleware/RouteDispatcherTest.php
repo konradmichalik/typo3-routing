@@ -868,7 +868,7 @@ final class RouteDispatcherTest extends TestCase
     public function regeneratesCachedResponseAfterTagFlush(): void
     {
         $first = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
-        $this->responseCache->flushByTag('pages');
+        $this->responseCache->flushByTags(['pages']);
         $second = $this->dispatch($this->request('GET', 'https://example.com/api/cached'));
 
         self::assertNotSame((string) $first->getBody(), (string) $second->getBody());

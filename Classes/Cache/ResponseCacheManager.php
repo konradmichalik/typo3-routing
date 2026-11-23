@@ -78,11 +78,6 @@ final class ResponseCacheManager
         ], $tags, $lifetime);
     }
 
-    public function flushByTag(string $tag): void
-    {
-        $this->cache()->flushByTag($tag);
-    }
-
     /**
      * @param list<string> $tags
      */

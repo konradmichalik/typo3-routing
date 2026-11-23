@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing;
 
-use KonradMichalik\Typo3Routing\Cache\{CacheTagFlusher, ResponseCacheManager};
+use KonradMichalik\Typo3Routing\Cache\ResponseCacheManager;
 use KonradMichalik\Typo3Routing\RateLimit\CacheStorage;
 use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
 
@@ -35,15 +35,14 @@ final class Configuration
     }
 
     /**
-     * Register the response cache (uses the TYPO3 default backend); part of the "all" group so
-     * "Flush all caches" clears it. Per-route invalidation is tag-based.
+     * Register the response cache (uses the TYPO3 default backend). Group "pages" lets the core
+     * DataHandler flush its `{table}` and `{table}_{uid}` tags and makes "Flush frontend caches" clear it.
+     * Filled in key by key, so a preconfigured backend keeps the group; explicitly set groups win.
      */
     public static function registerResponseCache(): void
     {
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER] ??= [
-            'frontend' => VariableFrontend::class,
-            'groups' => ['all'],
-        ];
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER]['frontend'] ??= VariableFrontend::class;
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER]['groups'] ??= ['pages', 'all'];
     }
 
     /**
@@ -55,14 +54,5 @@ final class Configuration
         $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][CacheStorage::CACHE_IDENTIFIER] ??= [
             'frontend' => VariableFrontend::class,
         ];
-    }
-
-    /**
-     * Flush tagged response cache entries when a record of a tagged table changes.
-     */
-    public static function registerCacheInvalidation(): void
-    {
-        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'][ResponseCacheManager::CACHE_IDENTIFIER] = CacheTagFlusher::class;
-        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processCmdmapClass'][ResponseCacheManager::CACHE_IDENTIFIER] = CacheTagFlusher::class;
     }
 }

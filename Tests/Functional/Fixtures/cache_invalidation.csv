@@ -1,0 +1,12 @@
+"be_users"
+,"uid","pid","username","admin"
+,1,0,"admin",1
+"pages"
+,"uid","pid","title","doktype","TSconfig"
+,1,0,"Root",1,""
+,2,1,"Cache disabled",1,"TCEMAIN.clearCache_disable = 1"
+"tx_routingtest_domain_model_item"
+,"uid","pid","title"
+,5,1,"Cached Item"
+,6,1,"Other Item"
+,7,2,"Item below a page with clearCache_disable"

@@ -105,6 +105,17 @@ $scenarios = [
         'routing' => '/api/bench/routing/alias-old',
         'plain' => '/api/bench/plain/alias-old',
     ],
+    // #[Cache] on a warm entry (every measured request is a HIT): key built from the coerced `page`
+    // plus one cache read, against a hand-rolled key and read. See PlainBenchmarkMiddleware::cached().
+    'Cache (hit)' => [
+        'routing' => '/api/bench/routing/cached?page=3',
+        'plain' => '/api/bench/plain/cached?page=3',
+    ],
+    // #[RateLimit] far below its limit: one limiter consume per request, against the same work by hand.
+    'RateLimit (accepted)' => [
+        'routing' => '/api/bench/routing/ratelimited',
+        'plain' => '/api/bench/plain/ratelimited',
+    ],
 ];
 
 /**

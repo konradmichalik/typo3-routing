@@ -19,14 +19,20 @@ declare(strict_types=1);
  * Usage: php benchmark.php <baseUrl> <count> <profilesDir>
  */
 
-if ($argc < 4) {
+// A function-scope `global` is always defined for PHPStan, unlike the bare $argv of the script scope.
+$arguments = (static function (): array {
+    global $argv;
+
+    return $argv;
+})();
+if (count($arguments) < 4) {
     fwrite(\STDERR, "Usage: php benchmark.php <baseUrl> <count> <profilesDir>\n");
     exit(1);
 }
 
-$baseUrl = rtrim($argv[1], '/');
-$count = max(1, (int) $argv[2]);
-$profilesDir = $argv[3];
+$baseUrl = rtrim($arguments[1], '/');
+$count = max(1, (int) $arguments[2]);
+$profilesDir = $arguments[3];
 $warmup = 5;
 
 /*

@@ -29,8 +29,10 @@ $configuration
     ])
     // Runtime-only requirement: the middleware is ordered after typo3/cms-frontend/site without referencing a symbol.
     ->ignoreErrorsOnPackage('typo3/cms-frontend', [ComposerDependencyAnalyser\Config\ErrorType::UNUSED_DEPENDENCY])
-    // #[Override] is native from PHP 8.3, so the analyser only sees the polyfill as used on PHP 8.2.
+    // #[Override] is native from PHP 8.3, so the polyfill only counts as used on PHP 8.2. The ignore applies
+    // on 8.3 and never on 8.2, hence unmatched ignores must not be reported.
     ->ignoreErrorsOnPackage('symfony/polyfill-php83', [ComposerDependencyAnalyser\Config\ErrorType::UNUSED_DEPENDENCY])
+    ->disableReportingUnmatchedIgnores()
 ;
 
 return $configuration;

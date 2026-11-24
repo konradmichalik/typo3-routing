@@ -17,7 +17,9 @@ On the machine these figures come from, a warm request to a minimal JSON endpoin
 | call a matched route | ~0.63 ms of dispatch, fixed, independent of payload |
 | pass path, query or body parameters | nothing on top of that |
 | resolve an Extbase entity from the path | ~0.8 ms, the extra being the database lookup rather than the routing |
-| use an opt-in feature (`#[Cache]`, `#[RateLimit]`, `#[DeprecatedRoute]`, `canonical`, `legacyPaths`) | under 0.2 ms where it acts, nothing where it does not |
+| use an opt-in feature (`#[DeprecatedRoute]`, `canonical`, `legacyPaths`) | under 0.2 ms where it acts, nothing where it does not |
+| serve a `#[Cache]` route from a stored response | about 0.2 ms on top of the dispatch, building the key and reading the entry |
+| call a `#[RateLimit]` route that is still within its limit | about 0.1 ms on top of the dispatch, one limiter consume against the cache |
 
 Two things are worth planning around. **The overhead is a fixed cost per matched request, not a cost per argument:** a route with no arguments, one with a path placeholder and one with a query parameter all measure the same. And **a feature you have not opted into costs nothing**, because its classes are never even loaded.
 
@@ -44,5 +46,7 @@ The same fixture ships `matching-microbench.php`, which measures the gate and th
 ## Caveats
 
 **Route count matters.** Matching cost scales with the size of the route collection. These figures come from an instance with 50 registered routes, 12 of them with placeholders. An installation with several hundred routes will measure differently.
+
+**The two cache and rate-limit rows are coarser.** Their hand-rolled counterparts read and write a cache, so the pair carries database round trips whose cost varies more than a pure-PHP scenario: the run-to-run spread of the delta was 0.05 to 0.07 ms there, against under 0.02 ms for the others. Read them to the nearest 0.1 ms. The plain side also skips the work a hand-written version would not bother with, such as the backend-user bypass check and conditional GET, so the numbers lean towards the upper end of what the framework adds.
 
 **One machine.** Apple Silicon, OrbStack, PHP 8.2 in Docker. The figures are meaningful as relative statements and should be reproduced on your own hardware before being quoted as absolutes. What travels between machines is the shape of the result: a constant overhead per matched request, nothing measurable for unused features, and a sub-microsecond gate on unrelated traffic.

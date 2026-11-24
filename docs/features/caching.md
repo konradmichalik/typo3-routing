@@ -49,7 +49,7 @@ public function list(int $page = 1): ResponseInterface
 
 ## Record tags from path parameters
 
-A tag may contain `{name}` placeholders bound to the route's path parameters. Each placeholder is replaced with the matched value when the response is stored, so a detail route gets one tag per record:
+Since `1.6.0`, a tag may contain `{name}` placeholders bound to the route's path parameters. Each placeholder is replaced with the matched value when the response is stored, so a detail route gets one tag per record:
 
 ```php
 // GET /api/news/5 → stored under the tag "tx_news_domain_model_news_5"

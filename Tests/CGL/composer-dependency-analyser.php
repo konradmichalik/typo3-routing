@@ -27,6 +27,8 @@ $configuration
         $rootPath.'/Tests/CGL',
         $rootPath.'/Tests/Functional/Fixtures',
     ])
+    // Runtime-only requirement: the middleware is ordered after typo3/cms-frontend/site without referencing a symbol.
+    ->ignoreErrorsOnPackage('typo3/cms-frontend', [ComposerDependencyAnalyser\Config\ErrorType::UNUSED_DEPENDENCY])
 ;
 
 return $configuration;

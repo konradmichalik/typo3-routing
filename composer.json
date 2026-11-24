@@ -22,6 +22,7 @@
 		"psr/http-server-middleware": "^1.0.2",
 		"symfony/console": "^7.0 || ^8.0",
 		"symfony/dependency-injection": "^7.1 || ^8.0",
+		"symfony/polyfill-php83": "^1.31",
 		"symfony/rate-limiter": "^7.0 || ^8.0",
 		"symfony/routing": "^7.0 || ^8.0",
 		"typo3/cms-core": "^13.4 || ^14.0",
@@ -34,6 +35,7 @@
 		"konradmichalik/ttt": "^0.6.0",
 		"phpunit/phpcov": "^10.0 || ^11.0 || ^12.0 || ^13.0",
 		"phpunit/phpunit": "^11.0 || ^12.0 || ^13.0",
+		"psr/log": "^3.0.1",
 		"typo3/cms-base-distribution": "^13.4 || ^14.0",
 		"typo3/cms-lowlevel": "^13.4 || ^14.0",
 		"typo3/testing-framework": "^8.3 || ^9.1 || ^10.0"

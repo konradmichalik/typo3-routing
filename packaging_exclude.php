@@ -31,8 +31,6 @@ return [
         'CODE_OF_CONDUCT.md',
         'CODEOWNERS',
         'composer.lock',
-        'composer-require-checker.json',
-        'composer-unused.php',
         'CONTRIBUTING.md',
         'editorconfig',
         'gitattributes',

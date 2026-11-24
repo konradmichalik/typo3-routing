@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace KonradMichalik\RoutingBenchmark\Controller;
 
 use KonradMichalik\RoutingBenchmark\Domain\Model\Item;
-use KonradMichalik\Typo3Routing\Attribute\{DeprecatedRoute, Route};
+use KonradMichalik\Typo3Routing\Attribute\{Cache, DeprecatedRoute, RateLimit, Route};
 use KonradMichalik\Typo3Routing\Routing\RouteControllerInterface;
 use TYPO3\CMS\Core\Http\JsonResponse;
 
@@ -110,6 +110,25 @@ final class BenchmarkController implements RouteControllerInterface
     // plain static route reached through its declared path.
     #[Route(path: '/api/bench/routing/alias-new', name: 'bench_routing_alias', legacyPaths: ['/api/bench/routing/alias-old'], legacyAlias: true)]
     public function legacyAliasRoute(): JsonResponse
+    {
+        return new JsonResponse(['ok' => true]);
+    }
+
+    // #[Cache] measured on a warm entry: after the warmup every request is a HIT, so this pair costs the
+    // cache key (built from the coerced `page` through the argument resolver) plus one cache read and
+    // the response rebuild. See PlainBenchmarkMiddleware::cached() for what the plain side does.
+    #[Route(path: '/api/bench/routing/cached', name: 'bench_routing_cached')]
+    #[Cache(lifetime: 3600)]
+    public function cached(int $page = 1): JsonResponse
+    {
+        return new JsonResponse(['page' => $page]);
+    }
+
+    // #[RateLimit] with a limit no benchmark run can reach, so the pair costs one limiter consume on the
+    // cache-backed bucket store plus the quota headers, and never a 429.
+    #[Route(path: '/api/bench/routing/ratelimited', name: 'bench_routing_ratelimited')]
+    #[RateLimit(limit: 100000, interval: '1 minute')]
+    public function rateLimited(): JsonResponse
     {
         return new JsonResponse(['ok' => true]);
     }

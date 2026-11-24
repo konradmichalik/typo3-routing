@@ -14,14 +14,20 @@ declare(strict_types=1);
 namespace KonradMichalik\RoutingBenchmark\Middleware;
 
 use KonradMichalik\RoutingBenchmark\Domain\Model\Item;
+use KonradMichalik\RoutingBenchmark\RateLimit\PlainRateLimitStorage;
 use Psr\Http\Message\{ResponseInterface, ServerRequestInterface};
 use Psr\Http\Server\{MiddlewareInterface, RequestHandlerInterface};
 use Symfony\Component\DependencyInjection\Attribute\Lazy;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Http\{JsonResponse, Response};
 use TYPO3\CMS\Core\Site\Entity\{SiteInterface, SiteLanguage};
 use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 use function in_array;
+use function is_array;
+use function is_int;
+use function is_string;
 
 // The "conventional middleware" side of the benchmark. It does by hand exactly what the
 // routing layer does for the BenchmarkController endpoints: match the path, pull and cast
@@ -47,6 +53,7 @@ final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
         // PageRepository's constructor-time DB query for every scenario, not only the one that
         // actually needs it.
         #[Lazy] private PersistenceManagerInterface $persistenceManager,
+        private CacheManager $cacheManager,
     ) {}
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -90,6 +97,8 @@ final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
             ?? $this->scoped($request, $path)
             ?? $this->canonical($path)
             ?? $this->legacy($path)
+            ?? $this->cached($request, $path)
+            ?? $this->rateLimited($request, $path)
             ?? $handler->handle($request);
     }
 
@@ -159,5 +168,91 @@ final readonly class PlainBenchmarkMiddleware implements MiddlewareInterface
         }
 
         return null;
+    }
+
+    /**
+     * Counterpart of #[Cache(lifetime: 3600)] on a warm entry. It derives a key from the coerced `page`,
+     * host, site and language, reads the entry from a VariableFrontend and rebuilds the response with the
+     * stored ETag and the X-TYPO3-API-Cache header, the same work the HIT path of the dispatcher does.
+     *
+     * Not comparable: the routing side also asks the backend-user bypass guard, resolves its argument
+     * specs through the registry and the argument resolver (type coercion of every declared argument,
+     * not one hand-written digit check), resolves cache tags and answers a conditional GET. The plain
+     * side skips all of that, so the delta is an upper bound of what the framework adds over a
+     * hand-rolled lookup, and the point of comparison for the key-building change since 1.5.0.
+     */
+    private function cached(ServerRequestInterface $request, string $path): ?ResponseInterface
+    {
+        if ('/api/bench/plain/cached' !== $path) {
+            return null;
+        }
+
+        $rawPage = $request->getQueryParams()['page'] ?? 1;
+        if (!is_int($rawPage) && 1 !== preg_match('/^\d+$/', (string) $rawPage)) {
+            return null;
+        }
+        $page = (int) $rawPage;
+
+        $language = $request->getAttribute('language');
+        $site = $request->getAttribute('site');
+        $key = 'plain_'.hash('sha256', implode('|', [
+            'bench_plain_cached',
+            'GET',
+            $request->getUri()->getHost(),
+            $site instanceof SiteInterface ? $site->getIdentifier() : '',
+            serialize(['page' => $page]),
+            serialize([]),
+            (string) ($language instanceof SiteLanguage ? $language->getLanguageId() : 0),
+        ]));
+
+        $cache = $this->cacheManager->getCache('routing_benchmark_plain_response');
+        $entry = $cache->get($key);
+        if (!is_array($entry) || !isset($entry['status'], $entry['headers'], $entry['body'])) {
+            $response = new JsonResponse(['page' => $page]);
+            $body = (string) $response->getBody();
+            $entry = [
+                'status' => $response->getStatusCode(),
+                'headers' => array_merge($response->getHeaders(), ['ETag' => ['"'.hash('sha256', $body).'"']]),
+                'body' => $body,
+            ];
+            $cache->set($key, $entry, [], 3600);
+        }
+
+        $response = new Response('php://temp', (int) $entry['status'], $entry['headers']);
+        $response->getBody()->write((string) $entry['body']);
+        $response->getBody()->rewind();
+
+        return $response->withHeader('X-TYPO3-API-Cache', 'HIT');
+    }
+
+    /**
+     * Counterpart of #[RateLimit(limit: 100000, interval: '1 minute')]: one token consumed from a
+     * sliding-window limiter whose state lives in a cache, the quota headers stamped on the response.
+     * Like the extension, the factory is built per request and without a lock factory.
+     *
+     * Not comparable: the routing side normalises the client address (IPv6 /64 bucketing, IPv4-mapped
+     * addresses) and prefers the normalizedParams attribute over REMOTE_ADDR. Both are a few
+     * instructions and the benchmark client is IPv4, so they are not expected to show.
+     */
+    private function rateLimited(ServerRequestInterface $request, string $path): ?ResponseInterface
+    {
+        if ('/api/bench/plain/ratelimited' !== $path) {
+            return null;
+        }
+
+        $remoteAddress = $request->getServerParams()['REMOTE_ADDR'] ?? '';
+        $factory = new RateLimiterFactory([
+            'id' => 'bench_plain_ratelimited',
+            'policy' => 'sliding_window',
+            'limit' => 100000,
+            'interval' => '1 minute',
+        ], new PlainRateLimitStorage($this->cacheManager->getCache('routing_benchmark_plain_ratelimit')));
+
+        $result = $factory->create('ip:'.(is_string($remoteAddress) ? $remoteAddress : ''))->consume();
+
+        return (new JsonResponse(['ok' => true]))
+            ->withHeader('X-RateLimit-Limit', (string) $result->getLimit())
+            ->withHeader('X-RateLimit-Remaining', (string) $result->getRemainingTokens())
+            ->withHeader('X-RateLimit-Reset', (string) $result->getRetryAfter()->getTimestamp());
     }
 }

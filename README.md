@@ -107,6 +107,9 @@ Full documentation lives in [`docs/`](docs/README.md), grouped into four parts. 
 > [!TIP]
 > Want to expose these routes to AI agents/MCP clients? <img src="https://github.com/konradmichalik/typo3-routing-mcp/raw/main/Resources/Public/Icons/Extension.png?raw=true" width="16" height="16" alt=""> [`typo3-routing-mcp`](https://github.com/konradmichalik/typo3-routing-mcp) adds a `#[McpTool]` attribute next to an existing `#[Route]` and serves it over Streamable HTTP.
 
+> [!TIP]
+> Consuming APIs instead of offering endpoints? <img src="https://github.com/konradmichalik/typo3-outbound/raw/main/Resources/Public/Icons/Extension.png?raw=true" width="16" height="16" alt=""> [`typo3-outbound`](https://github.com/konradmichalik/typo3-outbound) describes external APIs as PHP interfaces with attributes.
+
 ## 🧑‍💻 Contributing
 
 Please have a look at [`CONTRIBUTING.md`](CONTRIBUTING.md).

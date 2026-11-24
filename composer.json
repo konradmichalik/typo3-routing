@@ -1,6 +1,6 @@
 {
 	"name": "konradmichalik/typo3-routing",
-	"description": "Attribute Routing - Register frontend endpoints via PHP attributes on controller methods, as an attribute-based alternative to the missing frontend counterpart of AjaxRoutes.php.",
+	"description": "Routing - Register frontend endpoints via PHP attributes on controller methods, as an attribute-based alternative to the missing frontend counterpart of AjaxRoutes.php.",
 	"license": [
 		"GPL-2.0-or-later"
 	],

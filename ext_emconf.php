@@ -10,7 +10,7 @@
  */
 
 $EM_CONF[$_EXTKEY] = [
-    'title' => 'Attribute Routing',
+    'title' => 'Routing',
     'description' => 'Register frontend endpoints via PHP attributes on controller methods, as an attribute-based alternative to the missing frontend counterpart of AjaxRoutes.php.',
     'category' => 'fe',
     'author' => 'Konrad Michalik',

@@ -65,6 +65,7 @@ CI runs PHPUnit through a reusable workflow on PHP 8.2 to 8.6, TYPO3 13.4 and 14
 ## Code style and static analysis
 
 - PHPStan level 8 with `phpstan-typo3-preset` (`Tests/CGL/phpstan.neon`). Custom request attributes need a `requestGetAttributeMapping` entry
+- Dead code detection (`shipmonk/dead-code-detector` with `konradmichalik/phpstan-typo3-dead-code`) runs inside `ddev cgl sca`, usages in tests do not count. Public API that nothing in the repository calls needs `@api`. `#[Route]` targets are unknown to the detector and go into `Tests/CGL/phpstan-baseline.neon` with a reason. `sca:php` loads `Tests/CGL/phpstan-autoload.php`, the project autoloader plus a stand-in parent for the deliberately broken `Tests/Support/Broken` classes
 - PHP CS Fixer with `konradmichalik/php-cs-fixer-preset` (`Tests/CGL/.php-cs-fixer.php`)
 - Rector for TYPO3 and PHP 8.2 modernization (`Tests/CGL/rector.php`)
 - `declare(strict_types=1)` everywhere, `final readonly` where sensible

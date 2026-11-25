@@ -35,7 +35,7 @@
 		"konradmichalik/ttt": "^0.6.0",
 		"phpunit/phpcov": "^10.0 || ^11.0 || ^12.0 || ^13.0",
 		"phpunit/phpunit": "^11.0 || ^12.0 || ^13.0",
-		"psr/log": "^3.0.1",
+		"psr/log": "^3.0.2",
 		"typo3/cms-base-distribution": "^13.4 || ^14.0",
 		"typo3/cms-lowlevel": "^13.4 || ^14.0",
 		"typo3/testing-framework": "^8.3 || ^9.1 || ^10.0"

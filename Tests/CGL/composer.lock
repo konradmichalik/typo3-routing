@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fbfdd9f8411cfea6eeecd96a916448e8",
+    "content-hash": "48d36276c702798fa1f7b66c192937c4",
     "packages": [],
     "packages-dev": [
         {
@@ -3640,16 +3640,16 @@
         },
         {
             "name": "rector/rector",
-            "version": "2.8.5",
+            "version": "2.9.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/rectorphp/rector.git",
-                "reference": "bf2982e3e2b8dfbcb43e5589fa301431cb1e479e"
+                "reference": "8a06053cae42915224f9357566162ccb1076001a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/rectorphp/rector/zipball/bf2982e3e2b8dfbcb43e5589fa301431cb1e479e",
-                "reference": "bf2982e3e2b8dfbcb43e5589fa301431cb1e479e",
+                "url": "https://api.github.com/repos/rectorphp/rector/zipball/8a06053cae42915224f9357566162ccb1076001a",
+                "reference": "8a06053cae42915224f9357566162ccb1076001a",
                 "shasum": ""
             },
             "require": {
@@ -3685,7 +3685,7 @@
             ],
             "support": {
                 "issues": "https://github.com/rectorphp/rector/issues",
-                "source": "https://github.com/rectorphp/rector/tree/2.8.5"
+                "source": "https://github.com/rectorphp/rector/tree/2.9.2"
             },
             "funding": [
                 {
@@ -3693,8 +3693,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-14T23:24:35+00:00",
-            "published-time": "2026-11-14T23:24:41+00:00"
+            "time": "2026-11-24T23:34:02+00:00",
+            "published-time": "2026-11-24T23:34:08+00:00"
         },
         {
             "name": "saschaegerer/phpstan-typo3",

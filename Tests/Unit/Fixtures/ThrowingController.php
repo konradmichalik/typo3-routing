@@ -26,12 +26,12 @@ final class ThrowingController implements RouteControllerInterface
 {
     public function boom(): JsonResponse
     {
-        throw new RuntimeException('sensitive internal detail nobody should see in a response', 6977582795);
+        throw new RuntimeException('sensitive internal detail nobody should see in a response', 1000000001);
     }
 
     public function shortCircuit(): JsonResponse
     {
         // TYPO3 core's own control-flow signal, not an error: must propagate unconverted.
-        throw new ImmediateResponseException(new Response(statusCode: 302, headers: ['Location' => '/elsewhere']), 2465530407);
+        throw new ImmediateResponseException(new Response(statusCode: 302, headers: ['Location' => '/elsewhere']), 1000000002);
     }
 }

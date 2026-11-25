@@ -236,7 +236,7 @@ final class RouteInvokerTest extends FunctionalTestCase
         return (new RequestBuilder($method, $url))
             ->withAttribute('site', $site)
             ->withAttribute('language', $site->getDefaultLanguage())
-            ->withQueryParams($query) // @phpstan-ignore argument.type
+            ->withQueryParams($query) // @phpstan-ignore argument.type (a plain array literal of strings, the builder only types the keys as string)
             ->build();
     }
 }

@@ -183,7 +183,7 @@ final readonly class ControllerArgumentResolver
             return null;
         }
 
-        throw new ArgumentResolutionException(sprintf('Missing required parameter: %s', $spec['name']), 9685154824);
+        throw new ArgumentResolutionException(sprintf('Missing required parameter: %s', $spec['name']), 1750000071);
     }
 
     /**
@@ -225,7 +225,7 @@ final readonly class ControllerArgumentResolver
 
         $entity = $this->persistenceManager->getObjectByIdentifier($value, $class);
         if (null === $entity) {
-            throw new EntityNotFoundException(sprintf('No "%s" found for identifier "%s".', $class, $value), 7017190502);
+            throw new EntityNotFoundException(sprintf('No "%s" found for identifier "%s".', $class, $value), 1750000072);
         }
 
         return $entity;

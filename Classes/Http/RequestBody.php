@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace KonradMichalik\Typo3Routing\Http;
 
+use JsonException;
 use Psr\Http\Message\{ServerRequestInterface, StreamInterface};
 use WeakMap;
 
@@ -20,11 +21,10 @@ use function array_is_list;
 use function in_array;
 use function is_array;
 use function json_decode;
-use function json_last_error;
 use function str_contains;
 use function strtolower;
 
-use const JSON_ERROR_NONE;
+use const JSON_THROW_ON_ERROR;
 
 /**
  * RequestBody.
@@ -130,8 +130,9 @@ final class RequestBody
             return $memo[$stream] = ['body' => [], 'error' => null];
         }
 
-        $decoded = json_decode($raw, true);
-        if (JSON_ERROR_NONE !== json_last_error()) {
+        try {
+            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
             return $memo[$stream] = ['body' => [], 'error' => 'Malformed JSON request body'];
         }
         // A literal JSON `null` carries no data, same as an absent body.

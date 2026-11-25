@@ -62,7 +62,7 @@ final class RouteDispatcherTest extends TestCase
     protected function setUp(): void
     {
         $this->responseCache = $this->createResponseCacheManager();
-        $this->rateLimitCheck = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()));
+        $this->rateLimitCheck = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()), $this->contextAtNow());
         $this->events = new RecordingUnmatchedRouteDispatcher();
     }
 
@@ -1727,7 +1727,7 @@ final class RouteDispatcherTest extends TestCase
         return (new RequestBuilder($method, $url))
             ->withAttribute('site', $site)
             ->withAttribute('language', $site->getDefaultLanguage())
-            ->withQueryParams($query) // @phpstan-ignore argument.type
+            ->withQueryParams($query) // @phpstan-ignore argument.type (a plain array literal of strings, the builder only types the keys as string)
             ->build();
     }
 
@@ -1757,5 +1757,13 @@ final class RouteDispatcherTest extends TestCase
                 return $this->response;
             }
         };
+    }
+
+    private function contextAtNow(): Context
+    {
+        $context = self::createStub(Context::class);
+        $context->method('getPropertyFromAspect')->willReturn((int) microtime(true));
+
+        return $context;
     }
 }

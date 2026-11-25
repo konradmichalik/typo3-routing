@@ -150,7 +150,7 @@ final class ControllerInvokerTest extends TestCase
         self::assertSame(500, $response->getStatusCode());
         self::assertJsonPath($body, 'detail', 'sensitive internal detail nobody should see in a response');
         self::assertJsonPath($body, 'exception', RuntimeException::class);
-        self::assertJsonPath($body, 'code', 6977582795);
+        self::assertJsonPath($body, 'code', 1000000001);
         self::assertJsonHasPaths($body, ['file', 'line', 'trace']);
 
         // Frame arguments can carry secrets (passwords, tokens) even in Development.

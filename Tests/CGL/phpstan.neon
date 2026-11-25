@@ -1,5 +1,7 @@
 includes:
 	- %rootDir%/../../konradmichalik/phpstan-typo3-preset/phpstan.neon.dist
+	- %rootDir%/../../shipmonk/dead-code-detector/rules.neon
+	- %rootDir%/../../konradmichalik/phpstan-typo3-dead-code/rules.neon
 	- phpstan-baseline.neon
 
 parameters:
@@ -11,6 +13,7 @@ parameters:
 	paths:
 		- ../../Classes
 		- ../../Configuration
+		- ../../ext_localconf.php
 		- ../../Tests/Unit
 		- ../../Tests/Functional
 
@@ -31,7 +34,27 @@ parameters:
 
 	# These base controllers are deliberately overridden by concrete fixtures to test route
 	# inheritance (see docs/routes/route-groups.md) — marking them final would break that override.
+	shipmonkDeadCode:
+		usageExcluders:
+			tests:
+				enabled: true
+				devPaths:
+					- %currentWorkingDirectory%/../../Tests
+
 	ignoreErrors:
 		-
 			identifier: ergebnis.finalInAbstractClass
+			path: ../../Tests/Unit/Fixtures/*
+
+		# Fixture controllers are reached through #[Route] reflection, which the dead code detector does not follow.
+		-
+			identifiers:
+				- shipmonk.deadMethod
+				- shipmonk.deadProperty.neverRead
+				- shipmonk.deadEnumCase
+			paths:
+				- ../../Tests/Unit/Fixtures/*
+				- ../../Tests/Functional/Fixtures/*
+		-
+			identifier: shipmonk.deadProperty.neverWritten
 			path: ../../Tests/Unit/Fixtures/*

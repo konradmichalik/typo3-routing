@@ -23,3 +23,10 @@ parameters:
 			identifier: staticMethod.alreadyNarrowedType
 			count: 1
 			path: ../Unit/Middleware/DispatcherServicesTest.php
+
+		# Route targets declared with #[Route]. The dead code detector only knows routes from Configuration/*.php.
+		-
+			message: '#^Unused KonradMichalik\\Typo3Routing\\Controller\\SwaggerUiController\:\:(openApiJson|docs) \(all usages excluded by tests excluder\)$#'
+			identifier: shipmonk.deadMethod
+			count: 2
+			path: ../../Classes/Controller/SwaggerUiController.php

@@ -18,6 +18,7 @@ use KonradMichalik\Typo3Routing\RateLimit\{RateLimitCheck, RateLimitEnforcer};
 use PHPUnit\Framework\Attributes\{CoversClass, Test};
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
+use TYPO3\CMS\Core\Context\Context;
 
 /**
  * RateLimitCheckTest.
@@ -37,7 +38,7 @@ final class RateLimitCheckTest extends TestCase
     #[Test]
     public function anAcceptedRequestIsNotBlockedAndCarriesItsQuotaHeaders(): void
     {
-        $check = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()));
+        $check = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()), $this->contextAtNow());
 
         $result = $check->evaluate('route_a', self::CONFIG, '203.0.113.1');
 
@@ -50,7 +51,7 @@ final class RateLimitCheckTest extends TestCase
     #[Test]
     public function aBlockedRequestReturnsA429WithRetryAfterAndStillCarriesQuotaHeaders(): void
     {
-        $check = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()));
+        $check = new RateLimitCheck(new RateLimitEnforcer(new InMemoryStorage()), $this->contextAtNow());
 
         $check->evaluate('route_a', self::CONFIG, '203.0.113.1');
         $result = $check->evaluate('route_a', self::CONFIG, '203.0.113.1');
@@ -64,5 +65,13 @@ final class RateLimitCheckTest extends TestCase
         $body = (string) $result['blocked']->getBody();
         self::assertJsonHasPath($body, 'retryAfter');
         self::assertJsonPath($body, 'retryAfter', (int) $result['blocked']->getHeaderLine('Retry-After'));
+    }
+
+    private function contextAtNow(): Context
+    {
+        $context = self::createStub(Context::class);
+        $context->method('getPropertyFromAspect')->willReturn((int) microtime(true));
+
+        return $context;
     }
 }

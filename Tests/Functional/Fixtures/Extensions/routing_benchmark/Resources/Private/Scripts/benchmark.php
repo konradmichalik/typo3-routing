@@ -140,7 +140,7 @@ function request(string $url, int $expectedStatus): void
     curl_close($ch);
 
     if (false === $body || $status !== $expectedStatus) {
-        throw new RuntimeException(sprintf('Benchmark request failed for %s: expected HTTP %d, got HTTP %d %s', $url, $expectedStatus, $status, $error), 5429005340);
+        throw new RuntimeException(sprintf('Benchmark request failed for %s: expected HTTP %d, got HTTP %d %s', $url, $expectedStatus, $status, $error), 1000000003);
     }
 }
 
@@ -235,7 +235,11 @@ echo " done.\n\n";
 // 5. Aggregate timing.total_ms from the profiles, keyed by request path.
 $timingsByPath = [];
 foreach (glob($profilesDir.'/*.json') ?: [] as $file) {
-    $data = json_decode((string) file_get_contents($file), true);
+    try {
+        $data = json_decode((string) file_get_contents($file), true, 512, \JSON_THROW_ON_ERROR);
+    } catch (JsonException) {
+        continue;
+    }
     if (!is_array($data) || !isset($data['url'], $data['timing']['total_ms'])) {
         continue;
     }

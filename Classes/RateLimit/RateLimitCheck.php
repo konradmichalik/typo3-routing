@@ -15,9 +15,9 @@ namespace KonradMichalik\Typo3Routing\RateLimit;
 
 use KonradMichalik\Typo3Routing\Http\JsonErrorResponse;
 use Psr\Http\Message\ResponseInterface;
+use TYPO3\CMS\Core\Context\Context;
 
 use function max;
-use function time;
 
 /**
  * RateLimitCheck.
@@ -30,6 +30,7 @@ final readonly class RateLimitCheck
 {
     public function __construct(
         private RateLimitEnforcer $enforcer,
+        private Context $context,
     ) {}
 
     /**
@@ -53,7 +54,7 @@ final readonly class RateLimitCheck
             return ['blocked' => null, 'headers' => $headers];
         }
 
-        $retryAfter = max(0, $result->getRetryAfter()->getTimestamp() - time());
+        $retryAfter = max(0, $result->getRetryAfter()->getTimestamp() - (int) $this->context->getPropertyFromAspect('date', 'timestamp'));
         $blocked = JsonErrorResponse::create(429, 'Too Many Requests', [
             'Retry-After' => (string) $retryAfter,
         ], [

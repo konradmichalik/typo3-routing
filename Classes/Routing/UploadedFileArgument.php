@@ -85,7 +85,7 @@ final class UploadedFileArgument
             \UPLOAD_ERR_INI_SIZE, \UPLOAD_ERR_FORM_SIZE => throw new HttpProblemException(413, sprintf('Uploaded file too large for parameter: %s', $name)),
             // A server fault the client cannot fix: TYPO3's exception handling logs it for the admin.
             \UPLOAD_ERR_NO_TMP_DIR, \UPLOAD_ERR_CANT_WRITE, \UPLOAD_ERR_EXTENSION => throw new RuntimeException(sprintf('Uploaded file for parameter "%s" could not be stored (PHP upload error %d).', $name, $error), 1750000067),
-            default => throw new ArgumentResolutionException(sprintf('Upload failed for parameter: %s', $name), 4127730619),
+            default => throw new ArgumentResolutionException(sprintf('Upload failed for parameter: %s', $name), 1750000073),
         };
     }
 }

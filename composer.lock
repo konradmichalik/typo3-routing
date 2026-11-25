@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "3920473a90ec400b02cc65144070d4d9",
+    "content-hash": "1317b24cbcfac38d46bc93206c7a7fa8",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -6385,16 +6385,16 @@
         },
         {
             "name": "konradmichalik/ttt",
-            "version": "0.7.0",
+            "version": "0.8.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/konradmichalik/ttt.git",
-                "reference": "8ffba3f707800ec01e66b31c10813b3a71ee45e4"
+                "reference": "fa8bded0ffffdb3159d91c87455d82881d45c33e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/konradmichalik/ttt/zipball/8ffba3f707800ec01e66b31c10813b3a71ee45e4",
-                "reference": "8ffba3f707800ec01e66b31c10813b3a71ee45e4",
+                "url": "https://api.github.com/repos/konradmichalik/ttt/zipball/fa8bded0ffffdb3159d91c87455d82881d45c33e",
+                "reference": "fa8bded0ffffdb3159d91c87455d82881d45c33e",
                 "shasum": ""
             },
             "require": {
@@ -6408,8 +6408,9 @@
                 "armin/editorconfig-cli": "^2.0",
                 "ergebnis/composer-normalize": "^2.44",
                 "fakerphp/faker": "^1.24",
-                "konradmichalik/php-cs-fixer-preset": "^0.3.0",
-                "konradmichalik/php-doc-block-header-fixer": "^0.4.0",
+                "konradmichalik/php-cs-fixer-preset": "^0.4.0",
+                "konradmichalik/php-doc-block-header-fixer": "^0.5.0",
+                "nikic/php-parser": "^5.0",
                 "phpstan/phpstan": "^2.0",
                 "phpstan/phpstan-phpunit": "^2.0",
                 "rector/rector": "^2.2",
@@ -6419,10 +6420,18 @@
             "suggest": {
                 "ext-gd": "Required for ImageFixtures",
                 "fakerphp/faker": "Required for the record factories (RecordFactory, #[WithRecords]) (^1.24)",
+                "phpstan/extension-installer": "Activates the PHPStan rule that points direct global state changes in tests to ttt attributes (^1.4)",
                 "typo3/cms-core": "Required for TYPO3-specific attributes like InApplicationContext and WithEnvironment (^13.4 || ^14.0)",
                 "typo3/cms-frontend": "Required for WithFrontendUser (^13.4 || ^14.0)"
             },
             "type": "library",
+            "extra": {
+                "phpstan": {
+                    "includes": [
+                        "extension.neon"
+                    ]
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "KonradMichalik\\Ttt\\": "src"
@@ -6452,10 +6461,10 @@
             ],
             "support": {
                 "issues": "https://github.com/konradmichalik/ttt/issues",
-                "source": "https://github.com/konradmichalik/ttt/tree/0.7.0"
+                "source": "https://github.com/konradmichalik/ttt/tree/0.8.0"
             },
-            "time": "2026-11-24T20:08:59+00:00",
-            "published-time": "2026-11-24T20:29:00+00:00"
+            "time": "2026-11-25T10:59:29+00:00",
+            "published-time": "2026-11-25T11:00:52+00:00"
         },
         {
             "name": "myclabs/deep-copy",

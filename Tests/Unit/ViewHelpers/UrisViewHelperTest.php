@@ -42,6 +42,7 @@ final class UrisViewHelperTest extends TestCase
     public function rendersAJsonMapOfTheNamedRoutes(): void
     {
         $this->registerGenerator();
+        // @phpstan-ignore ttt.directGlobalState (the request carries a Site, no constant expression for #[WithGlobal]; tearDown() unsets it)
         $GLOBALS['TYPO3_REQUEST'] = Requests::get('https://example.com/')
             ->withSite('main', 1, ['base' => 'https://example.com/'])
             ->withoutNormalizedParams()
@@ -60,6 +61,7 @@ final class UrisViewHelperTest extends TestCase
     public function rendersAbsoluteUrisWhenRequested(): void
     {
         $this->registerGenerator();
+        // @phpstan-ignore ttt.directGlobalState (the request carries a Site, no constant expression for #[WithGlobal]; tearDown() unsets it)
         $GLOBALS['TYPO3_REQUEST'] = Requests::get('https://example.com/sub/')
             ->withSite('main', 1, ['base' => 'https://example.com/sub/'])
             ->withoutNormalizedParams()

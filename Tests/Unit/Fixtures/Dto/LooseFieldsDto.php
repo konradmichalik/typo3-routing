@@ -59,6 +59,6 @@ final class LooseFieldsDto
 
     public ?Countable $tags = null;
 
-    /** @phpstan-ignore missingType.property */
+    /** @phpstan-ignore missingType.property (the untyped property is what the fixture exercises) */
     public $legacy;
 }

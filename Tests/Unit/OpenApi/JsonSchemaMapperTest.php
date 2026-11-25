@@ -20,6 +20,7 @@ use KonradMichalik\Typo3Routing\Tests\Unit\Fixtures\Enum\{Priority, Spelling, St
 use PHPUnit\Framework\Attributes\{CoversClass, DataProvider, Test};
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\UploadedFileInterface;
+use stdClass;
 
 /**
  * JsonSchemaMapperTest.
@@ -78,7 +79,7 @@ final class JsonSchemaMapperTest extends TestCase
 
         self::assertSame('array', $schema['type']);
         // `items` must serialise as `{}`, not `[]` — an empty array would encode as a JSON array.
-        self::assertEquals((object) [], $schema['items']);
+        self::assertInstanceOf(stdClass::class, $schema['items']);
         self::assertSame('{"type":"array","items":{}}', json_encode($schema));
     }
 

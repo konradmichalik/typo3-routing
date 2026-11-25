@@ -38,6 +38,12 @@ return Config::create()
             DocBlockHeader::fromComposer()->__toArray(),
         ),
     )
+    // Fixtures under Tests/Unit/Fixtures are abstract on purpose and overridden by sibling fixtures.
+    ->withRule(
+        RuleSet::fromArray([
+            'final_public_method_for_abstract_class' => false,
+        ]),
+    )
     ->withFinder(
         static fn (Finder $finder) => $finder
             ->in($rootPath)

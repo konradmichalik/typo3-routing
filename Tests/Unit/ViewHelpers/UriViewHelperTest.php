@@ -42,6 +42,7 @@ final class UriViewHelperTest extends TestCase
     public function rendersReachableUriIncludingSiteBase(): void
     {
         $this->registerGenerator();
+        // @phpstan-ignore ttt.directGlobalState (the request carries a Site, no constant expression for #[WithGlobal]; tearDown() unsets it)
         $GLOBALS['TYPO3_REQUEST'] = Requests::get('https://example.com/sub/')
             ->withSite('main', 1, ['base' => 'https://example.com/sub/'])
             ->withoutNormalizedParams()
@@ -57,6 +58,7 @@ final class UriViewHelperTest extends TestCase
     public function rendersAnAbsoluteUriWhenRequested(): void
     {
         $this->registerGenerator();
+        // @phpstan-ignore ttt.directGlobalState (the request carries a Site, no constant expression for #[WithGlobal]; tearDown() unsets it)
         $GLOBALS['TYPO3_REQUEST'] = Requests::get('https://example.com/sub/')
             ->withSite('main', 1, ['base' => 'https://example.com/sub/'])
             ->withoutNormalizedParams()

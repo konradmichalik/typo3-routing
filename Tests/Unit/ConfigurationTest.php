@@ -52,10 +52,9 @@ final class ConfigurationTest extends TestCase
     }
 
     #[Test]
+    #[WithTypo3ConfVars(['SYS' => ['caching' => ['cacheConfigurations' => [ResponseCacheManager::CACHE_IDENTIFIER => ['backend' => 'RedisBackend']]]]])]
     public function addsThePagesGroupToAPreconfiguredResponseCacheWithoutGroups(): void
     {
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER] = ['backend' => 'RedisBackend'];
-
         Configuration::registerResponseCache();
 
         /** @var array{backend: string, frontend: string, groups: list<string>} $config */
@@ -66,10 +65,9 @@ final class ConfigurationTest extends TestCase
     }
 
     #[Test]
+    #[WithTypo3ConfVars(['SYS' => ['caching' => ['cacheConfigurations' => [ResponseCacheManager::CACHE_IDENTIFIER => ['groups' => ['all']]]]]])]
     public function keepsExplicitlyConfiguredResponseCacheGroups(): void
     {
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations'][ResponseCacheManager::CACHE_IDENTIFIER] = ['groups' => ['all']];
-
         Configuration::registerResponseCache();
 
         /** @var array{groups: list<string>} $config */

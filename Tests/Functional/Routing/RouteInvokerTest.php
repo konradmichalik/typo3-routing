@@ -62,12 +62,6 @@ final class RouteInvokerTest extends FunctionalTestCase
         ],
     ];
 
-    protected function tearDown(): void
-    {
-        $this->restoreEnvVars();
-        parent::tearDown();
-    }
-
     #[Test]
     public function isPubliclyAvailableFromTheContainer(): void
     {

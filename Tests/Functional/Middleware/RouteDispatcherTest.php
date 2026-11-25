@@ -70,12 +70,6 @@ final class RouteDispatcherTest extends FunctionalTestCase
         ],
     ];
 
-    protected function tearDown(): void
-    {
-        $this->restoreEnvVars();
-        parent::tearDown();
-    }
-
     #[Test]
     public function dispatchesMatchingRouteToController(): void
     {
